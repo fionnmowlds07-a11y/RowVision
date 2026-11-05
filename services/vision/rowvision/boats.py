@@ -9,6 +9,7 @@ from numpy.typing import NDArray
 from rowvision import skeleton as sk
 from rowvision.seats import is_rowing
 from rowvision.skeleton import FloatArray
+from rowvision.strokes import facing_direction, reach_signal
 from rowvision.tracking import MAX_SIZE_RATIO, Track
 
 BoolArray = NDArray[np.bool_]
@@ -23,6 +24,9 @@ MIN_ANALYSIS_TRUNK_PX = 15.0
 """Below this, one pixel of error moves the trunk angle by about 4 degrees."""
 OUTLINE_MARGIN_TRUNKS = 1.0
 MAX_DISJOINT_OVERLAP = 0.1
+MIN_AGREEMENT_CREW = 3
+MIN_AGREEMENT_FRAMES = 12
+OUT_OF_TIME_MARGIN = 0.25
 DISTANT_LINE_TRUNKS = 2.5
 MIN_DISTANT_PEOPLE = 2
 MIN_DISTANT_SECONDS = 5.0
@@ -163,12 +167,51 @@ def _merge_same_seat(rowers: list[Track]) -> list[Track]:
     return merged
 
 
-def fit_to_seats(rowers: list[Track], seats: int) -> list[Track]:
-    """Merge the closest tracks that never overlap until the crew fits the boat class.
+def crew_agreement(crew: list[Track]) -> list[float]:
+    """Return how closely each person's stroke follows the rest of the crew, from -1 to 1.
 
-    The athlete has told us how many people are in the boat, which is stronger evidence than any
-    distance limit. Tracks seen together are always different people, so they are never merged.
+    Rowers in a boat move together and a cox does not. NaN means too little shared footage.
     """
+    if len(crew) < MIN_AGREEMENT_CREW:
+        return [float("nan")] * len(crew)
+    votes = sum(facing_direction(track.points) for track in crew)
+    facing = 1 if votes > 0 else -1
+    signals = np.array([reach_signal(track.points, facing) for track in crew])
+    scores = []
+    for index, signal in enumerate(signals):
+        others = np.delete(signals, index, axis=0)
+        known = np.isfinite(others).any(axis=0) & np.isfinite(signal)
+        if known.sum() < MIN_AGREEMENT_FRAMES:
+            scores.append(float("nan"))
+            continue
+        scores.append(float(np.corrcoef(signal[known], np.nanmedian(others[:, known], axis=0))[0, 1]))
+    return scores
+
+
+def _without_outliers(crew: list[Track], seats: int) -> list[Track]:
+    """Drop people clearly out of time with the crew, but only while the boat has too many."""
+    kept = list(crew)
+    while len(kept) > seats:
+        scores = np.array(crew_agreement(kept))
+        if not np.isfinite(scores).any():
+            return kept
+        worst = int(np.nanargmin(scores))
+        if np.nanmedian(scores) - scores[worst] < OUT_OF_TIME_MARGIN:
+            return kept
+        del kept[worst]
+    return kept
+
+
+def fit_to_seats(rowers: list[Track], seats: int) -> list[Track]:
+    """Fit tracks to the boat class, which the athlete has told us.
+
+    Tracks that never overlap and sit close together are merged, because tracks seen together are
+    always different people. Anyone left over who is clearly out of time, such as a cox, is dropped.
+    """
+    return _without_outliers(_merge_to_fit(rowers, seats), seats)
+
+
+def _merge_to_fit(rowers: list[Track], seats: int) -> list[Track]:
     crew = list(rowers)
     while len(crew) > seats:
         positions = _positions_along_boat(crew)
