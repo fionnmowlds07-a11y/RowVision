@@ -7,8 +7,12 @@ import numpy as np
 from rowvision import skeleton as sk
 from rowvision.skeleton import FloatArray
 
-MIN_TORSO_SCORE = 0.3
+MIN_SHOULDER_SCORE = 0.1
+"""Deliberately permissive. Small rowers score low even when placed correctly, and the rhythm and
+boat checks reject false detections later. Hip scores are ignored because the hull hides hips."""
 DUPLICATE_DISTANCE_TRUNKS = 0.5
+MIN_TRUNK_PX = 6.0
+"""Smaller than this is not a usable person, and a zero length would break size comparisons."""
 MATCH_DISTANCE_TRUNKS = 1.0
 MAX_MISSED_SECONDS = 1.0
 MAX_SIZE_RATIO = 1.6
@@ -16,6 +20,7 @@ NEIGHBOUR_DISTANCE_TRUNKS = 8.0
 MAX_STITCH_SECONDS = 3.0
 STITCH_DISTANCE_TRUNKS = 2.0
 TORSO = [sk.LEFT_SHOULDER, sk.RIGHT_SHOULDER, sk.LEFT_HIP, sk.RIGHT_HIP]
+SHOULDERS = [sk.LEFT_SHOULDER, sk.RIGHT_SHOULDER]
 
 
 @dataclass
@@ -46,8 +51,14 @@ def _trunk_lengths(points: FloatArray) -> FloatArray:
 
 def clean_detections(points: FloatArray, scores: FloatArray) -> tuple[FloatArray, FloatArray]:
     """Drop weak detections and duplicates of one person, keeping the strongest of each group."""
-    usable = (scores[:, TORSO].mean(axis=1) >= MIN_TORSO_SCORE) & np.isfinite(points).all(axis=(1, 2))
+    usable = (scores[:, SHOULDERS].mean(axis=1) >= MIN_SHOULDER_SCORE) & np.isfinite(points).all(
+        axis=(1, 2)
+    )
     points, scores = points[usable], scores[usable]
+    if len(points) == 0:
+        return points, scores
+    real = _trunk_lengths(points) >= MIN_TRUNK_PX
+    points, scores = points[real], scores[real]
     if len(points) < 2:
         return points, scores
     trunks = _trunk_lengths(points)
