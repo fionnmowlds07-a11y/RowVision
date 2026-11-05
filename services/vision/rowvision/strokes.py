@@ -204,6 +204,16 @@ def _detect_run(reach: FloatArray, fps: float) -> StrokeTimeline:
     return StrokeTimeline(catches, finishes, 60 * fps / lag, regularity, float(lag))
 
 
+def crew_reach(signals: list[FloatArray]) -> FloatArray:
+    """Combine a crew's reach signals, so one rower's noise cannot move the stroke timing."""
+    scaled = [(signal - np.nanmean(signal)) / np.nanstd(signal) for signal in signals]
+    stacked = np.array(scaled)
+    combined = np.full(stacked.shape[1], np.nan)
+    seen = np.isfinite(stacked).any(axis=0)
+    combined[seen] = np.nanmedian(stacked[:, seen], axis=0)
+    return combined
+
+
 def continuous_runs(reach: FloatArray, fps: float) -> list[tuple[int, int]]:
     """Return (start, end) for stretches of footage, allowing only short gaps inside a stretch."""
     seen = np.where(np.isfinite(reach))[0]
