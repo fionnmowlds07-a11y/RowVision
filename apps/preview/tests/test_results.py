@@ -1,26 +1,30 @@
 import json
+from types import SimpleNamespace
+from typing import Any
 
 import numpy as np
 from hypothesis import given
 from hypothesis import strategies as st
-from rowvision.metrics import StrokeMetrics
-from rowvision.pipeline import FILM_CLOSER, Analysis, BoatChoice, RowerResult
+from rowvision.pipeline import FILM_CLOSER, Analysis, BoatChoice
 from rowvision.shots import Shot, ShotKind
 
 from rowvision_preview.results import analysis_json, boat_choices_json, stroke_markers
 
 
-def stroke(catch: int, finish: int, next_catch: int) -> StrokeMetrics:
-    nan = float("nan")
-    return StrokeMetrics(catch, finish, next_catch, nan, nan, nan, nan, 0.4, nan)
+def stroke(catch: int, finish: int, next_catch: int) -> Any:
+    """Stand in for StrokeMetrics, with only the fields the page uses."""
+    return SimpleNamespace(catch_frame=catch, finish_frame=finish, next_catch_frame=next_catch)
 
 
-def rower(frames: int = 4) -> RowerResult:
+def rower(frames: int = 4) -> Any:
+    """Stand in for RowerResult, with only the fields the page uses."""
     points = np.full((frames, 17, 2), np.nan)
     points[1] = 10.04
     points[2, 5] = (3.0, 4.0)
     scores = np.full((frames, 17), 0.5)
-    return RowerResult(3, points, scores, float("nan"), 0.0, [stroke(0, 1, 3)], {}, {})
+    return SimpleNamespace(
+        seat=3, points=points, scores=scores, rate_spm=float("nan"), strokes=[stroke(0, 1, 3)]
+    )
 
 
 def test_every_catch_is_marked_once_including_the_last() -> None:
