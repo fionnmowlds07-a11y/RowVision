@@ -7,7 +7,7 @@ from hypothesis import strategies as st
 
 from rowvision import skeleton as sk
 from rowvision.metrics import angle_series
-from rowvision.reference_pose import CATCH_REACH, FINISH_REACH, Style, pose_at
+from rowvision.reference_pose import BOAT_FLOOR, CATCH_REACH, FINISH_REACH, Style, pose_at
 from rowvision.synthetic import FOREARM, UPPER_ARM
 
 PAIRS = {
@@ -142,3 +142,47 @@ def test_elbows_draw_back_past_the_hands_at_the_finish(style: Style) -> None:
     joints = pose(-22, 165, FINISH_REACH, style)["left"]
     assert joints["elbow"][0] > joints["hand"][0]
     assert joints["elbow"][2] < joints["shoulder"][2]
+
+
+STROKE_POSITIONS = st.tuples(st.floats(-40, 45), st.floats(45, 180), st.sampled_from(list(Style)))
+
+
+@given(STROKE_POSITIONS)
+def test_the_legs_never_go_through_the_boat_floor(position: tuple[float, float, Style]) -> None:
+    lean, knee, style = position
+    result = pose(lean, knee, CATCH_REACH, style)
+    for side in ("left", "right"):
+        for joint in ("heel", "toe", "ankle", "knee", "hip"):
+            assert result[side][joint][2] > BOAT_FLOOR
+
+
+@given(STROKE_POSITIONS)
+def test_the_rower_sits_on_the_seat(position: tuple[float, float, Style]) -> None:
+    lean, knee, style = position
+    result = pose(lean, knee, CATCH_REACH, style)
+    seat = result["seat"]
+    assert seat[0] == pytest.approx(result["left"]["hip"][0], abs=1e-3)
+    assert 0.05 < result["left"]["hip"][2] - seat[2] < 0.12
+
+
+def test_feet_stay_on_the_footplate_through_the_stroke() -> None:
+    catch_side = catch(Style.SCULL)["left"]
+    finish_side = pose(-22, 172, FINISH_REACH, Style.SCULL)["left"]
+    for joint in ("heel", "toe", "ankle"):
+        assert catch_side[joint] == finish_side[joint]
+
+
+def test_the_sole_slopes_up_towards_the_stern() -> None:
+    side = catch(Style.SCULL)["left"]
+    assert side["toe"][0] < side["heel"][0]
+    assert side["toe"][2] > side["heel"][2]
+
+
+def test_the_seat_slides_towards_the_bow_on_the_drive() -> None:
+    assert pose(-22, 172, FINISH_REACH)["seat"][0] > catch(Style.SCULL)["seat"][0] + 0.3
+
+
+def test_feet_fit_inside_a_narrow_shell() -> None:
+    side = catch(Style.SCULL)["right"]
+    assert abs(side["heel"][1]) < 0.12
+    assert abs(side["toe"][1]) < 0.12
