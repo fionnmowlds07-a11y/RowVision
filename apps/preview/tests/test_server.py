@@ -93,6 +93,11 @@ def test_page_files_are_served(client: Client, path: str, kind: str) -> None:
     assert reply.headers["Content-Type"].startswith(kind)
 
 
+@pytest.mark.parametrize("path", ["/panel.mjs", "/model.mjs", "/vendor/three.module.min.js"])
+def test_new_page_files_are_served(client: Client, path: str) -> None:
+    assert client.call("GET", path).status == 200
+
+
 def test_only_listed_files_are_served(client: Client) -> None:
     assert client.call("GET", "/server.py").status == 404
     assert client.call("GET", "/../jobs.py").status == 404
@@ -175,7 +180,7 @@ def test_unknown_post_is_not_found(client: Client) -> None:
 
 
 def test_a_job_runs_from_start_to_result(client: Client) -> None:
-    settings = {"clip": CLIP, "boat_class": "4x", "boats_in_video": 1, "seat": 2}
+    settings = {"clip": CLIP, "boat_class": "4x", "boats_in_video": 1, "seat": 2, "side": "scull"}
     assert client.post("/api/job", settings).status == 200
     for _ in range(3000):
         status = client.call("GET", "/api/job").json()
@@ -195,18 +200,35 @@ def test_cancel_with_no_job_is_harmless(client: Client) -> None:
     assert client.post("/api/job/cancel", {}).json() == {"state": "idle"}
 
 
-def test_reference_pose_is_served(client: Client) -> None:
-    reply = client.call("GET", "/api/reference?lean=28&knee=52&reach=0.58")
+@pytest.mark.parametrize(("style", "oars"), [("scull", 2), ("stroke", 1), ("bow", 1)])
+def test_each_rowing_side_has_its_own_model(client: Client, style: str, oars: int) -> None:
+    reply = client.call("GET", f"/api/reference?lean=28&knee=52&reach=0.58&style={style}")
     assert reply.status == 200
-    joints = json.loads(reply.body)["joints"]
-    assert set(joints) == {"ankle", "knee", "hip", "shoulder", "elbow", "hand", "head"}
+    pose = json.loads(reply.body)
+    assert pose["style"] == style
+    assert len(pose["oars"]) == oars
+    assert set(pose["left"]) == {"ankle", "knee", "hip", "shoulder", "elbow", "hand"}
 
 
 @pytest.mark.parametrize(
-    "query", ["", "lean=28", "lean=x&knee=50&reach=0.5", "lean=28&knee=5&reach=0.5"]
+    "query",
+    [
+        "",
+        "lean=28",
+        "lean=x&knee=50&reach=0.5&style=scull",
+        "lean=28&knee=5&reach=0.5&style=scull",
+        "lean=28&knee=50&reach=0.5&style=port",
+    ],
 )
 def test_bad_reference_requests_are_refused(client: Client, query: str) -> None:
     assert client.call("GET", f"/api/reference?{query}").status == 400
+
+
+def test_page_is_told_which_sides_each_boat_allows(client: Client) -> None:
+    data = client.call("GET", "/api/clips").json()
+    assert data["sides"]["1x"] == ["scull"]
+    assert data["sides"]["8+"] == ["stroke", "bow"]
+    assert data["side_names"]["bow"] == "Bow side"
 
 
 def test_saved_results_start_empty(client: Client) -> None:

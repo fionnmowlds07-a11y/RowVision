@@ -1,6 +1,6 @@
 # Local preview
 
-A page for checking tracking by eye. Pick a clip, say what boat and seat it is, and step through it frame by frame with limb lines drawn on, jumping between catches and finishes. It runs on your own machine only, and has no accounts, scores, database or cloud.
+A page for checking results by eye. Pick a clip, say what boat, side and seat it is, and step through it frame by frame with limb lines and angles drawn on. Scores come with the evidence behind them. It runs on your own machine only, and has no accounts, database or cloud.
 
 ## Start it
 
@@ -22,11 +22,21 @@ Then open <http://127.0.0.1:8765>. Press Ctrl+C in the terminal to stop.
 
 - **Left and Right** step one frame, and with **Shift** ten.
 - **C** and **F** jump to the next catch or finish, and with **Shift** the previous one.
-- **L** hides the limb lines.
+- **L** hides the limb lines and **A** the angles.
+- **Plus**, **Minus** and **0** zoom in, out and back. **Z** zooms to the rower. The scroll wheel and pinch also zoom, and dragging moves around.
 - The bar under the video shows catches on top and finishes below. Click or drag it to move.
 - Cyan lines are the rower's left side and magenta the right, so a left/right swap is easy to spot. Dashed lines are joints the model scored below 0.3.
 
 Only the chosen seat has limb lines. Only complete strokes have markers, so a catch or finish in a stroke cut off by the clip edge or a gap is not marked.
+
+## Checking a score
+
+- Click a measure to see its target, sources and a freeze frame for every stroke, taken at the exact frame the value was read. Click a freeze frame to open it.
+- **Not scored** measures still show their value, with the reason they were left out.
+- If the rating is Poor, the overall score is hidden. **Show score anyway** reveals it after a warning.
+- **See this on the 3D model**, or clicking a live angle under the video, opens a rotatable figure. Teal is the target, orange is you, and yellow shades the target range. An angle that could not be measured reliably uses the target and says so.
+- There are separate models for stroke side (port, oar on the rower's right), bow side (starboard, oar on the rower's left) and sculling. Rigging and torso twist are typical values, shown for illustration and not scored. Body-angle targets are shared, as the reviewed studies do not separate them.
+- **Saved results** at the top of the page reopens analysed clips.
 
 ## How it works
 
