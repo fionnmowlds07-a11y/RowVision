@@ -45,3 +45,9 @@ def two_boat_detections(*, crossing: bool = False) -> tuple[list[FloatArray], li
         points.append(np.concatenate([near, people]))
         scores.append(np.concatenate([near_score, np.full(people.shape[:2], 0.9)]))
     return points, scores
+
+
+def distant_people(frame: int) -> FloatArray:
+    """Return two tiny motionless people far from the camera, with no provable stroke rhythm."""
+    joints = np.arange(17.0)[:, None] * np.array([0.0, 1.2]) + np.array([3000.0, 100.0])
+    return np.stack([joints, joints + np.array([60.0, 0.0])])

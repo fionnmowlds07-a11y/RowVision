@@ -1,5 +1,5 @@
 import numpy as np
-from crew import crew_detections, two_boat_detections
+from crew import crew_detections, distant_people, two_boat_detections
 
 from rowvision.boats import boat_at, find_boats, overlap_frames, preview_frame
 from rowvision.tracking import track_people
@@ -69,3 +69,19 @@ def test_bystanders_do_not_create_a_boat() -> None:
 def test_no_people_means_no_boats() -> None:
     assert find_boats([], FPS) == []
     assert preview_frame([]) == 0
+
+
+def test_distant_crew_is_listed_but_not_confirmed() -> None:
+    points, scores = crew_detections(2)
+    points = [np.concatenate([p, distant_people(i)]) for i, p in enumerate(points)]
+    scores = [np.concatenate([s, np.full((2, 17), 0.9)]) for s in scores]
+    boats = boats_from(points, scores)
+    assert [boat.confirmed for boat in boats] == [True, False]
+    assert boats[1].too_far
+
+
+def test_a_lone_distant_person_is_not_a_boat() -> None:
+    points, scores = crew_detections(2)
+    points = [np.concatenate([p, distant_people(i)[:1]]) for i, p in enumerate(points)]
+    scores = [np.concatenate([s, np.full((1, 17), 0.9)]) for s in scores]
+    assert len(boats_from(points, scores)) == 1

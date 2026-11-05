@@ -19,6 +19,9 @@ MIN_ANALYSIS_TRUNK_PX = 15.0
 """Below this, one pixel of error moves the trunk angle by about 4 degrees."""
 OUTLINE_MARGIN_TRUNKS = 1.0
 MAX_DISJOINT_OVERLAP = 0.1
+DISTANT_LINE_TRUNKS = 2.5
+MIN_DISTANT_PEOPLE = 2
+MIN_DISTANT_SECONDS = 5.0
 
 
 @dataclass
@@ -28,20 +31,33 @@ class Boat:
     rowers: list[Track]
 
     @property
+    def confirmed(self) -> bool:
+        """True if someone in the boat shows a stroke rhythm.
+
+        Distant crews are too small for this, so they stay unconfirmed. They can be listed as a
+        boat but never count as proof that the clip has more than one.
+        """
+        return bool(self.rowers)
+
+    @property
+    def members(self) -> list[Track]:
+        return self.rowers or self.tracks
+
+    @property
     def trunk_px(self) -> float:
-        return float(np.median([track.trunk() for track in self.rowers]))
+        return float(np.median([track.trunk() for track in self.members]))
 
     @property
     def too_far(self) -> bool:
         return self.trunk_px < MIN_ANALYSIS_TRUNK_PX
 
     def seen(self) -> BoolArray:
-        """Return a mask of frames where any rower in the boat is visible."""
-        return np.any([np.isfinite(track.centre()[:, 0]) for track in self.rowers], axis=0)
+        """Return a mask of frames where anyone counted in the boat is visible."""
+        return np.any([np.isfinite(track.centre()[:, 0]) for track in self.members], axis=0)
 
     def outline(self, frame: int) -> FloatArray | None:
         """Return the boat's x1, y1, x2, y2 on a frame, or None if it is out of view."""
-        people = [track.points[frame] for track in self.rowers]
+        people = [track.points[frame] for track in self.members]
         visible = [points for points in people if np.isfinite(points).all()]
         if not visible:
             return None
@@ -104,8 +120,26 @@ def _merge_separate_shots(boats: list[Boat]) -> list[Boat]:
     return merged
 
 
+def _distant_groups(tracks: list[Track], fps: float) -> list[Boat]:
+    """Group people too small to prove a rhythm, by size and height in the frame."""
+    small = [track for track in tracks if track.trunk() < MIN_ANALYSIS_TRUNK_PX]
+    heights = [float(np.nanmedian(track.centre()[:, 1])) for track in small]
+    links = [
+        (first, second)
+        for first, second in combinations(range(len(small)), 2)
+        if abs(heights[first] - heights[second])
+        <= DISTANT_LINE_TRUNKS * max(small[first].trunk(), small[second].trunk())
+    ]
+    groups = []
+    for group in _components(len(small), links):
+        boat = Boat([small[index] for index in group], [])
+        if len(group) >= MIN_DISTANT_PEOPLE and boat.seen().sum() >= MIN_DISTANT_SECONDS * fps:
+            groups.append(boat)
+    return groups
+
+
 def find_boats(tracks: list[Track], fps: float) -> list[Boat]:
-    """Return each boat with at least one rower, the most visible first."""
+    """Return confirmed boats, the most visible first, then any distant unconfirmed boats."""
     links = [
         (first, second)
         for first, second in combinations(range(len(tracks)), 2)
@@ -117,9 +151,12 @@ def find_boats(tracks: list[Track], fps: float) -> list[Boat]:
         rowers = [track for track in people if is_rowing(track, fps)]
         if rowers:
             boats.append(Boat(people, rowers))
-    return sorted(
+    confirmed = sorted(
         _merge_separate_shots(boats), key=lambda boat: int(boat.seen().sum()), reverse=True
     )
+    claimed = {id(track) for boat in confirmed for track in boat.rowers}
+    spare = [track for track in tracks if id(track) not in claimed]
+    return confirmed + _distant_groups(spare, fps)
 
 
 def preview_frame(boats: list[Boat]) -> int:
