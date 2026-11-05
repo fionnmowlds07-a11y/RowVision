@@ -80,7 +80,7 @@ def _score_metric(
 
     value = summary.get(name)
     if value is None or not np.isfinite(value):
-        return skip("Could not be measured in this video.")
+        return skip("Could not be seen reliably in this video.")
     if strokes < MIN_STROKES:
         return skip(f"Needs at least {MIN_STROKES} full strokes.", value)
     if spread.get(name, 0.0) > rule.max_spread:
