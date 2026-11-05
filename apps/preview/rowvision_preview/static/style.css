@@ -315,6 +315,11 @@ ul.caution-box { padding-left: 34px; }
 .mini-band { position: absolute; top: 0; bottom: 0; background: #7cc4e0; border-radius: 999px; }
 .mini-buoy { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; background: var(--buoy); border: 2px solid #fff; border-radius: 50%; box-shadow: 0 1px 3px rgb(14 42 59 / 0.3); }
 
+.timing { margin-top: 6px; padding: 12px 6px 0; border-top: 1px solid var(--line); }
+.timing-rows { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; margin: 6px 0 0; font-size: 14px; }
+.timing-rows dt { font-weight: 500; }
+.timing-rows dd { margin: 0; }
+
 .evidence { padding: 6px 6px 14px; }
 .evidence p { margin-top: 6px; font-size: 14px; color: var(--ink-soft); }
 .evidence .caution-note { color: var(--caution); background: var(--caution-bg); border-radius: 10px; padding: 4px 10px; font-weight: 500; }

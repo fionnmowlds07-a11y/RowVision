@@ -10,6 +10,7 @@ from rowvision.reference import Target
 from rowvision.reliability import Rating
 from rowvision.scoring import ScoreCard
 from rowvision.skeleton import FloatArray
+from rowvision.timing import FollowTiming
 
 
 def _finite(value: float) -> float | None:
@@ -87,6 +88,19 @@ def _rating(rating: Rating) -> dict[str, Any]:
     }
 
 
+def _timing(timing: FollowTiming | None) -> dict[str, Any] | None:
+    if timing is None:
+        return None
+    return {
+        "leader_seat": timing.leader_seat,
+        "catch_ms": _optional(timing.catch_ms),
+        "finish_ms": _optional(timing.finish_ms),
+        "catch_spread_ms": _optional(timing.catch_spread_ms),
+        "finish_spread_ms": _optional(timing.finish_spread_ms),
+        "strokes": timing.strokes,
+    }
+
+
 def _series(values: FloatArray) -> list[float | None]:
     return [round(float(value), 1) if np.isfinite(value) else None for value in values]
 
@@ -114,6 +128,7 @@ def _rower(rower: RowerResult, frames: int, facing: int, view_deg: float) -> dic
             "elbow": _series(angles.elbow),
         },
         "strokes": [_stroke(stroke) for stroke in rower.strokes],
+        "timing": _timing(rower.timing),
         "card": _card(rower.card, rower.spread),
         "rating": _rating(rower.rating),
     }
