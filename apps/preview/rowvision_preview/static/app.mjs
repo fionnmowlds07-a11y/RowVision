@@ -18,6 +18,8 @@ import {
   nearestMeasure,
   nextMarker,
   openingFrame,
+  previewLabel,
+  previewStart,
   resultSummary,
   savedShare,
   seatOptions,
@@ -100,13 +102,60 @@ function fillForm(settings) {
 
 function hideResults() {
   for (const id of [
-    "welcome", "progress", "failed", "film-closer", "warnings", "picker", "stage-area", "viewer",
+    "welcome", "clip-preview", "progress", "failed", "film-closer", "warnings", "picker", "stage-area", "viewer",
     "panel", "resize",
   ]) {
     $(id).hidden = true;
   }
   $("form-error").hidden = true;
   $("workspace").classList.remove("results");
+}
+
+let previewTicket = 0;
+let analysing = false;
+
+// Show a clip before analysing it, so the athlete can check the boat and find their seat.
+async function showClipPreview(name) {
+  if (analysing) return;
+  const ticket = ++previewTicket;
+  clearTimeout(pollTimer);
+  result = null;
+  picker = null;
+  hideResults();
+  if (!name) {
+    $("welcome").hidden = false;
+    return;
+  }
+  $("clip-preview").hidden = false;
+  $("preview-image").removeAttribute("src");
+  $("preview-frame").disabled = true;
+  $("preview-status").textContent = "Loading the clip...";
+  try {
+    await openClip(name);
+  } catch (error) {
+    if (ticket === previewTicket) $("preview-status").textContent = `Could not open this clip. ${error.message}`;
+    return;
+  }
+  if (ticket !== previewTicket) return; // Another clip was chosen in the meantime.
+  $("preview-frame").max = Math.max(clip.frames - 1, 0);
+  $("preview-frame").value = previewStart(clip.frames);
+  $("preview-frame").disabled = false;
+  showPreviewFrame();
+}
+
+function showPreviewFrame() {
+  const index = Number($("preview-frame").value);
+  const ticket = ++requested;
+  const next = new Image();
+  next.onload = () => {
+    if (ticket !== requested) return;
+    $("preview-image").src = next.src;
+    $("preview-status").textContent = previewLabel(index, clip.frames, clip.fps);
+  };
+  next.onerror = () => {
+    if (ticket === requested) $("preview-status").textContent = "This frame could not be read.";
+  };
+  next.src = frameUrl(index);
 }
 
 const SIZE_KEY = "rowvision-video-size";
@@ -144,9 +193,14 @@ function setVideoShare(share) {
   storeSize(videoShare);
 }
 
+let openingClip = 0;
+
 async function openClip(name) {
   if (clip?.name === name) return;
-  clip = { name, ...(await api(`/api/clips/${encodeURIComponent(name)}`)) };
+  const opening = ++openingClip;
+  const details = await api(`/api/clips/${encodeURIComponent(name)}`);
+  if (opening !== openingClip) return; // A later choice wins, however the requests finish.
+  clip = { name, ...details };
   canvas.width = clip.width * SCALE;
   canvas.height = clip.height * SCALE;
 }
@@ -485,6 +539,7 @@ async function showSaved() {
 async function openSaved(name) {
   clearTimeout(pollTimer);
   const saved = await api(`/api/results/${encodeURIComponent(name)}`);
+  previewTicket += 1;
   await openClip(saved.settings.clip);
   fillForm(saved.settings);
   $("saved-area").open = false;
@@ -554,12 +609,12 @@ function showFailed(message) {
 
 async function render(job) {
   clearTimeout(pollTimer);
+  analysing = job.state === "running";
   if (job.state === "idle" || job.state === "cancelled") {
-    picker = null;
-    hideResults();
-    $("welcome").hidden = false;
+    await showClipPreview($("clip").value);
     return;
   }
+  previewTicket += 1;
   await openClip(job.settings.clip);
   if (job.state === "running") {
     showProgress(job);
@@ -592,6 +647,8 @@ async function submit(path, body) {
 }
 
 $("boat-class").addEventListener("change", fillSeats);
+$("clip").addEventListener("change", () => showClipPreview($("clip").value));
+$("preview-frame").addEventListener("input", showPreviewFrame);
 
 $("setup").addEventListener("submit", (event) => {
   event.preventDefault();
