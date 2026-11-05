@@ -280,3 +280,42 @@ export function measureKind(name) {
   if (name.includes("elbow")) return "elbow";
   return null;
 }
+
+// The video takes this share of the width. Past STACK_AT, or on a narrow screen, scores go below.
+export const VIDEO_MIN = 40;
+export const VIDEO_MAX = 100;
+export const VIDEO_DEFAULT = 62;
+export const STACK_AT = 76;
+export const STACK_WIDTH = 980;
+
+export function videoLayout(share, width) {
+  const video = Math.min(Math.max(Math.round(share), VIDEO_MIN), VIDEO_MAX);
+  return { video, stacked: video > STACK_AT || width < STACK_WIDTH };
+}
+
+// A share read back from storage may be missing or damaged.
+export function savedShare(stored) {
+  const share = Number(stored);
+  if (stored === null || !Number.isFinite(share)) return VIDEO_DEFAULT;
+  return Math.min(Math.max(share, VIDEO_MIN), VIDEO_MAX);
+}
+
+// Where a measure sits on its small lane, as percentages along it. Null when there is nothing to
+// place, such as a measure with no target.
+export function laneMarks(value, target) {
+  if (!target || value === null || value === undefined) return null;
+  const low = target.low;
+  const high = target.high ?? Math.max(low, value) + 0.3;
+  const margin = Math.max(high - low, Math.abs(value - (low + high) / 2) * 0.4, 0.01) * 0.75;
+  const start = Math.min(low, value) - margin;
+  const end = Math.max(high, value) + margin;
+  const place = (point) => ((point - start) / (end - start)) * 100;
+  return { bandStart: place(low), bandWidth: place(high) - place(low), buoy: place(value) };
+}
+
+// Each angle's label sits on its own side of the joint, so they do not pile up on small rowers.
+export function labelSpot(kind, vertex, width, height, gap) {
+  if (kind === "trunk") return { x: vertex.x - width - gap, y: vertex.y + gap };
+  if (kind === "knee") return { x: vertex.x - width / 2, y: vertex.y - height - gap * 1.6 };
+  return { x: vertex.x + gap, y: vertex.y - height / 2 };
+}

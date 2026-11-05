@@ -3,88 +3,126 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RowVision preview</title>
+  <title>RowVision</title>
   <link rel="icon" href="data:,">
+  <link rel="preload" href="/vendor/rubik.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/style.css">
   <script type="importmap">{"imports": {"three": "/vendor/three.module.min.js"}}</script>
 </head>
 <body>
-  <main>
-    <h1>RowVision preview</h1>
+  <svg width="0" height="0" class="sprite" aria-hidden="true">
+    <defs>
+      <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+      <symbol id="i-next" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+      <symbol id="i-back-far" viewBox="0 0 24 24"><path d="M12 5l-7 7 7 7M19 5l-7 7 7 7"/></symbol>
+      <symbol id="i-next-far" viewBox="0 0 24 24"><path d="M12 5l7 7-7 7M5 5l7 7-7 7"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+      <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+      <symbol id="i-rower" viewBox="0 0 24 24"><circle cx="12" cy="7" r="3"/><path d="M6 21c0-5 2.5-8 6-8s6 3 6 8"/></symbol>
+      <symbol id="i-saved" viewBox="0 0 24 24"><path d="M6 4h12v17l-6-4-6 4z"/></symbol>
+      <symbol id="i-cube" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"/></symbol>
+    </defs>
+  </svg>
 
+  <header class="topbar">
+    <span class="brand"><span class="brand-buoy" aria-hidden="true"></span>RowVision</span>
     <details id="saved-area" hidden>
-      <summary>Saved results</summary>
-      <div class="table-scroll">
-        <table class="metrics">
+      <summary><svg class="icon"><use href="#i-saved"/></svg>Saved results</summary>
+      <div class="saved-menu">
+        <table class="saved-table">
           <thead><tr><th>Clip</th><th>Boat</th><th>Seat</th><th>Accuracy</th><th>Overall</th></tr></thead>
           <tbody id="saved"></tbody>
         </table>
       </div>
     </details>
+  </header>
 
-    <form id="setup">
-      <label>Clip <select id="clip" required></select></label>
-      <label>Boat class <select id="boat-class" required></select></label>
-      <label>Rowing side <select id="side" required></select></label>
+  <main>
+    <form id="setup" class="setup">
+      <label class="wide">Clip <select id="clip" required></select></label>
+      <label>Boat <select id="boat-class" required></select></label>
+      <label>Side <select id="side" required></select></label>
       <label>Boats in the video <input id="boats" type="number" min="1" max="20" value="1" required></label>
       <label>Your seat <select id="seat" required></select></label>
-      <button type="submit">Analyse</button>
+      <button type="submit" class="primary">Analyse</button>
     </form>
     <p id="form-error" class="error" role="alert" hidden></p>
 
-    <section id="progress" hidden aria-live="polite">
+    <section id="welcome" class="welcome">
+      <h1>See your stroke, frame by frame</h1>
+      <p>Choose a clip and your seat, then press Analyse. Or open something from Saved results.</p>
+    </section>
+
+    <section id="progress" class="progress" hidden aria-live="polite">
       <p id="stage"></p>
       <progress id="bar" max="1"></progress>
       <button id="cancel" type="button">Cancel</button>
     </section>
 
     <p id="failed" class="error" role="alert" hidden></p>
-    <p id="film-closer" class="banner" role="alert" hidden></p>
-    <ul id="warnings" hidden></ul>
+    <p id="film-closer" class="caution-box" role="alert" hidden></p>
+    <ul id="warnings" class="caution-box" hidden></ul>
 
-    <section id="picker" hidden>
+    <section id="picker" class="picker" hidden>
       <h2>Tap your boat</h2>
       <p id="picker-note"></p>
-      <button id="use-boat" type="button" disabled>Use this boat</button>
+      <button id="use-boat" type="button" class="primary" disabled>Use this boat</button>
     </section>
 
-    <div id="stage-area" hidden>
-      <canvas id="canvas"></canvas>
+    <div id="workspace" class="workspace">
+      <div id="left" class="left">
+        <div id="stage-area" class="stage" hidden>
+          <canvas id="canvas"></canvas>
+        </div>
+
+        <section id="viewer" class="viewer" hidden>
+          <p id="summary" class="summary"></p>
+          <div id="timeline" class="lane-track" role="presentation"><div id="cursor"></div></div>
+          <div class="readout-row">
+            <p id="readout" aria-live="polite"></p>
+            <div id="live-angles"></div>
+          </div>
+          <div class="toolbar">
+            <div class="group" role="group" aria-label="Move through the video">
+              <button type="button" data-jump="catches:-1" title="Previous catch (Shift + C)"><svg class="icon"><use href="#i-back-far"/></svg>Catch</button>
+              <button type="button" data-jump="finishes:-1" title="Previous finish (Shift + F)"><svg class="icon"><use href="#i-back-far"/></svg>Finish</button>
+              <button type="button" data-step="-10" title="Back 10 frames (Shift + Left)">&minus;10</button>
+              <button type="button" data-step="-1" title="Back 1 frame (Left)" aria-label="Back one frame"><svg class="icon"><use href="#i-back"/></svg></button>
+              <button type="button" data-step="1" title="Forward 1 frame (Right)" aria-label="Forward one frame"><svg class="icon"><use href="#i-next"/></svg></button>
+              <button type="button" data-step="10" title="Forward 10 frames (Shift + Right)">+10</button>
+              <button type="button" data-jump="finishes:1" title="Next finish (F)">Finish<svg class="icon"><use href="#i-next-far"/></svg></button>
+              <button type="button" data-jump="catches:1" title="Next catch (C)">Catch<svg class="icon"><use href="#i-next-far"/></svg></button>
+            </div>
+            <div class="group" role="group" aria-label="Zoom">
+              <button id="zoom-out" type="button" title="Zoom out (Minus)" aria-label="Zoom out"><svg class="icon"><use href="#i-minus"/></svg></button>
+              <button id="zoom-in" type="button" title="Zoom in (Plus)" aria-label="Zoom in"><svg class="icon"><use href="#i-plus"/></svg></button>
+              <button id="zoom-fit" type="button" title="Fit the frame (0)" aria-label="Fit the frame"><svg class="icon"><use href="#i-fit"/></svg></button>
+              <button id="zoom-rower" type="button" title="Zoom to rower (Z)"><svg class="icon"><use href="#i-rower"/></svg>Rower</button>
+            </div>
+            <div class="group toggles">
+              <label class="switch"><input id="show-lines" type="checkbox" checked> Limbs</label>
+              <label class="switch"><input id="show-angles" type="checkbox" checked> Angles</label>
+              <label class="switch"><input id="follow" type="checkbox"> Follow</label>
+              <label class="size-control">Video size <input id="video-size" type="range" min="40" max="100" step="1"></label>
+            </div>
+          </div>
+          <details class="keys">
+            <summary>Keys and legend</summary>
+            <p>Left and Right step one frame, with Shift ten. C and F jump to the next catch or
+              finish, with Shift the previous one. L hides the limbs and A the angles. Plus, Minus,
+              0 and Z control zoom. Scroll or pinch to zoom, and drag to move around.
+              <span class="key left">Left side</span>, <span class="key right">right side</span>.
+              Dashed lines are joints the model was unsure of.</p>
+          </details>
+        </section>
+      </div>
+
+      <div id="resize" class="resize" role="separator" aria-orientation="vertical" tabindex="0"
+           aria-label="Resize video" aria-valuemin="40" aria-valuemax="100" hidden></div>
+
+      <section id="panel" class="panel" aria-label="Scores and evidence" hidden></section>
     </div>
-
-    <section id="viewer" hidden>
-      <p id="summary"></p>
-      <div id="timeline" role="presentation"><div id="cursor"></div></div>
-      <p id="readout" aria-live="polite"></p>
-      <p id="live-angles"></p>
-      <div class="controls">
-        <button type="button" data-jump="catches:-1" title="C with Shift">&#9664; Catch</button>
-        <button type="button" data-jump="finishes:-1" title="F with Shift">&#9664; Finish</button>
-        <button type="button" data-step="-10" title="Shift + Left">&minus;10</button>
-        <button type="button" data-step="-1" title="Left arrow">&minus;1</button>
-        <button type="button" data-step="1" title="Right arrow">+1</button>
-        <button type="button" data-step="10" title="Shift + Right">+10</button>
-        <button type="button" data-jump="finishes:1" title="F">Finish &#9654;</button>
-        <button type="button" data-jump="catches:1" title="C">Catch &#9654;</button>
-        <label class="toggle"><input id="show-lines" type="checkbox" checked> Limb lines</label>
-        <label class="toggle"><input id="show-angles" type="checkbox" checked> Angles</label>
-      </div>
-      <div class="controls">
-        <button id="zoom-in" type="button" title="Plus key">Zoom in</button>
-        <button id="zoom-out" type="button" title="Minus key">Zoom out</button>
-        <button id="zoom-fit" type="button" title="0 key">Fit</button>
-        <button id="zoom-rower" type="button" title="Z key">Zoom to rower</button>
-        <label class="toggle"><input id="follow" type="checkbox"> Follow rower</label>
-      </div>
-      <p class="hint">
-        Keys: Left and Right step one frame, with Shift ten. C and F jump to the next catch or
-        finish, with Shift the previous one. L hides the lines and A the angles. Use the scroll
-        wheel or pinch to zoom, and drag to move around.
-        <span class="key left">Left side</span> <span class="key right">right side</span>.
-        Dashed lines are joints the model was unsure of.
-      </p>
-      <section id="panel" aria-label="Scores and evidence"></section>
-    </section>
 
     <dialog id="reveal-dialog">
       <h2>Show the score anyway?</h2>
@@ -92,7 +130,7 @@
         guide only, and don't use it to judge your technique.</p>
       <form method="dialog" class="dialog-actions">
         <button value="cancel">Keep it hidden</button>
-        <button value="show" id="reveal-confirm">Show score</button>
+        <button value="show" id="reveal-confirm" class="primary">Show score</button>
       </form>
     </dialog>
 
@@ -100,13 +138,15 @@
       <h2 id="model-title"></h2>
       <div id="model-view"></div>
       <p id="model-caption"></p>
-      <p id="model-note" class="caution" hidden></p>
-      <div class="controls">
-        <button type="button" data-view="side">Side</button>
-        <button type="button" data-view="stern">From the stern</button>
-        <button type="button" data-view="above">From above</button>
-        <label class="toggle"><input id="model-yours" type="checkbox" checked> Show yours</label>
-        <button id="model-close" type="button">Close</button>
+      <p id="model-note" class="caution-box" hidden></p>
+      <div class="toolbar">
+        <div class="group">
+          <button type="button" data-view="side">Side</button>
+          <button type="button" data-view="stern">Stern</button>
+          <button type="button" data-view="above">Above</button>
+        </div>
+        <label class="switch"><input id="model-yours" type="checkbox" checked> Show yours</label>
+        <button id="model-close" type="button" class="primary push">Close</button>
       </div>
       <p class="hint">Drag to rotate, scroll or pinch to zoom. <span class="key target">Teal is the
         target</span>, <span class="key yours">orange is you</span>, and yellow shades the target

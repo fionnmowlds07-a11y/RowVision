@@ -1,5 +1,7 @@
 import {
   FIT,
+  VIDEO_MAX,
+  VIDEO_MIN,
   angleMarks,
   arcBetween,
   boatAt,
@@ -10,16 +12,19 @@ import {
   clampView,
   formatTarget,
   formatValue,
+  labelSpot,
   limbSegments,
   modelRequest,
   nearestMeasure,
   nextMarker,
   openingFrame,
   resultSummary,
+  savedShare,
   seatOptions,
   shotAt,
   stageText,
   toVideoPoint,
+  videoLayout,
   viewPoint,
   zoomAt,
 } from "./logic.mjs";
@@ -94,10 +99,49 @@ function fillForm(settings) {
 }
 
 function hideResults() {
-  for (const id of ["progress", "failed", "film-closer", "warnings", "picker", "stage-area", "viewer"]) {
+  for (const id of [
+    "welcome", "progress", "failed", "film-closer", "warnings", "picker", "stage-area", "viewer",
+    "panel", "resize",
+  ]) {
     $(id).hidden = true;
   }
   $("form-error").hidden = true;
+  $("workspace").classList.remove("results");
+}
+
+const SIZE_KEY = "rowvision-video-size";
+let videoShare = 62;
+
+function readStoredSize() {
+  try {
+    return localStorage.getItem(SIZE_KEY);
+  } catch {
+    return null; // Storage can be blocked, and the default size is fine.
+  }
+}
+
+function storeSize(share) {
+  try {
+    localStorage.setItem(SIZE_KEY, String(share));
+  } catch {
+    // Not being remembered is harmless.
+  }
+}
+
+function applyLayout() {
+  const { video, stacked } = videoLayout(videoShare, window.innerWidth);
+  const workspace = $("workspace");
+  workspace.style.setProperty("--video", video);
+  workspace.style.setProperty("--video-stacked", window.innerWidth < 980 ? 100 : video);
+  workspace.classList.toggle("stacked", stacked);
+  $("video-size").value = video;
+  $("resize").setAttribute("aria-valuenow", video);
+}
+
+function setVideoShare(share) {
+  videoShare = Math.min(Math.max(share, VIDEO_MIN), VIDEO_MAX);
+  applyLayout();
+  storeSize(videoShare);
 }
 
 async function openClip(name) {
@@ -172,11 +216,15 @@ function drawAngles(target, pose, index, size, only = null) {
     target.stroke();
     target.setLineDash([]);
     const label = item.sure ? item.label : `${item.label}?`;
-    const width = target.measureText(label).width + 6 * size;
-    target.fillStyle = "rgba(0, 0, 0, 0.7)";
-    target.fillRect(x + 14 * size, y - 14 * size, width, 15 * size);
+    const width = target.measureText(label).width + 8 * size;
+    const height = 15 * size;
+    const spot = labelSpot(item.kind, item.vertex, width, height, 14 * size);
+    target.fillStyle = "rgba(11, 30, 43, 0.82)";
+    target.beginPath();
+    target.roundRect(spot.x, spot.y, width, height, 5 * size);
+    target.fill();
     target.fillStyle = "#fff";
-    target.fillText(label, x + 17 * size, y - 3 * size);
+    target.fillText(label, spot.x + 4 * size, spot.y + 11 * size);
   }
 }
 
@@ -439,6 +487,7 @@ async function openSaved(name) {
   const saved = await api(`/api/results/${encodeURIComponent(name)}`);
   await openClip(saved.settings.clip);
   fillForm(saved.settings);
+  $("saved-area").open = false;
   showViewer(saved);
 }
 
@@ -454,6 +503,9 @@ function showViewer(data) {
   document.activeElement?.blur(); // Arrow keys would otherwise change a focused form field.
   $("stage-area").hidden = false;
   $("viewer").hidden = false;
+  $("resize").hidden = !data.rower;
+  $("workspace").classList.toggle("results", Boolean(data.rower));
+  applyLayout();
   canvas.classList.remove("tappable");
   drawTicks();
   frame = openingFrame(result.rower);
@@ -505,6 +557,7 @@ async function render(job) {
   if (job.state === "idle" || job.state === "cancelled") {
     picker = null;
     hideResults();
+    $("welcome").hidden = false;
     return;
   }
   await openClip(job.settings.clip);
@@ -588,6 +641,29 @@ $("model-dialog").addEventListener("close", () => {
   model?.close();
   model = null;
 });
+$("video-size").addEventListener("input", (event) => setVideoShare(Number(event.target.value)));
+window.addEventListener("resize", applyLayout);
+
+function dragSize(event) {
+  const rect = $("workspace").getBoundingClientRect();
+  setVideoShare(((event.clientX - rect.left) / rect.width) * 100);
+}
+$("resize").addEventListener("pointerdown", (event) => {
+  $("resize").setPointerCapture(event.pointerId);
+  $("resize").classList.add("dragging");
+});
+$("resize").addEventListener("pointermove", (event) => {
+  if (event.buttons) dragSize(event);
+});
+$("resize").addEventListener("pointerup", () => $("resize").classList.remove("dragging"));
+$("resize").addEventListener("keydown", (event) => {
+  const change = { ArrowLeft: -2, ArrowRight: 2 }[event.key];
+  if (!change) return;
+  event.preventDefault();
+  event.stopPropagation();
+  setVideoShare(videoShare + change);
+});
+
 $("show-lines").addEventListener("change", draw);
 $("show-angles").addEventListener("change", draw);
 $("zoom-in").addEventListener("click", () => zoomCentre(ZOOM_STEP));
@@ -686,6 +762,8 @@ document.addEventListener("keydown", (event) => {
 });
 
 async function start() {
+  videoShare = savedShare(readStoredSize());
+  applyLayout();
   const { clips, boats, sides, side_names: names } = await api("/api/clips");
   boatSeats = boats;
   boatSides = sides;

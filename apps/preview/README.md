@@ -29,6 +29,10 @@ Then open <http://127.0.0.1:8765>. Press Ctrl+C in the terminal to stop.
 
 Only the chosen seat has limb lines. Only complete strokes have markers, so a catch or finish in a stroke cut off by the clip edge or a gap is not marked.
 
+## Layout
+
+Video sits on the left and scores on the right. Drag the handle between them, or use **Video size**, to resize. Past 76% of the width, or on a narrow screen, scores move underneath. The size is remembered in this browser. See `DESIGN.md` for the design system.
+
 ## Checking a score
 
 - Click a measure to see its target, sources and a freeze frame for every stroke, taken at the exact frame the value was read. Click a freeze frame to open it.
