@@ -1,23 +1,45 @@
 """Estimate how accurate a result is, and say why.
 
 Accuracy means the share of joint-angle measurements expected to fall within +/-5 degrees of the
-true value. It is derived from an error model, so synthetic footage can test it directly. It stays
-"uncalibrated" until it has been checked against hand-labelled real footage.
+true value. It answers only that. How much footage there is, and how well the rower was followed,
+are separate questions, reported as warnings. The figure stays "uncalibrated" until the keypoint
+error has been measured against enough hand-labelled real footage.
 """
 
 import math
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
+
+import yaml
 
 TOLERANCE_DEG = 5.0
-KEYPOINT_ERROR_PX = 1.5
-"""Assumed error per keypoint on real footage. To be replaced by calibration."""
+ASSUMED_KEYPOINT_ERROR_PX = 1.5
+"""Used until calibration replaces it. This is an assumption, not a measurement."""
+MIN_CALIBRATION_FRAMES = 100
+CALIBRATION_FILE = Path(__file__).parent.parent / "reference" / "calibration.yaml"
 VIEW_ERROR_DEG = 3.0
 """Assumed error in the estimated camera angle."""
 MIN_FULL_STROKES = 5
+MIN_STROKES_FOR_SPREAD = 3
 LOW_AGREEMENT = 0.5
 LOW_COVERAGE = 0.7
 OBLIQUE_VIEW_DEG = 25.0
+
+
+@dataclass(frozen=True)
+class Calibration:
+    keypoint_error_px: float
+    calibrated: bool
+
+
+def load_calibration(path: Path = CALIBRATION_FILE) -> Calibration:
+    """Return the measured keypoint error, or the assumption if too few frames have been labelled."""
+    data = yaml.safe_load(path.read_text())
+    measured = data.get("keypoint_error_px")
+    if measured is None or data.get("labelled_frames", 0) < MIN_CALIBRATION_FRAMES:
+        return Calibration(ASSUMED_KEYPOINT_ERROR_PX, False)
+    return Calibration(float(measured), True)
 
 
 class Band(StrEnum):
@@ -92,20 +114,21 @@ def _warnings(evidence: Evidence) -> list[str]:
     if evidence.coverage < LOW_COVERAGE:
         warnings.append("You were only tracked for part of the video.")
     if evidence.strokes < MIN_FULL_STROKES:
-        warnings.append(f"Only {evidence.strokes} full strokes were measured. Film at least 10.")
+        strokes = "1 full stroke was" if evidence.strokes == 1 else f"{evidence.strokes} full strokes were"
+        warnings.append(f"Only {strokes} measured. Film at least 10.")
     if evidence.crew_agreement is not None and evidence.crew_agreement < LOW_AGREEMENT:
         warnings.append("Tracking did not follow the crew's rhythm well, so check your results.")
     return warnings
 
 
-def rate(evidence: Evidence, *, calibrated: bool = False) -> Rating:
-    """Return the estimated accuracy, its band, and what is limiting it."""
-    modelled = angle_error_deg(evidence.trunk_px, KEYPOINT_ERROR_PX, evidence.view_deg)
-    # Interquartile range to standard deviation, for a normal distribution.
-    observed = evidence.stroke_spread_deg / 1.35
+def rate(evidence: Evidence, calibration: Calibration | None = None) -> Rating:
+    """Return the estimated accuracy of the angles, its band, and anything else to be aware of."""
+    used = calibration if calibration is not None else load_calibration()
+    modelled = angle_error_deg(evidence.trunk_px, used.keypoint_error_px, evidence.view_deg)
+    # Interquartile range to standard deviation, for a normal distribution. Two strokes cannot
+    # show a spread, so they do not count as evidence of one.
+    observed = 0.0
+    if evidence.strokes >= MIN_STROKES_FOR_SPREAD:
+        observed = evidence.stroke_spread_deg / 1.35
     accuracy = share_within_tolerance(max(modelled, observed))
-    accuracy *= min(evidence.coverage / LOW_COVERAGE, 1.0)
-    accuracy *= min(evidence.strokes / MIN_FULL_STROKES, 1.0)
-    if evidence.crew_agreement is not None:
-        accuracy *= min(max(evidence.crew_agreement, 0.0) / LOW_AGREEMENT, 1.0)
-    return Rating(accuracy, band_for(accuracy), calibrated, _warnings(evidence))
+    return Rating(accuracy, band_for(accuracy), used.calibrated, _warnings(evidence))

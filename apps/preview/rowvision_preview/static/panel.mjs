@@ -192,5 +192,8 @@ export function renderPanel(container, rower, state, handlers) {
   headline.append(ratingBlock(rower.rating), overallBlock(rower, state.revealed, handlers.onReveal));
   const list = element("ul", "measures");
   list.append(...metrics.map((metric) => measureItem(metric, state.active, rower, handlers)));
-  container.replaceChildren(headline, phaseBlock(rower.card), list);
+  const notes = element("ul", "rating-notes");
+  notes.append(...rower.rating.warnings.map((text) => element("li", "", text)));
+  const parts = rower.rating.warnings.length ? [headline, notes] : [headline];
+  container.replaceChildren(...parts, phaseBlock(rower.card), list);
 }
