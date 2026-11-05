@@ -1,5 +1,5 @@
 import numpy as np
-from crew import crew_detections
+from crew import crew_detections, two_boat_detections
 
 from rowvision.tracking import clean_detections, track_people
 
@@ -48,3 +48,17 @@ def test_frames_with_nobody_are_handled() -> None:
     points[10] = np.zeros((0, 17, 2))
     scores[10] = np.zeros((0, 17))
     assert len(track_people(points, scores, FPS)) == 2
+
+
+def test_pieces_of_one_person_are_stitched_after_a_long_gap() -> None:
+    points, scores = crew_detections(2)
+    for frame in range(100, 150):
+        points[frame] = points[frame][:1]
+        scores[frame] = scores[frame][:1]
+    tracks = track_people(points, scores, FPS)
+    assert len(tracks) == 2
+
+
+def test_small_background_rowers_do_not_break_a_large_rower_apart() -> None:
+    points, scores = two_boat_detections()
+    assert len(track_people(points, scores, FPS)) == 6
