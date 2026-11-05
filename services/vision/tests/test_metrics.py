@@ -56,3 +56,10 @@ def test_stroke_without_a_finish_is_skipped() -> None:
     timeline = StrokeTimeline([10, 60, 110], [80], 24, 1.0)
     strokes = per_stroke(angle_series(clip.points, clip.facing, 0), timeline)
     assert [stroke.catch_frame for stroke in strokes] == [60]
+
+
+def test_gap_between_catches_is_not_counted_as_a_stroke() -> None:
+    clip = generate(strokes=8)
+    timeline = StrokeTimeline([0, 75, 375, 450], [30, 105, 405], 24, 1.0, 75.0)
+    strokes = per_stroke(angle_series(clip.points, clip.facing, 0), timeline)
+    assert [stroke.catch_frame for stroke in strokes] == [0, 375]

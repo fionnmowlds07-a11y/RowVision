@@ -12,6 +12,7 @@ MAX_RATE_SPM = 48.0
 SMOOTHING_SECONDS = 0.15
 HARMONIC_TOLERANCE = 0.85
 RHYTHM_TOLERANCE = 0.12
+MAX_GAP_SECONDS = 1.0
 MIN_REACH_RANGE = 0.3
 """Smallest hand travel, in trunk lengths, that counts as rowing. Excludes a still cox."""
 
@@ -23,6 +24,7 @@ class StrokeTimeline:
     rate_spm: float
     regularity: float
     """Autocorrelation at the stroke period, from 0 (no rhythm) to 1 (perfectly repeating)."""
+    period_frames: float = 0.0
 
 
 def facing_direction(points: FloatArray) -> int:
@@ -108,8 +110,8 @@ def _drop_outliers(frames: list[int], lag: int) -> list[int]:
     return kept
 
 
-def detect_strokes(reach: FloatArray, fps: float) -> StrokeTimeline:
-    """Find catches (maximum reach) and finishes (minimum reach) in a reach signal."""
+def _detect_run(reach: FloatArray, fps: float) -> StrokeTimeline:
+    """Analyse one continuous stretch of footage."""
     smoothed = _smooth(_fill_gaps(reach), fps)
     if np.ptp(smoothed) < MIN_REACH_RANGE:
         return StrokeTimeline([], [], 0.0, 0.0)
@@ -119,4 +121,37 @@ def detect_strokes(reach: FloatArray, fps: float) -> StrokeTimeline:
     spacing = int(lag * 0.6)
     catches = _drop_outliers(_peaks(smoothed, spacing), lag)
     finishes = _drop_outliers(_peaks(-smoothed, spacing), lag)
-    return StrokeTimeline(catches, finishes, 60 * fps / lag, regularity)
+    return StrokeTimeline(catches, finishes, 60 * fps / lag, regularity, float(lag))
+
+
+def continuous_runs(reach: FloatArray, fps: float) -> list[tuple[int, int]]:
+    """Return (start, end) for stretches of footage, allowing only short gaps inside a stretch."""
+    seen = np.where(np.isfinite(reach))[0]
+    if len(seen) == 0:
+        return []
+    breaks = np.where(np.diff(seen) > MAX_GAP_SECONDS * fps)[0]
+    starts = [int(seen[0]), *(int(seen[index + 1]) for index in breaks)]
+    ends = [*(int(seen[index]) + 1 for index in breaks), int(seen[-1]) + 1]
+    return list(zip(starts, ends, strict=True))
+
+
+def detect_strokes(reach: FloatArray, fps: float) -> StrokeTimeline:
+    """Find catches (maximum reach) and finishes (minimum reach) in a reach signal.
+
+    Each continuous stretch is analysed separately, because interpolating across a long gap would
+    invent motion. Rate and regularity come from the longest stretch.
+    """
+    runs = continuous_runs(reach, fps)
+    if not runs:
+        raise ValueError("no usable frames in signal")
+    catches: list[int] = []
+    finishes: list[int] = []
+    longest = max(runs, key=lambda run: run[1] - run[0])
+    main = StrokeTimeline([], [], 0.0, 0.0)
+    for start, end in runs:
+        timeline = _detect_run(reach[start:end], fps)
+        catches.extend(frame + start for frame in timeline.catches)
+        finishes.extend(frame + start for frame in timeline.finishes)
+        if (start, end) == longest:
+            main = timeline
+    return StrokeTimeline(catches, finishes, main.rate_spm, main.regularity, main.period_frames)
