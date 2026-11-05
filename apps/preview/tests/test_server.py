@@ -184,6 +184,37 @@ def test_a_job_runs_from_start_to_result(client: Client) -> None:
     assert status["state"] == "done"
     assert status["result"]["rower"]["seat"] == 2
 
+    saved = client.call("GET", "/api/results").json()["results"]
+    assert [item["settings"]["clip"] for item in saved] == [CLIP]
+    assert saved[0]["band"] == status["result"]["rower"]["rating"]["band"]
+    reopened = client.call("GET", f"/api/results/{saved[0]['name']}").json()
+    assert reopened["rower"]["card"] == status["result"]["rower"]["card"]
+
 
 def test_cancel_with_no_job_is_harmless(client: Client) -> None:
     assert client.post("/api/job/cancel", {}).json() == {"state": "idle"}
+
+
+def test_reference_pose_is_served(client: Client) -> None:
+    reply = client.call("GET", "/api/reference?lean=28&knee=52&reach=0.58")
+    assert reply.status == 200
+    joints = json.loads(reply.body)["joints"]
+    assert set(joints) == {"ankle", "knee", "hip", "shoulder", "elbow", "hand", "head"}
+
+
+@pytest.mark.parametrize(
+    "query", ["", "lean=28", "lean=x&knee=50&reach=0.5", "lean=28&knee=5&reach=0.5"]
+)
+def test_bad_reference_requests_are_refused(client: Client, query: str) -> None:
+    assert client.call("GET", f"/api/reference?{query}").status == 400
+
+
+def test_saved_results_start_empty(client: Client) -> None:
+    reply = client.call("GET", "/api/results")
+    assert reply.status == 200
+    assert json.loads(reply.body) == {"results": []}
+
+
+@pytest.mark.parametrize("name", ["missing.json", "..%2F..%2Fetc%2Fpasswd"])
+def test_only_saved_results_can_be_read(client: Client, name: str) -> None:
+    assert client.call("GET", f"/api/results/{name}").status == 404

@@ -8,9 +8,10 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from rowvision.pose import RtmBackend
+from rowvision.reference_pose import pose_at
 from rowvision.video import VideoReader
 
 from rowvision_preview.clips import ClipLibrary
@@ -92,10 +93,34 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"clips": self.clips.names(), "boats": BOAT_SEATS})
         elif path == "/api/job":
             self._json(self.runner.status())
+        elif path == "/api/results":
+            self._json({"results": self.runner.saved()})
+        elif path.startswith("/api/results/"):
+            self._saved(unquote(path.removeprefix("/api/results/")))
+        elif path == "/api/reference":
+            self._reference(urlsplit(self.path).query)
         elif path.startswith("/api/clips/"):
             self._clip(path.removeprefix("/api/clips/").split("/"))
         else:
             self._error(HTTPStatus.NOT_FOUND, "Not found.")
+
+    def _saved(self, name: str) -> None:
+        try:
+            self._json(self.runner.saved_result(name))
+        except KeyError:
+            self._error(HTTPStatus.NOT_FOUND, "No such saved result.")
+
+    def _reference(self, query: str) -> None:
+        """Return joint positions in metres for a body angle and knee angle."""
+        values = parse_qs(query)
+        try:
+            pose = pose_at(
+                float(values["lean"][0]), float(values["knee"][0]), float(values["reach"][0])
+            )
+        except (KeyError, ValueError):
+            self._error(HTTPStatus.BAD_REQUEST, "Send lean, knee and reach within normal ranges.")
+        else:
+            self._json(pose)
 
     def _clip(self, parts: list[str]) -> None:
         name = unquote(parts[0])
