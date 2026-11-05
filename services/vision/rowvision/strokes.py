@@ -142,6 +142,9 @@ def _align_to_shape(signal: FloatArray, events: list[int], lag: int, sign: int) 
         centred = shape - shape.mean()
         moved = []
         for event in aligned:
+            if _window(signal, event, half) is None:
+                moved.append(event)
+                continue
             best, best_score = event, -np.inf
             for shift in range(-search, search + 1):
                 window = _window(signal, event + shift, half)
