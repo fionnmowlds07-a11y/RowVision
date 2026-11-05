@@ -202,3 +202,16 @@ def test_boxes_are_not_interpolated_across_a_long_gap() -> None:
     assert np.isfinite(boxes[5 * COARSE_STEP]).all()
     assert np.isnan(boxes[20 * COARSE_STEP]).all()
     assert np.isfinite(boxes[35 * COARSE_STEP]).all()
+
+
+def test_a_crew_shares_one_stroke_timeline() -> None:
+    result = run(FakeBackend(4), Request(boat_seats=4, scope=Scope.CREW))
+    catches = [[stroke.catch_frame for stroke in rower.strokes] for rower in result.rowers]
+    assert all(frames == catches[0] for frames in catches)
+    assert len(catches[0]) >= 4
+
+
+def test_small_boats_use_their_own_timing() -> None:
+    result = run(FakeBackend(2), Request(boat_seats=2, seat=1))
+    assert result.rowers[0].rate_spm == pytest.approx(24, abs=1)
+    assert len(result.rowers[0].strokes) >= 3
