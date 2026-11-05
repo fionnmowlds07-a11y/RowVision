@@ -298,16 +298,39 @@ def test_saved_json_is_strict(four: Rig) -> None:
     ],
 )
 def test_bad_settings_are_refused(change: dict[str, Any], message: str) -> None:
-    body = {"clip": CLIP, "boat_class": "4x", "boats_in_video": 1, "seat": 2} | change
+    body = {"clip": CLIP, "boat_class": "4x", "boats_in_video": 1, "seat": 2, "side": "scull"}
+    body = body | change
     with pytest.raises(ValueError, match=message):
         Settings.parse(body, [CLIP])
 
 
 def test_seat_limit_follows_the_boat_class() -> None:
-    body = {"clip": CLIP, "boat_class": "8+", "boats_in_video": 1, "seat": 8}
+    body = {"clip": CLIP, "boat_class": "8+", "boats_in_video": 1, "seat": 8, "side": "bow"}
     assert Settings.parse(body, [CLIP]).request().boat_seats == 8
-    assert Settings.parse(body | {"seat": 1, "boat_class": "1x"}, [CLIP]).request().boat_seats == 1
+    single = body | {"seat": 1, "boat_class": "1x", "side": "scull"}
+    assert Settings.parse(single, [CLIP]).request().boat_seats == 1
 
 
 def test_state_values_match_the_page() -> None:
     assert {state.value for state in State} == SETTLED | {"idle", "running"}
+
+
+@pytest.mark.parametrize(
+    ("boat_class", "side", "allowed"),
+    [
+        ("1x", "scull", True),
+        ("4x", "scull", True),
+        ("8+", "stroke", True),
+        ("2-", "bow", True),
+        ("1x", "bow", False),
+        ("8+", "scull", False),
+        ("4+", None, False),
+    ],
+)
+def test_rowing_side_must_suit_the_boat(boat_class: str, side: str | None, allowed: bool) -> None:
+    body = {"clip": CLIP, "boat_class": boat_class, "boats_in_video": 1, "seat": 1, "side": side}
+    if allowed:
+        assert Settings.parse(body, [CLIP]).side == side
+    else:
+        with pytest.raises(ValueError, match="needs"):
+            Settings.parse(body, [CLIP])

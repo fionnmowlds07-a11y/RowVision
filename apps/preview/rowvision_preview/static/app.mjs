@@ -42,6 +42,8 @@ const canvas = $("canvas");
 const context = canvas.getContext("2d");
 
 let boatSeats = {};
+let boatSides = {};
+let sideNames = {};
 let clip = null; // { name, fps, frames, width, height }
 let result = null;
 let picker = null; // { boats, preview, chosen }
@@ -73,6 +75,8 @@ const frameUrl = (index) =>
 function fillSeats() {
   const options = seatOptions(boatSeats[$("boat-class").value]);
   $("seat").replaceChildren(...options.map(({ value, label }) => new Option(label, value)));
+  const sides = boatSides[$("boat-class").value];
+  $("side").replaceChildren(...sides.map((side) => new Option(sideNames[side], side)));
 }
 
 // After a reload, show the settings of the job the server still holds.
@@ -81,6 +85,7 @@ function fillForm(settings) {
   $("boat-class").value = settings.boat_class;
   fillSeats();
   $("seat").value = settings.seat;
+  $("side").value = settings.side;
   $("boats").value = settings.boats_in_video;
 }
 
@@ -488,6 +493,7 @@ $("setup").addEventListener("submit", (event) => {
     boat_class: $("boat-class").value,
     boats_in_video: Number($("boats").value),
     seat: Number($("seat").value),
+    side: $("side").value,
   });
 });
 
@@ -616,8 +622,10 @@ document.addEventListener("keydown", (event) => {
 });
 
 async function start() {
-  const { clips, boats } = await api("/api/clips");
+  const { clips, boats, sides, side_names: names } = await api("/api/clips");
   boatSeats = boats;
+  boatSides = sides;
+  sideNames = names;
   $("clip").replaceChildren(...clips.map((name) => new Option(name, name)));
   $("boat-class").replaceChildren(...Object.keys(boats).map((name) => new Option(name, name)));
   fillSeats();

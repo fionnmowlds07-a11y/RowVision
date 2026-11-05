@@ -11,11 +11,11 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from rowvision.pose import RtmBackend
-from rowvision.reference_pose import pose_at
+from rowvision.reference_pose import Style, pose_at
 from rowvision.video import VideoReader
 
 from rowvision_preview.clips import ClipLibrary
-from rowvision_preview.jobs import BOAT_SEATS, Runner, Settings
+from rowvision_preview.jobs import BOAT_SEATS, SIDE_NAMES, Runner, Settings, sides_for
 
 STATIC = Path(__file__).parent / "static"
 STATIC_FILES = {
@@ -91,7 +91,14 @@ class Handler(BaseHTTPRequestHandler):
             name, content_type = STATIC_FILES[path]
             self._send(HTTPStatus.OK, (STATIC / name).read_bytes(), content_type)
         elif path == "/api/clips":
-            self._json({"clips": self.clips.names(), "boats": BOAT_SEATS})
+            self._json(
+                {
+                    "clips": self.clips.names(),
+                    "boats": BOAT_SEATS,
+                    "sides": {boat: sides_for(boat) for boat in BOAT_SEATS},
+                    "side_names": SIDE_NAMES,
+                }
+            )
         elif path == "/api/job":
             self._json(self.runner.status())
         elif path == "/api/results":
@@ -116,10 +123,13 @@ class Handler(BaseHTTPRequestHandler):
         values = parse_qs(query)
         try:
             pose = pose_at(
-                float(values["lean"][0]), float(values["knee"][0]), float(values["reach"][0])
+                float(values["lean"][0]),
+                float(values["knee"][0]),
+                float(values["reach"][0]),
+                Style(values["style"][0]),
             )
         except (KeyError, ValueError):
-            self._error(HTTPStatus.BAD_REQUEST, "Send lean, knee and reach within normal ranges.")
+            self._error(HTTPStatus.BAD_REQUEST, "Send lean, knee, reach and style within normal ranges.")
         else:
             self._json(pose)
 

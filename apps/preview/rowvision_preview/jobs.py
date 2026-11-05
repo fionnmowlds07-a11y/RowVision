@@ -28,9 +28,17 @@ from rowvision_preview.results import analysis_json, boat_choices_json, result_s
 
 BOAT_SEATS = {"1x": 1, "2x": 2, "2-": 2, "4x": 4, "4-": 4, "4+": 4, "8+": 8}
 """Rowing seats in each boat class. A cox has no seat number."""
+SCULLING_BOATS = {"1x", "2x", "4x"}
+SIDE_NAMES = {"stroke": "Stroke side", "bow": "Bow side", "scull": "Sculling"}
+"""Rowing sides. Each gets its own reference model."""
 MAX_BOATS = 20
 RESULT_VERSION = 2
 """Raise this when the saved JSON changes shape, so older results are not reused."""
+
+
+def sides_for(boat_class: str) -> list[str]:
+    """Return the rowing sides a boat class allows."""
+    return ["scull"] if boat_class in SCULLING_BOATS else ["stroke", "bow"]
 
 
 class Source(Protocol):
@@ -59,6 +67,7 @@ class Settings:
     boat_class: str
     boats_in_video: int
     seat: int
+    side: str = "scull"
 
     @staticmethod
     def parse(body: dict[str, Any], clips: list[str]) -> "Settings":
@@ -74,7 +83,11 @@ class Settings:
         seats = BOAT_SEATS[boat_class]
         if type(seat) is not int or not 1 <= seat <= seats:
             raise ValueError(f"Seat must be from 1 to {seats} in a {boat_class}.")
-        return Settings(clip, boat_class, boats, seat)
+        side = body.get("side")
+        if side not in sides_for(boat_class):
+            names = " or ".join(SIDE_NAMES[item].lower() for item in sides_for(boat_class))
+            raise ValueError(f"A {boat_class} needs {names}.")
+        return Settings(clip, boat_class, boats, seat, side)
 
     def request(self, boat_tap: tuple[int, float, float] | None = None) -> Request:
         return Request(
