@@ -118,8 +118,9 @@ def test_stops_to_ask_for_a_boat_then_carries_on(two_boats: Rig) -> None:
     status = wait(two_boats.runner)
     assert status["state"] == "done"
     assert status["result"]["rower"]["seat"] == 2
-    # The boats found before the question are reused, so only the fine pass reads frames.
-    assert two_boats.source.reads - reads <= two_boats.source.frames
+    # The boats found before the question are reused, so only the fine passes read frames: one for
+    # this rower and one for the rower they follow.
+    assert two_boats.source.reads - reads <= 2 * two_boats.source.frames
 
 
 def test_any_tap_on_the_same_boat_reuses_the_result(two_boats: Rig) -> None:
@@ -258,7 +259,7 @@ def test_saved_detections_replace_the_coarse_pass(four: Rig) -> None:
     reads = four.source.reads
     assert with_saved["state"] == "done"
     # Only the fine pass read the video, and it never looks at the coarse frames twice.
-    assert reads <= frames
+    assert reads <= 2 * frames
 
     for path in (four.folder / "results").glob("*.json"):
         path.unlink()

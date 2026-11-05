@@ -1,7 +1,7 @@
 """Run the full analysis: find rowers and shots coarsely, then measure the chosen rowers finely."""
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from itertools import pairwise
 from typing import Any
@@ -27,6 +27,7 @@ from rowvision.seats import assign_seats, track_at
 from rowvision.shots import Shot, ShotKind, split_shots
 from rowvision.skeleton import FloatArray
 from rowvision.strokes import StrokeTimeline, crew_reach, detect_strokes, reach_signal
+from rowvision.timing import FollowTiming, follow_timing, leader_seat
 from rowvision.tracking import Track, track_people
 from rowvision.view import estimate_view_deg
 
@@ -64,6 +65,8 @@ class Request:
     """How many boats the athlete says are in the video."""
     boat_tap: tuple[int, float, float] | None = None
     """Frame, x and y where the athlete tapped their boat."""
+    side: str = "scull"
+    """Stroke, bow or scull, which decides who this rower follows."""
 
 
 @dataclass(frozen=True)
@@ -80,6 +83,8 @@ class RowerResult:
     """Interquartile range of each measure, showing how far the median can be trusted."""
     card: ScoreCard
     rating: Rating
+    timing: FollowTiming | None = None
+    """Catch and finish timing against the rower being followed."""
 
 
 @dataclass(frozen=True)
@@ -390,11 +395,18 @@ def analyse(
     shared = crew_timeline(rowers, assignment.facing, frames, fps)
     agreements = dict(zip(map(id, rowers), crew_agreement(rowers), strict=True))
     in_view = boat.seen()[np.minimum(np.arange(frames) // COARSE_STEP, coarse_frames - 1)]
-    results = []
-    for seat, track in targets:
+    fine: dict[int | None, FloatArray] = {}
+
+    def measured_points(seat: int | None, track: Track) -> tuple[FloatArray, FloatArray]:
         points, scores = _fine_pass(read, frames, track, backend)
         points[dropped] = np.nan
         scores[dropped] = 0
+        fine[seat] = points
+        return points, scores
+
+    results = []
+    for seat, track in targets:
+        points, scores = measured_points(seat, track)
         measured = np.isfinite(points[:, sk.LEFT_SHOULDER, 0])
         agreement = agreements.get(id(track))
         results.append(
@@ -411,6 +423,16 @@ def analyse(
                 agreement=None if agreement is None or np.isnan(agreement) else agreement,
             )
         )
+
+    for index, rower in enumerate(results):
+        leader = None if rower.seat is None else leader_seat(rower.seat, request.boat_seats, request.side)
+        if leader is None or leader not in assignment.seats:
+            continue
+        if leader not in fine:
+            measured_points(leader, assignment.seats[leader])
+        timing = follow_timing(rower.points, fine[leader], leader, assignment.facing, fps)
+        results[index] = replace(rower, timing=timing)
+
     if results and not any(rower.strokes for rower in results):
         warnings.append(
             "No full strokes could be measured. Try a clip that shows more of the rower side-on."

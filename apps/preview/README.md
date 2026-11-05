@@ -34,6 +34,10 @@ Only the chosen seat has limb lines. Only complete strokes have markers, so a ca
 
 Choosing a clip shows a large frame with a slider, before any analysis. Drag to any point to check what boat it is and find your seat.
 
+## Timing
+
+Each rower is compared with the seat they follow: stroke side with stroke, bow side with the seat behind stroke, and scullers with stroke. The figure comes from lining up hand movement around each catch and finish across all strokes. It is good to about 50 ms, so smaller gaps read as "In time", and footage with a spread over 70 ms reads as too variable. It is not scored.
+
 ## Labelling frames
 
 **Label frames** opens a page for measuring how accurate the pose model really is. It picks up to 8 frames from each analysed clip, across the whole stroke. Click each joint on the side nearest the camera, or press **Can't see this joint**. The model's answer is never shown, so your clicks stay independent.
