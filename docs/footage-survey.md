@@ -36,7 +36,7 @@ Rowers found in each clip, against the crew visible in the footage. The boat cla
 | Two too many (eight) | 1 clip, small rowers |
 | No confirmed rowers (eight) | 1 clip, rowers about 25 px tall |
 
-In the last clip, the larger pose model confirmed 4 of 8 rowers, at about 20 times the time per frame. Eights filmed from a distance remain the hardest case.
+In the last clip, the larger pose model confirmed 4 of 8 rowers, but took 204 seconds to scout a 14-second clip, roughly three times the estimated time for the standard model. Eights filmed from a distance remain the hardest case.
 
 ## Measured speed
 
