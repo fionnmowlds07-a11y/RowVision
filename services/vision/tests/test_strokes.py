@@ -53,3 +53,12 @@ def test_motionless_footage_reports_no_rhythm() -> None:
 def test_all_missing_signal_is_an_error() -> None:
     with pytest.raises(ValueError, match="no usable frames"):
         detect_strokes(np.full(100, np.nan), 30)
+
+
+def test_false_peak_between_strokes_is_dropped() -> None:
+    clip = generate(strokes=6)
+    reach = reach_signal(clip.points, clip.facing)
+    true_catches = detect_strokes(reach, clip.fps).catches
+    false_peak = true_catches[2] + 30
+    reach[false_peak - 2 : false_peak + 3] = reach.max() * 1.05
+    assert false_peak not in detect_strokes(reach, clip.fps).catches
