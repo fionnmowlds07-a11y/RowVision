@@ -151,6 +151,13 @@ button.link:hover { background: none; color: var(--ink); }
 .welcome { padding: 56px 8px; text-align: center; }
 .welcome p { margin-top: 8px; color: var(--ink-soft); }
 
+.clip-preview { max-width: 1100px; margin: 12px auto 0; }
+#preview-image { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: contain; background: #000; border-radius: 16px; }
+.preview-controls { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: end; justify-content: space-between; margin-top: 12px; padding: 12px 16px; background: var(--pontoon); border-radius: 20px; box-shadow: var(--lift); }
+.preview-slider { flex: 1 1 320px; display: grid; gap: 6px; font-size: 14px; font-weight: 500; }
+.preview-slider input { width: 100%; margin: 0; }
+#preview-status { font-size: 14px; color: var(--ink-soft); white-space: nowrap; }
+
 .progress { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 16px; padding: 14px 16px; background: var(--pontoon); border-radius: 20px; box-shadow: var(--lift); }
 .progress p { flex-basis: 100%; font-weight: 500; }
 progress { flex: 1; min-width: 160px; height: 12px; border: 0; border-radius: 999px; overflow: hidden; background: var(--shallow); }
