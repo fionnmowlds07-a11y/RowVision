@@ -24,3 +24,20 @@ Fourteen unique real clips were reviewed to set requirements. One clip existed i
 ## Analysis scope
 
 Analysis defaults to the chosen seat. Whole crew is a per-analysis option, because it takes much longer and processes more of teammates' data.
+
+## Tracking results
+
+Rowers found in each clip, against the crew visible in the footage. The boat class was supplied, as the athlete would supply it. Crew sizes were judged by eye from sampled frames, and these checks confirm the headcount only, not that each seat was matched to the right person.
+
+| Result | Clips |
+|---|---|
+| Correct crew size | 11 of 14 |
+| One too many (four) | 1 clip |
+| Two too many (eight) | 1 clip, small rowers |
+| No confirmed rowers (eight) | 1 clip, rowers about 25 px tall |
+
+In the last clip, the larger pose model confirmed 4 of 8 rowers, at about 20 times the time per frame. Eights filmed from a distance remain the hardest case.
+
+## Measured speed
+
+Chosen-seat analysis on 8 CPU cores took 77 seconds for a 15-second clip and 248 seconds for a 35-second clip.
