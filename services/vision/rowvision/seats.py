@@ -1,14 +1,16 @@
 """Work out which tracked person sits in which seat."""
 
 from dataclasses import dataclass
+from itertools import combinations
 
 import numpy as np
 
+from rowvision import skeleton as sk
 from rowvision.skeleton import FloatArray
 from rowvision.strokes import detect_strokes, facing_direction, reach_signal
 from rowvision.tracking import Track
 
-MIN_COVERAGE = 0.25
+MIN_SEEN_SECONDS = 5.0
 MIN_REGULARITY = 0.4
 
 
@@ -19,22 +21,41 @@ class SeatAssignment:
     facing: int
     complete: bool
     """False when fewer rowers were seen than the boat holds, so numbering needs confirming."""
+    surplus: int = 0
+    """Rowers beyond what the boat holds, which suggests two boats were grouped together."""
 
 
 def is_rowing(track: Track, fps: float) -> bool:
-    """Return True if the track shows a stroke rhythm, which excludes the cox."""
-    if track.coverage < MIN_COVERAGE:
+    """Return True if the track shows a stroke rhythm, which excludes the cox and bystanders.
+
+    Only frames where the person was seen count, so a rower visible for part of a clip qualifies.
+    """
+    seen = int(np.isfinite(track.points[:, sk.LEFT_SHOULDER, 0]).sum())
+    if seen < MIN_SEEN_SECONDS * fps:
         return False
-    try:
-        facing = facing_direction(track.points)
-        timeline = detect_strokes(reach_signal(track.points, facing), fps)
-    except ValueError:
-        return False
+    facing = facing_direction(track.points)
+    timeline = detect_strokes(reach_signal(track.points, facing), fps)
     return timeline.regularity >= MIN_REGULARITY
 
 
+def _order_along_boat(rowers: list[Track], facing: int) -> list[Track]:
+    """Sort rowers from bow to stroke by who is ahead of whom while both are in view.
+
+    Comparing on shared frames keeps the order correct while the camera pans.
+    """
+    wins = [0] * len(rowers)
+    centres = [track.centre()[:, 0] * facing for track in rowers]
+    for first, second in combinations(range(len(rowers)), 2):
+        shared = np.isfinite(centres[first]) & np.isfinite(centres[second])
+        if not shared.any():
+            continue
+        ahead = np.median(centres[first][shared] - centres[second][shared])
+        wins[first if ahead > 0 else second] += 1
+    return [rowers[index] for index in np.argsort(wins, kind="stable")]
+
+
 def assign_seats(tracks: list[Track], boat_seats: int, fps: float) -> SeatAssignment:
-    """Number rowers along the boat from which way they face.
+    """Number rowers along one boat from which way they face.
 
     Rowers face the stern, so the one furthest in the facing direction is stroke. If rowers are
     missing from view the numbering is a best guess, and the athlete's tap decides.
@@ -44,13 +65,12 @@ def assign_seats(tracks: list[Track], boat_seats: int, fps: float) -> SeatAssign
         return SeatAssignment({}, 0, False)
     votes = [facing_direction(track.points) for track in rowers]
     facing = 1 if sum(votes) > 0 else -1
-    positions = [float(np.nanmedian(track.centre()[:, 0])) * facing for track in rowers]
-    ordered = [rowers[index] for index in np.argsort(positions)]
+    ordered = _order_along_boat(rowers, facing)
+    surplus = max(len(ordered) - boat_seats, 0)
     ordered = ordered[-boat_seats:]
-    complete = len(ordered) == boat_seats
     first_seat = boat_seats - len(ordered) + 1
     seats = {first_seat + offset: track for offset, track in enumerate(ordered)}
-    return SeatAssignment(seats, facing, complete)
+    return SeatAssignment(seats, facing, len(ordered) == boat_seats, surplus)
 
 
 def track_at(tracks: list[Track], frame: int, point: FloatArray) -> Track | None:

@@ -1,10 +1,11 @@
 import numpy as np
 import pytest
-from crew import crew_detections
+from crew import crew_detections, distant_people, two_boat_detections
 
-from rowvision.pipeline import Analysis, Request, Scope, analyse
+from rowvision.pipeline import COARSE_STEP, Analysis, Request, Scope, _boxes_for, analyse
 from rowvision.shots import ShotKind
 from rowvision.skeleton import FloatArray
+from rowvision.tracking import Track
 
 FPS = 30.0
 
@@ -12,8 +13,11 @@ FPS = 30.0
 class FakeBackend:
     """Serves synthetic detections. A frame is its own index."""
 
-    def __init__(self, seats: int) -> None:
-        self.points, self.scores = crew_detections(seats)
+    def __init__(self, seats: int = 4, *, crossing: bool | None = None) -> None:
+        if crossing is None:
+            self.points, self.scores = crew_detections(seats)
+        else:
+            self.points, self.scores = two_boat_detections(crossing=crossing)
         self.estimated_people = 0
 
     def detect(self, frame: int) -> FloatArray:
@@ -90,3 +94,93 @@ def test_footage_with_no_rowers_is_reported() -> None:
     result = run(backend, Request(boat_seats=1, seat=1))
     assert result.rowers == []
     assert any("No rowers" in warning for warning in result.warnings)
+
+
+def tap_on(result: Analysis, index: int) -> tuple[int, float, float]:
+    outline = result.boat_choices[index].outline
+    assert outline is not None
+    centre = (outline[:2] + outline[2:]) / 2
+    return result.preview, float(centre[0]), float(centre[1])
+
+
+def test_two_boats_stop_and_ask_which_is_yours() -> None:
+    result = run(FakeBackend(crossing=False), Request(boat_seats=4, seat=2, boats_in_video=2))
+    assert result.needs_boat_choice
+    assert result.rowers == []
+    assert sorted(choice.people for choice in result.boat_choices) == [2, 4]
+
+
+def test_analysis_continues_on_the_tapped_boat() -> None:
+    backend = FakeBackend(crossing=False)
+    first = run(backend, Request(boat_seats=4, seat=2, boats_in_video=2))
+    index = next(i for i, choice in enumerate(first.boat_choices) if choice.people == 4)
+    request = Request(boat_seats=4, seat=2, boats_in_video=2, boat_tap=tap_on(first, index))
+    result = run(backend, request)
+    assert not result.needs_boat_choice
+    assert result.seats_complete
+    assert [rower.seat for rower in result.rowers] == [2]
+
+
+def test_boat_class_applies_only_to_the_chosen_boat() -> None:
+    backend = FakeBackend(crossing=False)
+    first = run(backend, Request(boat_seats=2, seat=1, boats_in_video=2))
+    index = next(i for i, choice in enumerate(first.boat_choices) if choice.people == 2)
+    request = Request(boat_seats=2, seat=1, boats_in_video=2, boat_tap=tap_on(first, index))
+    result = run(backend, request)
+    assert result.seats_complete
+    assert any("too far away" in warning for warning in result.warnings)
+
+
+def test_unconfirmed_distant_group_does_not_trigger_a_question() -> None:
+    backend = FakeBackend(4)
+    for frame in range(len(backend.points)):
+        backend.points[frame] = np.concatenate([backend.points[frame], distant_people(frame)])
+        backend.scores[frame] = np.concatenate([backend.scores[frame], np.full((2, 17), 0.9)])
+    result = run(backend, Request(boat_seats=4, seat=2))
+    assert not result.needs_boat_choice
+    assert [rower.seat for rower in result.rowers] == [2]
+
+
+def test_saying_one_boat_when_two_are_found_still_asks() -> None:
+    result = run(FakeBackend(crossing=False), Request(boat_seats=4, seat=2, boats_in_video=1))
+    assert result.needs_boat_choice
+
+
+def test_saying_two_boats_when_one_is_found_still_asks() -> None:
+    result = run(FakeBackend(4), Request(boat_seats=4, seat=2, boats_in_video=2))
+    assert result.needs_boat_choice
+    assert len(result.boat_choices) == 1
+
+
+def test_count_mismatch_is_kept_as_a_warning_after_choosing() -> None:
+    backend = FakeBackend(4)
+    first = run(backend, Request(boat_seats=4, seat=2, boats_in_video=2))
+    request = Request(boat_seats=4, seat=2, boats_in_video=2, boat_tap=tap_on(first, 0))
+    result = run(backend, request)
+    assert any("You said 2 boat(s), but 1 were found" in warning for warning in result.warnings)
+
+
+def test_too_many_rowers_for_the_boat_class_warns() -> None:
+    result = run(FakeBackend(4), Request(boat_seats=2, seat=1))
+    assert any("two boats may have been grouped" in warning for warning in result.warnings)
+
+
+def test_frames_where_another_boat_crosses_are_dropped() -> None:
+    backend = FakeBackend(crossing=True)
+    first = run(backend, Request(boat_seats=4, seat=2, boats_in_video=2))
+    index = next(i for i, choice in enumerate(first.boat_choices) if choice.people == 4)
+    request = Request(boat_seats=4, seat=2, boats_in_video=2, boat_tap=tap_on(first, index))
+    result = run(backend, request)
+    assert 0 < result.overlap_share < 1
+    assert any("crossed yours" in warning for warning in result.warnings)
+    assert np.isnan(result.rowers[0].points[:, 5, 0]).any()
+
+
+def test_boxes_are_not_interpolated_across_a_long_gap() -> None:
+    points = np.full((40, 17, 2), np.nan)
+    points[:10] = 100.0 + np.arange(17.0)[:, None]
+    points[30:] = 500.0 + np.arange(17.0)[:, None]
+    boxes = _boxes_for(Track(points, np.ones((40, 17))), 40 * COARSE_STEP)
+    assert np.isfinite(boxes[5 * COARSE_STEP]).all()
+    assert np.isnan(boxes[20 * COARSE_STEP]).all()
+    assert np.isfinite(boxes[35 * COARSE_STEP]).all()
