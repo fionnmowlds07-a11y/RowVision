@@ -99,3 +99,24 @@ def test_drive_length_stays_steady_on_noisy_signals() -> None:
         for catch in timeline.catches[:-1]
     ]
     assert np.ptp(drives) <= 12
+
+
+def plateau_stroke(period: int, strokes: int) -> np.ndarray:
+    """A stroke with an early hump and a long plateau before the fall, starting at the finish.
+
+    The values are one real rower's average reach, sampled every five frames.
+    """
+    measured = [-0.46, -0.39, -0.42, -0.25, -0.06, 0.23, 0.46, 0.32, 0.31,
+                0.33, 0.34, 0.37, 0.35, 0.23, 0.14, -0.15, -0.40]  # fmt: skip
+    cycle = np.interp(np.arange(period), np.arange(len(measured)) * 5, measured)
+    return np.tile(cycle, strokes)
+
+
+@pytest.mark.parametrize("seed", range(5))
+def test_catch_is_the_end_of_a_plateau_not_where_the_hands_first_go_out(seed: int) -> None:
+    period = 85
+    signal = plateau_stroke(period, 10)
+    noisy = signal + np.random.default_rng(seed).normal(0, 0.05, len(signal))
+    timeline = detect_strokes(noisy, 30)
+    offsets = [(frame % period) for frame in timeline.catches]
+    assert all(50 <= offset <= 66 for offset in offsets)

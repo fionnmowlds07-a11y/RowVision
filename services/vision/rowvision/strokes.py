@@ -16,6 +16,7 @@ MAX_GAP_SECONDS = 1.0
 MIN_STROKES_FOR_SHAPE = 3
 ALIGN_SEARCH_SHARE = 0.3
 ALIGN_PASSES = 2
+CATCH_RUN_UP_SHARE = 0.35
 MIN_EVENT_SPACING = 0.7
 MIN_REACH_RANGE = 0.3
 """Smallest hand travel, in trunk lengths, that counts as rowing. Excludes a still cox."""
@@ -125,6 +126,22 @@ def _stroke_shape(signal: FloatArray, events: list[int], half: int) -> FloatArra
     return np.median(windows, axis=0) if len(windows) >= MIN_STROKES_FOR_SHAPE else None
 
 
+def _catch_position(shape: FloatArray) -> int:
+    """Return where the catch falls in an average stroke: the last moment before the drive.
+
+    Many rowers get their hands out early and hold them there up the slide, so the furthest point
+    is an unreliable plateau. The steepest fall marks the drive, so the catch is the highest point
+    in the run-up to it. Where the fall starts is no use: real drives begin slowly and steepen when
+    the arms pull in.
+    """
+    length = len(shape)
+    bottom = int(np.argmin(shape))
+    cycle = np.roll(shape, -bottom)
+    fall = int(np.argmax(-np.diff(cycle)))
+    start = max(fall - round(CATCH_RUN_UP_SHARE * length), 0)
+    return (start + int(np.argmax(cycle[start : fall + 1])) + bottom) % length
+
+
 def _align_to_shape(signal: FloatArray, events: list[int], lag: int, sign: int) -> list[int]:
     """Place each event by matching the whole stroke to the rower's average stroke.
 
@@ -158,8 +175,7 @@ def _align_to_shape(signal: FloatArray, events: list[int], lag: int, sign: int) 
     shape = _stroke_shape(signal, aligned, half)
     if shape is None:
         return aligned
-    # The shape's own peak marks where the event sits within the matched stroke.
-    peak = int(np.argmax(sign * shape)) - half
+    peak = (_catch_position(shape) if sign > 0 else int(np.argmin(shape))) - half
     # Strokes cut off by the clip edge cannot be matched, so they are left out.
     placed = sorted({event + peak for event in aligned if _window(signal, event, half) is not None})
     return _spaced(placed, lag)
