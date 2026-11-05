@@ -1,8 +1,8 @@
 import numpy as np
 from crew import crew_detections, distant_people, two_boat_detections
 
-from rowvision.boats import boat_at, find_boats, overlap_frames, preview_frame
-from rowvision.tracking import track_people
+from rowvision.boats import boat_at, find_boats, fit_to_seats, overlap_frames, preview_frame
+from rowvision.tracking import Track, track_people
 
 FPS = 30
 
@@ -85,3 +85,53 @@ def test_a_lone_distant_person_is_not_a_boat() -> None:
     points = [np.concatenate([p, distant_people(i)[:1]]) for i, p in enumerate(points)]
     scores = [np.concatenate([s, np.full((1, 17), 0.9)]) for s in scores]
     assert len(boats_from(points, scores)) == 1
+
+
+def test_rower_lost_and_found_again_in_a_pan_is_one_person() -> None:
+    """Seats 1 and 2 stay in view, while seat 3 vanishes and returns as a separate track."""
+    points, scores = crew_detections(3)
+    tracks = track_people(points, scores, FPS)
+    ordered = sorted(tracks, key=lambda track: float(np.nanmedian(track.centre()[:, 0])))
+    last = ordered[2]
+    early, late = Track(last.points.copy(), last.scores.copy()), Track(last.points.copy(), last.scores.copy())
+    early.points[225:] = np.nan
+    late.points[:225] = np.nan
+    boats = find_boats([ordered[0], ordered[1], early, late], FPS)
+    assert len(boats[0].rowers) == 3
+    assert len(boats[0].crew()) == 3
+
+
+def test_neighbours_are_never_merged() -> None:
+    points, scores = crew_detections(4)
+    boats = boats_from(points, scores)
+    assert len(boats[0].rowers) == 4
+
+
+def test_seats_come_from_the_shot_with_most_of_the_crew() -> None:
+    points, scores = crew_detections(4)
+    tracks = track_people(points, scores, FPS)
+    for track in tracks[:1]:
+        track.points[:] = np.nan
+    lone = Track(np.full_like(tracks[1].points, np.nan), np.zeros_like(tracks[1].scores))
+    boats = find_boats(tracks[1:], FPS)
+    boats[0].rowers.append(lone)
+    assert len(boats[0].crew()) == 3
+
+
+def split_track(track: Track, frame: int) -> list[Track]:
+    early = Track(track.points.copy(), track.scores.copy())
+    late = Track(track.points.copy(), track.scores.copy())
+    early.points[frame:] = np.nan
+    late.points[:frame] = np.nan
+    return [early, late]
+
+
+def test_boat_class_merges_split_tracks_down_to_the_crew() -> None:
+    tracks = track_people(*crew_detections(3), FPS)
+    pieces = [*tracks[:2], *split_track(tracks[2], 225)]
+    assert len(fit_to_seats(pieces, 3)) == 3
+
+
+def test_people_seen_together_are_never_merged_to_fit() -> None:
+    tracks = track_people(*crew_detections(3), FPS)
+    assert len(fit_to_seats(tracks, 2)) == 3
