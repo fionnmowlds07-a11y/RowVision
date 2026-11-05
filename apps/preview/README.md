@@ -34,6 +34,14 @@ Only the chosen seat has limb lines. Only complete strokes have markers, so a ca
 
 Choosing a clip shows a large frame with a slider, before any analysis. Drag to any point to check what boat it is and find your seat.
 
+## Labelling frames
+
+**Label frames** opens a page for measuring how accurate the pose model really is. It picks up to 8 frames from each analysed clip, across the whole stroke. Click each joint on the side nearest the camera, or press **Can't see this joint**. The model's answer is never shown, so your clicks stay independent.
+
+- **S** marks a joint as hidden, **Z** undoes a click, and **Enter** saves.
+- Labels are saved to `private/labels/labels.json`, because they come from real athletes.
+- The results box compares your clicks with the model. Once 100 frames are labelled, the measured error goes in `services/vision/reference/calibration.yaml`, which removes the "uncalibrated" wording.
+
 ## Layout
 
 Video sits on the left and scores on the right. Drag the handle between them, or use **Video size**, to resize. Past 76% of the width, or on a narrow screen, scores move underneath. The size is remembered in this browser. See `DESIGN.md` for the design system.

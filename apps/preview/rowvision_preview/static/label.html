@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Label frames · RowVision</title>
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="/vendor/rubik.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand"><span class="brand-buoy" aria-hidden="true"></span>RowVision</span>
+    <a class="pill-link" href="/">Back to analysis</a>
+  </header>
+
+  <main class="label-page">
+    <section class="label-stage">
+      <div class="stage"><canvas id="canvas" class="tappable"></canvas></div>
+      <p id="frame-note" class="summary"></p>
+    </section>
+
+    <section class="panel label-panel" aria-label="Labelling">
+      <h1 id="prompt">Loading...</h1>
+      <p id="guide" class="muted-text">Click the centre of each joint on the side nearest the
+        camera. You won't see the model's answer, so your clicks stay independent.</p>
+      <ol id="joints" class="joint-list"></ol>
+      <div class="toolbar">
+        <button id="hidden" type="button" title="S">Can't see this joint</button>
+        <button id="undo-click" type="button" title="Z">Undo click</button>
+      </div>
+      <div class="toolbar">
+        <button id="save" type="button" class="primary" title="Enter" disabled>Save and next</button>
+        <button id="skip" type="button">Too blurry, skip frame</button>
+        <button id="undo-frame" type="button">Redo last frame</button>
+      </div>
+      <p class="progress-line"><strong id="count"></strong></p>
+      <progress id="bar" max="100" value="0"></progress>
+      <p id="error" class="error" role="alert" hidden></p>
+      <section id="results" class="label-results" hidden aria-label="Results so far">
+        <h2>What your labels show so far</h2>
+        <p id="results-text"></p>
+      </section>
+    </section>
+  </main>
+  <script type="module" src="/label.mjs"></script>
+</body>
+</html>
