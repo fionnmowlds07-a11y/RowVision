@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from rowvision.strokes import detect_strokes, facing_direction, reach_signal
+from rowvision.strokes import crew_reach, detect_strokes, facing_direction, reach_signal
 from rowvision.synthetic import generate
 
 
@@ -120,3 +120,22 @@ def test_catch_is_the_end_of_a_plateau_not_where_the_hands_first_go_out(seed: in
     timeline = detect_strokes(noisy, 30)
     offsets = [(frame % period) for frame in timeline.catches]
     assert all(50 <= offset <= 66 for offset in offsets)
+
+
+def test_crew_timing_ignores_one_rower_with_a_misleading_stroke_shape() -> None:
+    clip = generate(strokes=10)
+    good = reach_signal(clip.points, clip.facing)
+    rng = np.random.default_rng(7)
+    crew = [good + rng.normal(0, 0.1, len(good)) for _ in range(3)]
+    crew.append(np.roll(good, 25))
+    timeline = detect_strokes(crew_reach(crew), clip.fps)
+    truth = np.array(clip.catch_frames)
+    errors = [frame - truth[np.abs(truth - frame).argmin()] for frame in timeline.catches]
+    assert np.abs(errors).max() <= 3
+
+
+def test_crew_signal_covers_frames_seen_by_anyone() -> None:
+    first = np.array([0.0, 1.0, 2.0, np.nan, np.nan])
+    second = np.array([np.nan, np.nan, 2.0, 1.0, 0.0])
+    combined = crew_reach([first, second])
+    assert np.isfinite(combined).all()
