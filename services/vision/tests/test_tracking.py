@@ -25,10 +25,26 @@ def test_duplicate_detection_is_removed() -> None:
     assert len(kept) == 2
 
 
+def test_hidden_hips_do_not_remove_a_rower() -> None:
+    points, scores = crew_detections(2)
+    hidden = scores[0].copy()
+    hidden[:, 11:] = 0.05
+    kept, _ = clean_detections(points[0], hidden)
+    assert len(kept) == 2
+
+
+def test_collapsed_skeleton_is_removed() -> None:
+    points, scores = crew_detections(2)
+    collapsed = points[0].copy()
+    collapsed[1, :, :] = collapsed[1, 0, :]
+    kept, _ = clean_detections(collapsed, scores[0])
+    assert len(kept) == 1
+
+
 def test_weak_detection_is_removed() -> None:
     points, scores = crew_detections(2)
     weak = scores[0].copy()
-    weak[1] = 0.1
+    weak[1] = 0.05
     kept, _ = clean_detections(points[0], weak)
     assert len(kept) == 1
 
