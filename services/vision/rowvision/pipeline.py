@@ -22,13 +22,14 @@ from rowvision.pose import PoseBackend
 from rowvision.seats import assign_seats, track_at
 from rowvision.shots import Shot, ShotKind, split_shots
 from rowvision.skeleton import FloatArray
-from rowvision.strokes import detect_strokes, reach_signal
+from rowvision.strokes import StrokeTimeline, crew_reach, detect_strokes, reach_signal
 from rowvision.tracking import Track, track_people
 from rowvision.view import estimate_view_deg
 
 COARSE_STEP = 5
 BOX_MARGIN = 0.25
 MAX_BOX_GAP_FRAMES = 30
+MIN_CREW_FOR_TIMING = 3
 VIEW_WINDOW_SECONDS = 3.0
 MIN_VIEW_FRAMES = 4
 UNCORRECTABLE_VIEW_DEG = 60.0
@@ -193,10 +194,38 @@ def _usable_view(shots: list[Shot], views: FloatArray) -> float:
     return float(np.nanmedian(np.concatenate([views[shot.start : shot.end] for shot in side])))
 
 
+def crew_timeline(
+    crew: list[Track], facing: int, frames: int, fps: float
+) -> StrokeTimeline | None:
+    """Time strokes from the whole crew, which is steadier than any one rower.
+
+    Rowers in a boat share one rhythm, so combining them stops one rower's stroke shape from moving
+    the catch. Needs at least MIN_CREW_FOR_TIMING rowers, and otherwise returns None.
+    """
+    if len(crew) < MIN_CREW_FOR_TIMING:
+        return None
+    coarse = crew_reach([reach_signal(track.points, facing) for track in crew])
+    seen = np.isfinite(coarse)
+    if seen.sum() < 2:
+        return None
+    every = np.arange(frames)
+    positions = np.arange(len(coarse)) * COARSE_STEP
+    signal = np.interp(every, positions[seen], coarse[seen])
+    signal[~seen[np.minimum(every // COARSE_STEP, len(coarse) - 1)]] = np.nan
+    timeline = detect_strokes(signal, fps)
+    return timeline if timeline.catches else None
+
+
 def _measure(
-    seat: int | None, points: FloatArray, scores: FloatArray, facing: int, view: float, fps: float
+    seat: int | None,
+    points: FloatArray,
+    scores: FloatArray,
+    facing: int,
+    view: float,
+    fps: float,
+    shared: StrokeTimeline | None = None,
 ) -> RowerResult:
-    timeline = detect_strokes(reach_signal(points, facing), fps)
+    timeline = shared if shared is not None else detect_strokes(reach_signal(points, facing), fps)
     strokes = per_stroke(angle_series(points, facing, view), timeline)
     names = ("catch_lean_deg", "finish_lean_deg", "catch_knee_deg", "finish_elbow_deg",
              "drive_ratio", "legs_lead")  # fmt: skip
@@ -333,12 +362,13 @@ def analyse(
             "Those frames were left out."
         )
 
+    shared = crew_timeline(rowers, assignment.facing, frames, fps)
     results = []
     for seat, track in targets:
         points, scores = _fine_pass(read, frames, track, backend)
         points[dropped] = np.nan
         scores[dropped] = 0
-        results.append(_measure(seat, points, scores, assignment.facing, view, fps))
+        results.append(_measure(seat, points, scores, assignment.facing, view, fps, shared))
     return Analysis(
         fps,
         frames,
