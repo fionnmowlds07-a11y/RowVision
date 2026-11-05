@@ -24,6 +24,7 @@ MIN_ANALYSIS_TRUNK_PX = 15.0
 """Below this, one pixel of error moves the trunk angle by about 4 degrees."""
 OUTLINE_MARGIN_TRUNKS = 1.0
 MAX_DISJOINT_OVERLAP = 0.1
+CONFUSION_TRUNKS = 1.5
 MIN_AGREEMENT_CREW = 3
 MIN_AGREEMENT_FRAMES = 12
 OUT_OF_TIME_MARGIN = 0.25
@@ -342,21 +343,19 @@ def boat_at(boats: list[Boat], frame: int, point: FloatArray) -> Boat | None:
 
 
 def overlap_frames(chosen: Boat, others: list[Boat], frames: int) -> BoolArray:
-    """Return a mask of frames where another boat's outline crosses the chosen boat's."""
+    """Return a mask of frames where someone in another boat could be confused with a rower here.
+
+    Only people of a similar size count, so a distant boat passing behind does not, however much
+    its outline overlaps. They must also be close to a rower, not just near the boat's outline.
+    """
     mask = np.zeros(frames, dtype=bool)
-    for frame in np.where(chosen.seen())[0]:
-        mine = chosen.outline(int(frame))
-        if mine is None:
+    limit = CONFUSION_TRUNKS * chosen.trunk_px
+    for other in others:
+        sizes = chosen.trunk_px, other.trunk_px
+        if max(sizes) / min(sizes) > MAX_SIZE_RATIO:
             continue
-        for other in others:
-            theirs = other.outline(int(frame))
-            if theirs is None:
-                continue
-            separate = (
-                mine[2] < theirs[0]
-                or theirs[2] < mine[0]
-                or mine[3] < theirs[1]
-                or theirs[3] < mine[1]
-            )
-            mask[frame] = mask[frame] or not separate
+        for rower in chosen.members:
+            for person in other.members:
+                gap = np.linalg.norm(rower.centre() - person.centre(), axis=-1)
+                mask |= gap[:frames] <= limit
     return mask

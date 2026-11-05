@@ -2,6 +2,7 @@ import numpy as np
 from crew import crew_detections, distant_people, two_boat_detections
 
 from rowvision.boats import (
+    Boat,
     boat_at,
     crew_agreement,
     find_boats,
@@ -178,3 +179,13 @@ def test_a_uniformly_noisy_crew_keeps_everyone() -> None:
 def test_agreement_needs_a_crew_to_compare_against() -> None:
     tracks = track_people(*crew_detections(2), FPS)
     assert all(np.isnan(score) for score in crew_agreement(tracks))
+
+
+def test_a_distant_boat_behind_does_not_count_as_crossing() -> None:
+    """A far boat can sit inside the near boat's outline without being confused with it."""
+    near = track_people(*crew_detections(2), FPS)
+    boats = find_boats(near, FPS)
+    far_points = near[0].points * np.array([0.1, 0.1]) + near[0].centre()[:, None, :] * 0.9
+    far = Boat([Track(far_points, near[0].scores)], [Track(far_points, near[0].scores)])
+    frames = len(near[0].points)
+    assert overlap_frames(boats[0], [far], frames).sum() == 0
