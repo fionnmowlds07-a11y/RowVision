@@ -13,7 +13,7 @@ from fakes import FakeBackend, FakeSource
 from rowvision.pipeline import COARSE_STEP, FILM_CLOSER
 
 from rowvision_preview.clips import ClipLibrary
-from rowvision_preview.jobs import Runner, Settings, State, load_detections
+from rowvision_preview.jobs import Runner, Settings, State, code_version, load_detections
 
 CLIP = "clip(1).mp4"
 SETTLED = {"done", "failed", "cancelled", "needs_boat"}
@@ -334,3 +334,17 @@ def test_rowing_side_must_suit_the_boat(boat_class: str, side: str | None, allow
     else:
         with pytest.raises(ValueError, match="needs"):
             Settings.parse(body, [CLIP])
+
+
+def test_changing_a_target_invalidates_saved_results(tmp_path: Path, monkeypatch: Any) -> None:
+    package = tmp_path / "rowvision"
+    package.mkdir()
+    (package / "__init__.py").write_text("")
+    targets = tmp_path / "reference"
+    targets.mkdir()
+    target_file = targets / "general.yaml"
+    target_file.write_text("min: 160")
+    monkeypatch.setattr("rowvision.__file__", str(package / "__init__.py"))
+    before = code_version()
+    target_file.write_text("min: 165")
+    assert code_version() != before
