@@ -11,6 +11,9 @@ MIN_RATE_SPM = 14.0
 MAX_RATE_SPM = 48.0
 SMOOTHING_SECONDS = 0.15
 HARMONIC_TOLERANCE = 0.85
+RHYTHM_TOLERANCE = 0.12
+MIN_REACH_RANGE = 0.3
+"""Smallest hand travel, in trunk lengths, that counts as rowing. Excludes a still cox."""
 
 
 @dataclass(frozen=True)
@@ -92,13 +95,28 @@ def _peaks(signal: FloatArray, spacing: int) -> list[int]:
     return sorted(chosen)
 
 
+def _drop_outliers(frames: list[int], lag: int) -> list[int]:
+    """Remove events that break the stroke rhythm, such as a false peak in noisy keypoints.
+
+    An event is kept if a neighbour sits about one period (or a whole number of periods) away.
+    """
+    kept = []
+    for frame in frames:
+        gaps = [abs(frame - other) / lag for other in frames if other != frame]
+        if any(abs(gap - round(gap)) <= RHYTHM_TOLERANCE for gap in gaps if gap >= 0.5):
+            kept.append(frame)
+    return kept
+
+
 def detect_strokes(reach: FloatArray, fps: float) -> StrokeTimeline:
     """Find catches (maximum reach) and finishes (minimum reach) in a reach signal."""
     smoothed = _smooth(_fill_gaps(reach), fps)
+    if np.ptp(smoothed) < MIN_REACH_RANGE:
+        return StrokeTimeline([], [], 0.0, 0.0)
     lag, regularity = _stroke_period(smoothed, fps)
     if lag == 0:
         return StrokeTimeline([], [], 0.0, 0.0)
     spacing = int(lag * 0.6)
-    catches = _peaks(smoothed, spacing)
-    finishes = _peaks(-smoothed, spacing)
+    catches = _drop_outliers(_peaks(smoothed, spacing), lag)
+    finishes = _drop_outliers(_peaks(-smoothed, spacing), lag)
     return StrokeTimeline(catches, finishes, 60 * fps / lag, regularity)
