@@ -3,6 +3,9 @@ import { test } from "node:test";
 
 import {
   FIT,
+  clipTime,
+  previewLabel,
+  previewStart,
   labelSpot,
   STACK_AT,
   VIDEO_DEFAULT,
@@ -350,4 +353,18 @@ test("angle labels sit on different sides of their joints", () => {
   assert.ok(trunk.x + 40 <= vertex.x);
   assert.ok(knee.y + 15 <= vertex.y);
   assert.ok(elbow.x >= vertex.x);
+});
+
+
+test("a clip preview opens part way through", () => {
+  assert.equal(previewStart(1000), 500);
+  assert.equal(previewStart(1), 0);
+  assert.equal(previewStart(0), 0);
+});
+
+test("clip times read as minutes and seconds", () => {
+  assert.equal(clipTime(0, 30), "0:00");
+  assert.equal(clipTime(95, 30), "0:03");
+  assert.equal(clipTime(1830, 30), "1:01");
+  assert.equal(previewLabel(300, 901, 30), "0:10 of 0:30");
 });

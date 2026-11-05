@@ -49,9 +49,22 @@
     </form>
     <p id="form-error" class="error" role="alert" hidden></p>
 
-    <section id="welcome" class="welcome">
-      <h1>See your stroke, frame by frame</h1>
-      <p>Choose a clip and your seat, then press Analyse. Or open something from Saved results.</p>
+    <section id="welcome" class="welcome" hidden>
+      <h1>No clips yet</h1>
+      <p>Add videos to your clips folder, then reload this page.</p>
+    </section>
+
+    <section id="clip-preview" class="clip-preview" aria-label="Clip preview" hidden>
+      <div class="stage">
+        <img id="preview-image" alt="Frame from the selected clip">
+      </div>
+      <div class="preview-controls">
+        <label class="preview-slider">
+          <span>Drag to any point to check the boat and find your seat</span>
+          <input id="preview-frame" type="range" min="0" value="0">
+        </label>
+        <p id="preview-status" aria-live="polite"></p>
+      </div>
     </section>
 
     <section id="progress" class="progress" hidden aria-live="polite">
