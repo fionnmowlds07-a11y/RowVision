@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from rowvision import skeleton as sk
 from rowvision.metrics import angle_series, per_stroke
 from rowvision.strokes import StrokeTimeline, detect_strokes, reach_signal
 from rowvision.synthetic import SyntheticClip, generate
@@ -63,3 +64,13 @@ def test_gap_between_catches_is_not_counted_as_a_stroke() -> None:
     timeline = StrokeTimeline([0, 75, 375, 450], [30, 105, 405], 24, 1.0, 75.0)
     strokes = per_stroke(angle_series(clip.points, clip.facing, 0), timeline)
     assert [stroke.catch_frame for stroke in strokes] == [0, 375]
+
+
+def test_the_synthetic_rower_has_a_human_shape() -> None:
+    """Angle maths cannot see a limb bent backwards, so check the anatomy directly."""
+    clip = generate()
+    catch = clip.points[clip.catch_frames[1]]
+    finish = clip.points[clip.finish_frames[1]]
+    # Image y increases downwards, so a smaller value is higher up.
+    assert catch[sk.LEFT_KNEE, 1] < catch[sk.LEFT_HIP, 1]
+    assert finish[sk.LEFT_ELBOW, 1] > finish[sk.LEFT_SHOULDER, 1]

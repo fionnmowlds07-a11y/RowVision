@@ -129,3 +129,16 @@ def test_arms_keep_their_length_at_the_finish(style: Style) -> None:
         upper = np.linalg.norm(np.subtract(joints["shoulder"], joints["elbow"]))
         assert upper == pytest.approx(UPPER_ARM, abs=0.03)
         assert np.linalg.norm(np.subtract(joints["elbow"], joints["hand"])) <= FOREARM + 0.15
+
+
+@pytest.mark.parametrize("style", list(Style))
+def test_knees_rise_towards_the_chest_at_the_catch(style: Style) -> None:
+    joints = catch(style)["left"]
+    assert joints["knee"][2] > joints["hip"][2] + 0.1
+
+
+@pytest.mark.parametrize("style", list(Style))
+def test_elbows_draw_back_past_the_hands_at_the_finish(style: Style) -> None:
+    joints = pose(-22, 165, FINISH_REACH, style)["left"]
+    assert joints["elbow"][0] > joints["hand"][0]
+    assert joints["elbow"][2] < joints["shoulder"][2]
