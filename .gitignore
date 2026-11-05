@@ -36,3 +36,6 @@ test-results/
 # Frames or overlays from real footage must stay local (public repo, identifiable athletes)
 private/
 samples/
+
+# Uploaded test footage
+videos/
