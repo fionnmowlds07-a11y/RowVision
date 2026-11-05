@@ -18,6 +18,8 @@ import {
   nearestMeasure,
   nextMarker,
   openingFrame,
+  playStart,
+  playbackFrame,
   previewLabel,
   previewStart,
   resultSummary,
@@ -64,6 +66,8 @@ let pollTimer = null;
 let stageName = null;
 let stageStart = 0;
 let view = FIT;
+let playback = null; // { start, startedAt, speed } while playing
+let frameLoading = false;
 let model = null;
 let panelState = { revealed: false, active: null };
 const pointers = new Map();
@@ -109,6 +113,7 @@ function hideResults() {
   }
   $("form-error").hidden = true;
   $("workspace").classList.remove("results");
+  pause();
 }
 
 let previewTicket = 0;
@@ -209,13 +214,17 @@ async function openClip(name) {
 function showFrame(index) {
   const ticket = ++requested;
   const next = new Image();
+  frameLoading = true;
   next.onload = () => {
     if (ticket !== requested) return;
+    frameLoading = false;
     image = next;
     draw();
   };
   next.onerror = () => {
-    if (ticket === requested) $("readout").textContent = `Frame ${index} could not be read.`;
+    if (ticket !== requested) return;
+    frameLoading = false;
+    $("readout").textContent = `Frame ${index} could not be read.`;
   };
   next.src = frameUrl(index);
 }
@@ -399,7 +408,44 @@ async function openModel(name) {
   }
 }
 
+function setPlayButton(playing) {
+  $("play-icon").setAttribute("href", playing ? "#i-pause" : "#i-play");
+  $("play-text").textContent = playing ? "Pause" : "Play";
+}
+
+function pause() {
+  playback = null;
+  setPlayButton(false);
+}
+
+function play() {
+  frame = playStart(frame, clip.frames - 1);
+  playback = { start: frame, startedAt: performance.now(), speed: Number($("speed").value) };
+  setPlayButton(true);
+  requestAnimationFrame(advance);
+}
+
+function togglePlay() {
+  if (playback) pause();
+  else play();
+}
+
+function advance(now) {
+  if (!playback) return;
+  const last = clip.frames - 1;
+  const next = playbackFrame(playback.start, now - playback.startedAt, clip.fps, playback.speed, last);
+  // A frame still on its way is left to finish, and the clock skips ahead past it.
+  if (next !== frame && !frameLoading) showAt(next);
+  if (next >= last) pause();
+  else requestAnimationFrame(advance);
+}
+
 function goTo(target) {
+  pause();
+  showAt(target);
+}
+
+function showAt(target) {
   const next = clampFrame(target, clip.frames);
   const direction = next < frame ? -1 : 1;
   frame = next;
@@ -681,6 +727,8 @@ $("use-boat").addEventListener("click", () => {
 
 $("viewer").addEventListener("click", (event) => {
   const button = event.target.closest("button");
+  if (button && event.detail) button.blur(); // So Space and the arrow keys go back to the video.
+  if (button?.id === "play") togglePlay();
   if (button?.dataset.step) goTo(frame + Number(button.dataset.step));
   if (button?.dataset.jump) {
     const [kind, direction] = button.dataset.jump.split(":");
@@ -699,6 +747,11 @@ $("model-dialog").addEventListener("close", () => {
   model = null;
 });
 $("video-size").addEventListener("input", (event) => setVideoShare(Number(event.target.value)));
+$("video-size").addEventListener("change", (event) => event.target.blur());
+$("speed").addEventListener("change", (event) => {
+  event.target.blur();
+  if (playback) play();
+});
 window.addEventListener("resize", applyLayout);
 
 function dragSize(event) {
@@ -795,8 +848,15 @@ $("timeline").addEventListener("pointermove", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if ($("viewer").hidden || event.target.matches("input[type=number], select")) return;
+  if ($("viewer").hidden || event.target.matches("input, select")) return;
+  if (document.querySelector("dialog[open]")) return;
   if (event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.key === " ") {
+    if (event.target.matches("button, summary, a")) return; // Space presses a focused control.
+    event.preventDefault();
+    togglePlay();
+    return;
+  }
   const size = event.shiftKey ? 10 : 1;
   const direction = event.shiftKey ? -1 : 1;
   const key = event.key.toLowerCase();

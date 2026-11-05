@@ -10,6 +10,7 @@ import {
   sourceLink,
 } from "./logic.mjs";
 
+const MIN_STROKES = 3;
 const PHASES = [
   ["catch", "Catch"],
   ["drive", "Drive"],
@@ -48,7 +49,10 @@ function overallBlock(rower, revealed, onReveal) {
   const block = element("div", "overall");
   const { overall } = rower.card;
   if (overall === null) {
-    block.append(element("p", "overall-text", "No overall score: nothing could be measured reliably."));
+    const reason = rower.strokes.length < MIN_STROKES
+      ? `No overall score: it needs at least ${MIN_STROKES} full strokes.`
+      : "No overall score: nothing could be measured reliably.";
+    block.append(element("p", "overall-text", reason));
   } else if (overallVisible(rower.rating, revealed)) {
     const text = element("p", "overall-text", "Overall score");
     if (rower.rating.band === "Poor") {

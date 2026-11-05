@@ -3,6 +3,8 @@ import { test } from "node:test";
 
 import {
   FIT,
+  playStart,
+  playbackFrame,
   clipTime,
   previewLabel,
   previewStart,
@@ -367,4 +369,20 @@ test("clip times read as minutes and seconds", () => {
   assert.equal(clipTime(95, 30), "0:03");
   assert.equal(clipTime(1830, 30), "1:01");
   assert.equal(previewLabel(300, 901, 30), "0:10 of 0:30");
+});
+
+
+test("playback follows the clock at each speed", () => {
+  assert.equal(playbackFrame(10, 1000, 30, 1, 500), 40);
+  assert.equal(playbackFrame(10, 1000, 30, 0.5, 500), 25);
+  assert.equal(playbackFrame(10, 1000, 30, 0.25, 500), 17);
+});
+
+test("playback stops at the last frame", () => {
+  assert.equal(playbackFrame(490, 5000, 30, 1, 500), 500);
+});
+
+test("pressing play at the end restarts the clip", () => {
+  assert.equal(playStart(500, 500), 0);
+  assert.equal(playStart(120, 500), 120);
 });

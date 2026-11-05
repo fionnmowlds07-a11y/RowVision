@@ -20,7 +20,8 @@ Then open <http://127.0.0.1:8765>. Press Ctrl+C in the terminal to stop.
 
 ## Using it
 
-- **Left and Right** step one frame, and with **Shift** ten.
+- **Space** plays and pauses, at full, half or quarter speed. Playback follows the clock, so frames that arrive late are skipped and the speed stays true.
+- **Left and Right** pause and step one frame, and with **Shift** ten.
 - **C** and **F** jump to the next catch or finish, and with **Shift** the previous one.
 - **L** hides the limb lines and **A** the angles.
 - **Plus**, **Minus** and **0** zoom in, out and back. **Z** zooms to the rower. The scroll wheel and pinch also zoom, and dragging moves around.
