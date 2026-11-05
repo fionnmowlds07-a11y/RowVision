@@ -1,7 +1,15 @@
 import numpy as np
 from crew import crew_detections, distant_people, two_boat_detections
 
-from rowvision.boats import boat_at, find_boats, fit_to_seats, overlap_frames, preview_frame
+from rowvision.boats import (
+    boat_at,
+    crew_agreement,
+    find_boats,
+    fit_to_seats,
+    overlap_frames,
+    preview_frame,
+)
+from rowvision.synthetic import generate
 from rowvision.tracking import Track, track_people
 
 FPS = 30
@@ -135,3 +143,38 @@ def test_boat_class_merges_split_tracks_down_to_the_crew() -> None:
 def test_people_seen_together_are_never_merged_to_fit() -> None:
     tracks = track_people(*crew_detections(3), FPS)
     assert len(fit_to_seats(tracks, 2)) == 3
+
+
+def out_of_time_person(frames: int) -> Track:
+    """A person with a rhythm of their own, unrelated to the crew's stroke."""
+    clip = generate(strokes=8, rate_spm=31, seed=4)
+    return Track(clip.points[:frames].copy(), np.full((frames, 17), 0.9))
+
+
+def test_crew_in_time_agrees_closely() -> None:
+    tracks = track_people(*crew_detections(4), FPS)
+    assert min(crew_agreement(tracks)) > 0.9
+
+
+def test_person_out_of_time_is_dropped_when_the_boat_is_over_full() -> None:
+    tracks = track_people(*crew_detections(4), FPS)
+    extra = out_of_time_person(len(tracks[0].points))
+    crew = fit_to_seats([*tracks, extra], 4)
+    assert len(crew) == 4
+    assert all(track is not extra for track in crew)
+
+
+def test_nobody_is_dropped_when_the_crew_already_fits() -> None:
+    tracks = track_people(*crew_detections(4), FPS)
+    extra = out_of_time_person(len(tracks[0].points))
+    assert len(fit_to_seats([*tracks[:3], extra], 4)) == 4
+
+
+def test_a_uniformly_noisy_crew_keeps_everyone() -> None:
+    tracks = track_people(*crew_detections(3), FPS)
+    assert len(fit_to_seats(tracks, 2)) == 3
+
+
+def test_agreement_needs_a_crew_to_compare_against() -> None:
+    tracks = track_people(*crew_detections(2), FPS)
+    assert all(np.isnan(score) for score in crew_agreement(tracks))
