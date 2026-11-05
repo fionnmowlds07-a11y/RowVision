@@ -113,7 +113,7 @@ def pose_at(
     leg = math.sqrt(THIGH**2 + SHIN**2 - 2 * THIGH * SHIN * math.cos(math.radians(knee_deg)))
     ankle = np.zeros(2)
     hip = np.array([math.sqrt(max(leg**2 - HIP_HEIGHT**2, 0.0)), HIP_HEIGHT])
-    knee = bend(ankle, hip, SHIN, THIGH, -1.0)
+    knee = bend(ankle, hip, SHIN, THIGH, 1.0)
 
     radians = math.radians(lean_deg)
     along_trunk = np.array([-math.sin(radians), math.cos(radians)])
