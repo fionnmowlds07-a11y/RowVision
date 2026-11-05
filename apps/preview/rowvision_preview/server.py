@@ -23,6 +23,9 @@ STATIC_FILES = {
     "/app.mjs": ("app.mjs", "text/javascript; charset=utf-8"),
     "/logic.mjs": ("logic.mjs", "text/javascript; charset=utf-8"),
     "/panel.mjs": ("panel.mjs", "text/javascript; charset=utf-8"),
+    "/model.mjs": ("model.mjs", "text/javascript; charset=utf-8"),
+    "/vendor/three.module.min.js": ("vendor/three.module.min.js", "text/javascript; charset=utf-8"),
+    "/vendor/OrbitControls.js": ("vendor/OrbitControls.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
 MAX_BODY_BYTES = 10_000

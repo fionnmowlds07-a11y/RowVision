@@ -3,6 +3,11 @@ import { test } from "node:test";
 
 import {
   FIT,
+  measureKind,
+  modelRequest,
+  nearestMeasure,
+  referenceUrl,
+  toScene,
   angleMarks,
   arcBetween,
   bodyCentre,
@@ -234,4 +239,57 @@ test("the median skips missing values", () => {
   assert.equal(median([3, null, 1, 2]), 2);
   assert.equal(median([1, 2]), 1.5);
   assert.equal(median([null]), null);
+});
+
+
+const METRICS = [
+  { name: "catch_lean_deg", label: "Body angle at the catch", value: 25, score: 100, target: { low: 20, high: 35 } },
+  { name: "catch_knee_deg", label: "Knee angle at the catch", value: 95, score: null, target: { low: 45, high: 60 } },
+  { name: "finish_lean_deg", label: "Layback at the finish", value: -18, score: 100, target: { low: -30, high: -15 } },
+  { name: "finish_knee_deg", label: "Knee angle at the finish", value: 165, score: 100, target: { low: 160, high: 170 } },
+];
+
+test("the model poses the middle of the target at the right stroke moment", () => {
+  const request = modelRequest("finish_lean_deg", METRICS);
+  assert.equal(request.phase, "finish");
+  assert.deepEqual(request.target, { lean: -22.5, knee: 165, reach: 0.33 });
+  assert.equal(request.shaded, "lean");
+  assert.deepEqual(request.range, { low: -30, high: -15 });
+});
+
+test("an unreliable angle is never shown as the athlete's own", () => {
+  const request = modelRequest("catch_knee_deg", METRICS);
+  assert.equal(request.yours.knee, request.target.knee);
+  assert.equal(request.yours.lean, 25);
+  assert.deepEqual(request.assumed, ["Knee angle at the catch"]);
+});
+
+test("the elbow has no shaded range", () => {
+  const request = modelRequest("finish_elbow_deg", METRICS);
+  assert.equal(request.phase, "finish");
+  assert.equal(request.shaded, null);
+});
+
+test("the reference request carries the rowing side", () => {
+  const url = referenceUrl({ lean: 25, knee: 50, reach: 0.58 }, "bow");
+  assert.equal(url, "/api/reference?lean=25&knee=50&reach=0.58&style=bow");
+});
+
+test("a live angle opens the nearest stroke moment", () => {
+  assert.equal(nearestMeasure("trunk", 12, [10, 90], [40]), "catch_lean_deg");
+  assert.equal(nearestMeasure("knee", 42, [10, 90], [40]), "finish_knee_deg");
+  assert.equal(nearestMeasure("elbow", 5, [10], [40]), "finish_elbow_deg");
+  assert.equal(nearestMeasure("trunk", 5, [], []), "catch_lean_deg");
+});
+
+test("the scene keeps a right-handed layout with height upwards", () => {
+  assert.deepEqual(toScene([1, 2, 3]), [1, 3, -2]);
+});
+
+
+test("a freeze frame shows only the angle being checked", () => {
+  assert.equal(measureKind("catch_lean_deg"), "trunk");
+  assert.equal(measureKind("finish_knee_deg"), "knee");
+  assert.equal(measureKind("finish_elbow_deg"), "elbow");
+  assert.equal(measureKind("drive_share"), null);
 });

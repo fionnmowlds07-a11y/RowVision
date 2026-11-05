@@ -93,6 +93,11 @@ def test_page_files_are_served(client: Client, path: str, kind: str) -> None:
     assert reply.headers["Content-Type"].startswith(kind)
 
 
+@pytest.mark.parametrize("path", ["/panel.mjs", "/model.mjs", "/vendor/three.module.min.js"])
+def test_new_page_files_are_served(client: Client, path: str) -> None:
+    assert client.call("GET", path).status == 200
+
+
 def test_only_listed_files_are_served(client: Client) -> None:
     assert client.call("GET", "/server.py").status == 404
     assert client.call("GET", "/../jobs.py").status == 404

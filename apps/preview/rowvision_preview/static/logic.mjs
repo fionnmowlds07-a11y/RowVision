@@ -230,3 +230,53 @@ export function median(values) {
   const half = Math.floor(known.length / 2);
   return known.length % 2 ? known[half] : (known[half - 1] + known[half]) / 2;
 }
+
+const REACH = { catch: 0.58, finish: 0.33 };
+
+const middleOf = (target) => (target.low + target.high) / 2;
+
+// What the 3D model should show for a measure: the target pose, the athlete's pose if it can be
+// trusted, and the range to shade. An unreliable angle falls back to the target and says so.
+export function modelRequest(name, metrics) {
+  const phase = name.startsWith("finish") ? "finish" : "catch";
+  const lean = metrics.find((item) => item.name === `${phase}_lean_deg`);
+  const knee = metrics.find((item) => item.name === `${phase}_knee_deg`);
+  const reach = REACH[phase];
+  const target = { lean: middleOf(lean.target), knee: middleOf(knee.target), reach };
+  const usable = (item) => item.value !== null && item.score !== null;
+  const yours = {
+    lean: usable(lean) ? lean.value : target.lean,
+    knee: usable(knee) ? knee.value : target.knee,
+    reach,
+  };
+  const assumed = [lean, knee].filter((item) => !usable(item)).map((item) => item.label);
+  const shaded = name.includes("lean") ? "lean" : name.includes("knee") ? "knee" : null;
+  const range = shaded === "lean" ? lean.target : shaded === "knee" ? knee.target : null;
+  return { phase, target, yours, assumed, shaded, range };
+}
+
+export function referenceUrl(pose, style) {
+  const query = new URLSearchParams({ ...pose, style });
+  return `/api/reference?${query}`;
+}
+
+// The measure a live angle should open, using the stroke moment nearest the current frame.
+export function nearestMeasure(kind, frame, catches, finishes) {
+  if (kind === "elbow") return "finish_elbow_deg";
+  const distance = (markers) => Math.min(...markers.map((marker) => Math.abs(marker - frame)), Infinity);
+  const phase = distance(finishes) < distance(catches) ? "finish" : "catch";
+  return `${phase}_${kind === "trunk" ? "lean" : "knee"}_deg`;
+}
+
+// Pose positions use X along the boat, Y to the rower's right and Z up. The 3D scene uses Y up.
+export function toScene([x, y, z]) {
+  return [x, z, -y];
+}
+
+// Which drawn angle belongs to a measure, or null when it has none of its own.
+export function measureKind(name) {
+  if (name.includes("lean")) return "trunk";
+  if (name.includes("knee")) return "knee";
+  if (name.includes("elbow")) return "elbow";
+  return null;
+}
