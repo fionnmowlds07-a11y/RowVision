@@ -1,0 +1,189 @@
+import http.client
+import json
+import threading
+from collections.abc import Iterator
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+from urllib.parse import quote
+
+import pytest
+from crew import crew_detections
+from fakes import FakeBackend, FakeSource, write_video
+
+from rowvision_preview.clips import ClipLibrary
+from rowvision_preview.jobs import Runner
+from rowvision_preview.server import make_server
+
+CLIP = "clip (1).avi"
+
+
+@dataclass
+class Reply:
+    status: int
+    headers: dict[str, str]
+    body: bytes
+
+    def json(self) -> Any:
+        return json.loads(self.body)
+
+
+class Client:
+    def __init__(self, port: int) -> None:
+        self.port = port
+
+    def call(
+        self,
+        method: str,
+        path: str,
+        body: bytes | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> Reply:
+        connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=30)
+        connection.request(method, path, body, headers or {})
+        response = connection.getresponse()
+        reply = Reply(response.status, dict(response.getheaders()), response.read())
+        connection.close()
+        return reply
+
+    def post(self, path: str, value: Any) -> Reply:
+        body = json.dumps(value).encode()
+        return self.call("POST", path, body, {"Content-Type": "application/json"})
+
+
+@pytest.fixture
+def client(tmp_path: Path) -> Iterator[Client]:
+    videos = tmp_path / "videos"
+    videos.mkdir()
+    write_video(videos / CLIP)
+    points, scores = crew_detections(4)
+    clips = ClipLibrary(videos)
+    runner = Runner(
+        clips,
+        tmp_path / "results",
+        tmp_path / "detections",
+        lambda path: FakeSource(len(points)),
+        lambda: FakeBackend(points, scores),
+    )
+    server = make_server("127.0.0.1", 0, clips, runner)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield Client(server.server_address[1])
+    server.shutdown()
+    server.server_close()
+    thread.join()
+
+
+def test_server_listens_on_loopback_by_default(client: Client) -> None:
+    assert client.call("GET", "/").status == 200
+
+
+@pytest.mark.parametrize(
+    ("path", "kind"),
+    [
+        ("/", "text/html"),
+        ("/app.mjs", "text/javascript"),
+        ("/logic.mjs", "text/javascript"),
+        ("/style.css", "text/css"),
+    ],
+)
+def test_page_files_are_served(client: Client, path: str, kind: str) -> None:
+    reply = client.call("GET", path)
+    assert reply.status == 200
+    assert reply.headers["Content-Type"].startswith(kind)
+
+
+def test_only_listed_files_are_served(client: Client) -> None:
+    assert client.call("GET", "/server.py").status == 404
+    assert client.call("GET", "/../jobs.py").status == 404
+
+
+def test_clips_and_boat_classes_are_listed(client: Client) -> None:
+    reply = client.call("GET", "/api/clips").json()
+    assert reply["clips"] == [CLIP]
+    assert reply["boats"]["8+"] == 8
+
+
+def test_clip_details_and_frames(client: Client) -> None:
+    base = f"/api/clips/{quote(CLIP)}"
+    assert client.call("GET", base).json()["frames"] == 12
+    frame = client.call("GET", f"{base}/frames/3.jpg")
+    assert frame.status == 200
+    assert frame.headers["Content-Type"] == "image/jpeg"
+    assert frame.body.startswith(b"\xff\xd8")
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/clips/missing.avi",
+        "/api/clips/..%2F..%2Fetc%2Fpasswd",
+        f"/api/clips/{quote(CLIP)}/frames/999.jpg",
+        f"/api/clips/{quote(CLIP)}/frames/abc.jpg",
+        f"/api/clips/{quote(CLIP)}/other",
+        "/api/nothing",
+    ],
+)
+def test_bad_paths_are_not_found(client: Client, path: str) -> None:
+    assert client.call("GET", path).status == 404
+
+
+def test_other_hostnames_are_refused(client: Client) -> None:
+    assert client.call("GET", "/api/clips", headers={"Host": "evil.example"}).status == 403
+    reply = client.call(
+        "POST",
+        "/api/job/cancel",
+        b"{}",
+        {"Host": "evil.example", "Content-Type": "application/json"},
+    )
+    assert reply.status == 403
+
+
+def test_localhost_name_is_allowed(client: Client) -> None:
+    headers = {"Host": f"localhost:{client.port}"}
+    assert client.call("GET", "/api/clips", headers=headers).status == 200
+
+
+def test_form_posts_are_refused(client: Client) -> None:
+    reply = client.call(
+        "POST", "/api/job", b"clip=a", {"Content-Type": "application/x-www-form-urlencoded"}
+    )
+    assert reply.status == 400
+
+
+@pytest.mark.parametrize("body", [b"not json", b"[1]"])
+def test_bad_json_is_refused(client: Client, body: bytes) -> None:
+    headers = {"Content-Type": "application/json"}
+    assert client.call("POST", "/api/job", body, headers).status == 400
+
+
+def test_bad_settings_return_a_message(client: Client) -> None:
+    reply = client.post("/api/job", {"clip": CLIP, "boat_class": "4x"})
+    assert reply.status == 400
+    assert "Boats" in reply.json()["error"]
+
+
+def test_boat_tap_needs_a_waiting_job_and_coordinates(client: Client) -> None:
+    assert client.post("/api/job/boat", {}).status == 400
+    reply = client.post("/api/job/boat", {"x": 1, "y": 2})
+    assert reply.status == 400
+    assert "waiting" in reply.json()["error"]
+
+
+def test_unknown_post_is_not_found(client: Client) -> None:
+    assert client.post("/api/nothing", {}).status == 404
+
+
+def test_a_job_runs_from_start_to_result(client: Client) -> None:
+    settings = {"clip": CLIP, "boat_class": "4x", "boats_in_video": 1, "seat": 2}
+    assert client.post("/api/job", settings).status == 200
+    for _ in range(3000):
+        status = client.call("GET", "/api/job").json()
+        if status["state"] != "running":
+            break
+    assert status["state"] == "done"
+    assert status["result"]["rower"]["seat"] == 2
+
+
+def test_cancel_with_no_job_is_harmless(client: Client) -> None:
+    assert client.post("/api/job/cancel", {}).json() == {"state": "idle"}
