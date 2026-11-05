@@ -11,6 +11,10 @@ MIN_TORSO_SCORE = 0.3
 DUPLICATE_DISTANCE_TRUNKS = 0.5
 MATCH_DISTANCE_TRUNKS = 1.0
 MAX_MISSED_SECONDS = 1.0
+MAX_SIZE_RATIO = 1.6
+NEIGHBOUR_DISTANCE_TRUNKS = 8.0
+MAX_STITCH_SECONDS = 3.0
+STITCH_DISTANCE_TRUNKS = 2.0
 TORSO = [sk.LEFT_SHOULDER, sk.RIGHT_SHOULDER, sk.LEFT_HIP, sk.RIGHT_HIP]
 
 
@@ -26,15 +30,18 @@ class Track:
         return float(np.isfinite(self.points[:, sk.LEFT_SHOULDER, 0]).mean())
 
     def centre(self) -> FloatArray:
-        return np.nanmean(self.points[:, TORSO, :], axis=1)
+        return self.points[:, TORSO, :].mean(axis=1)
+
+    def trunk(self) -> float:
+        return _median_trunk(self)
 
 
 def _torso_centres(points: FloatArray) -> FloatArray:
     return points[:, TORSO, :].mean(axis=1)
 
 
-def _trunk_length(points: FloatArray) -> float:
-    return float(np.median(np.linalg.norm(sk.shoulders(points) - sk.hips(points), axis=-1)))
+def _trunk_lengths(points: FloatArray) -> FloatArray:
+    return np.linalg.norm(sk.shoulders(points) - sk.hips(points), axis=-1)
 
 
 def clean_detections(points: FloatArray, scores: FloatArray) -> tuple[FloatArray, FloatArray]:
@@ -43,46 +50,104 @@ def clean_detections(points: FloatArray, scores: FloatArray) -> tuple[FloatArray
     points, scores = points[usable], scores[usable]
     if len(points) < 2:
         return points, scores
-    limit = DUPLICATE_DISTANCE_TRUNKS * _trunk_length(points)
+    trunks = _trunk_lengths(points)
     centres = _torso_centres(points)
     kept: list[int] = []
     for index in np.argsort(scores.mean(axis=1))[::-1]:
-        distances = [np.linalg.norm(centres[index] - centres[other]) for other in kept]
-        if all(distance >= limit for distance in distances):
+        duplicate = any(
+            np.linalg.norm(centres[index] - centres[other])
+            < DUPLICATE_DISTANCE_TRUNKS * min(trunks[index], trunks[other])
+            for other in kept
+        )
+        if not duplicate:
             kept.append(int(index))
     return points[kept], scores[kept]
 
 
-def _match(predicted: FloatArray, found: FloatArray, limit: float) -> list[tuple[int, int]]:
-    """Pair tracks with detections, closest pairs first, each used at most once."""
+def _match(
+    predicted: FloatArray, sizes: FloatArray, found: FloatArray, found_sizes: FloatArray
+) -> list[tuple[int, int]]:
+    """Pair tracks with detections, closest pairs first, each used at most once.
+
+    Limits come from each track's own body size, because a small rower in a distant boat and a
+    large rower in a near boat move by very different amounts in the image.
+    """
     if len(predicted) == 0 or len(found) == 0:
         return []
     distances = np.linalg.norm(predicted[:, None, :] - found[None, :, :], axis=-1)
+    ratio = np.maximum(sizes[:, None], found_sizes[None, :]) / np.minimum(
+        sizes[:, None], found_sizes[None, :]
+    )
+    allowed = (distances <= MATCH_DISTANCE_TRUNKS * sizes[:, None]) & (ratio <= MAX_SIZE_RATIO)
     pairs: list[tuple[int, int]] = []
     used_tracks: set[int] = set()
     used_found: set[int] = set()
     for flat in np.argsort(distances, axis=None):
         track, detection = (int(value) for value in np.unravel_index(flat, distances.shape))
-        if distances[track, detection] > limit:
-            break
-        if track not in used_tracks and detection not in used_found:
+        if allowed[track, detection] and track not in used_tracks and detection not in used_found:
             pairs.append((track, detection))
             used_tracks.add(track)
             used_found.add(detection)
     return pairs
 
 
-def _shared_motion(predicted: FloatArray, found: FloatArray) -> FloatArray:
-    """Estimate frame-to-frame motion shared by everyone, which is mostly the camera panning.
+def _local_motion(predicted: FloatArray, sizes: FloatArray, found: FloatArray) -> FloatArray:
+    """Estimate each track's motion from its neighbours, which is mostly the camera panning.
 
-    Rowers in a boat move together in the image, so the median nearest-neighbour shift follows the
-    camera, and tracks survive pans that would otherwise exceed the matching distance.
+    Rowers in one boat move together in the image, so the median shift of nearby tracks follows
+    the boat. Using neighbours rather than the whole frame keeps separate boats independent.
     """
+    shifts = np.zeros_like(predicted)
     if len(predicted) == 0 or len(found) == 0:
-        return np.zeros(2)
+        return shifts
     offsets = found[None, :, :] - predicted[:, None, :]
     nearest = np.linalg.norm(offsets, axis=-1).argmin(axis=1)
-    return np.median(offsets[np.arange(len(predicted)), nearest], axis=0)
+    moves = offsets[np.arange(len(predicted)), nearest]
+    gaps = np.linalg.norm(predicted[:, None, :] - predicted[None, :, :], axis=-1)
+    for index in range(len(predicted)):
+        ratio = np.maximum(sizes, sizes[index]) / np.minimum(sizes, sizes[index])
+        near = (gaps[index] <= NEIGHBOUR_DISTANCE_TRUNKS * sizes[index]) & (ratio <= MAX_SIZE_RATIO)
+        shifts[index] = np.median(moves[near], axis=0)
+    return shifts
+
+
+def _stitch(tracks: list[Track], fps: float) -> list[Track]:
+    """Join track pieces where one person continues after a gap, such as behind another rower."""
+    max_gap = round(MAX_STITCH_SECONDS * fps)
+    while True:
+        best: tuple[float, int, int] | None = None
+        spans = [_span(track) for track in tracks]
+        for first, (_, end) in enumerate(spans):
+            for second, (start, _) in enumerate(spans):
+                gap = start - end
+                if first == second or not 0 < gap <= max_gap:
+                    continue
+                size = _median_trunk(tracks[first])
+                other = _median_trunk(tracks[second])
+                if max(size, other) / min(size, other) > MAX_SIZE_RATIO:
+                    continue
+                distance = float(
+                    np.linalg.norm(tracks[second].centre()[start] - tracks[first].centre()[end])
+                )
+                limit = STITCH_DISTANCE_TRUNKS * size
+                if distance <= limit and (best is None or distance < best[0]):
+                    best = (distance, first, second)
+        if best is None:
+            return tracks
+        _, first, second = best
+        seen = np.isfinite(tracks[second].points[:, sk.LEFT_SHOULDER, 0])
+        tracks[first].points[seen] = tracks[second].points[seen]
+        tracks[first].scores[seen] = tracks[second].scores[seen]
+        del tracks[second]
+
+
+def _span(track: Track) -> tuple[int, int]:
+    seen = np.where(np.isfinite(track.points[:, sk.LEFT_SHOULDER, 0]))[0]
+    return int(seen[0]), int(seen[-1])
+
+
+def _median_trunk(track: Track) -> float:
+    return float(np.nanmedian(_trunk_lengths(track.points)))
 
 
 def track_people(
@@ -93,27 +158,27 @@ def track_people(
     max_missed = round(MAX_MISSED_SECONDS * fps)
     tracks: list[Track] = []
     last_seen: list[FloatArray] = []
+    last_size: list[float] = []
     last_frame: list[int] = []
 
     for frame in range(total):
         points, scores = clean_detections(frame_points[frame], frame_scores[frame])
         centres = _torso_centres(points) if len(points) else np.zeros((0, 2))
+        found_sizes = _trunk_lengths(points) if len(points) else np.zeros(0)
         active = [i for i, seen in enumerate(last_frame) if frame - seen <= max_missed]
-        predicted = np.array([last_seen[i] for i in active]).reshape(-1, 2)
-        shift = _shared_motion(predicted, centres)
-        predicted = predicted + shift
-        for index in range(len(last_seen)):
-            if index in active:
-                last_seen[index] = last_seen[index] + shift
+        previous = np.array([last_seen[i] for i in active]).reshape(-1, 2)
+        sizes = np.array([last_size[i] for i in active])
+        predicted = previous + _local_motion(previous, sizes, centres)
+        for slot, index in enumerate(active):
+            last_seen[index] = predicted[slot]
 
-        limit = MATCH_DISTANCE_TRUNKS * (_trunk_length(points) if len(points) else 0.0)
-        pairs = _match(predicted, centres, limit)
         matched = set()
-        for slot, detection in pairs:
+        for slot, detection in _match(predicted, sizes, centres, found_sizes):
             index = active[slot]
             tracks[index].points[frame] = points[detection]
             tracks[index].scores[frame] = scores[detection]
             last_seen[index] = centres[detection]
+            last_size[index] = float(found_sizes[detection])
             last_frame[index] = frame
             matched.add(detection)
 
@@ -127,6 +192,7 @@ def track_people(
             track.scores[frame] = scores[detection]
             tracks.append(track)
             last_seen.append(centres[detection])
+            last_size.append(float(found_sizes[detection]))
             last_frame.append(frame)
 
-    return sorted(tracks, key=lambda track: track.coverage, reverse=True)
+    return sorted(_stitch(tracks, fps), key=lambda track: track.coverage, reverse=True)
