@@ -23,6 +23,7 @@ These figures have not been compared with hand-labelled ground truth. Stroke rat
 - **Lower legs are mostly hidden.** Ankle and shin measurements should be expected as "not scored" on footage like this.
 - **Duplicate detections occur.** One rower produced two tracks, so tracking needs duplicate suppression.
 - **The tracker is too simple.** Nearest-neighbour tracking lost the outer rowers (17–43% coverage) as they crossed the frame edge.
+- **Detector.** The pose library uses YOLOX for person detection, not RTMDet. Its code is Apache-2.0, but licence terms for the pretrained weights and their training data still need checking before commercial launch.
 - **Upscaling the whole frame adds little.** Pose already runs on a crop, so upscaling mostly costs time.
 - **Real footage is messy.** Zoom changes, a finger over the lens and oblique final shots all appear in this clip.
 
