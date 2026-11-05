@@ -32,6 +32,10 @@ MAX_BOX_GAP_FRAMES = 30
 VIEW_WINDOW_SECONDS = 3.0
 MIN_VIEW_FRAMES = 4
 UNCORRECTABLE_VIEW_DEG = 60.0
+FILM_CLOSER = (
+    "The rowers are too small in this video to measure accurately, so no scores were given. "
+    "Film closer, so that the boat fills most of the frame width."
+)
 
 FrameReader = Callable[[int], Any]
 """Return the frame at an index."""
@@ -226,7 +230,9 @@ def needs_boat_choice(scouting: Scouting, request: Request) -> bool:
     if request.boat_tap is not None or not scouting.boats:
         return False
     confirmed = sum(boat.confirmed for boat in scouting.boats)
-    return confirmed != 1 or request.boats_in_video != 1
+    if confirmed == 0:
+        return False
+    return confirmed > 1 or request.boats_in_video != 1
 
 
 def _chosen_boat(scouting: Scouting, request: Request) -> Boat | None:
@@ -245,8 +251,6 @@ def _boat_warnings(
         warnings.append(
             f"You said {stated} boat(s), but {len(boats)} were found. Check your selection."
         )
-    if boat.too_far:
-        warnings.append("This boat is too far away to analyse reliably.")
     if surplus:
         warnings.append(
             f"More rowers were found than a {boat_seats}-seat boat holds, "
@@ -275,9 +279,10 @@ def analyse(
         )
     boat = _chosen_boat(found, request)
     if boat is None:
-        return Analysis(
-            fps, frames, warnings=["No rowers with a stroke rhythm were found in this video."]
-        )
+        message = FILM_CLOSER if found.boats else "No rowers were found in this video."
+        return Analysis(fps, frames, warnings=[message])
+    if boat.too_far:
+        return Analysis(fps, frames, warnings=[FILM_CLOSER])
 
     coarse_fps = fps / COARSE_STEP
     assignment = assign_seats(
