@@ -58,7 +58,7 @@ def _progress(phase: FloatArray) -> tuple[FloatArray, FloatArray, FloatArray]:
     return legs, trunk, arms
 
 
-def _bend(start: FloatArray, end: FloatArray, first: float, second: float, sign: float) -> FloatArray:
+def bend(start: FloatArray, end: FloatArray, first: float, second: float, sign: float) -> FloatArray:
     """Place the middle joint of a two-segment limb between `start` and `end` (X, Z arrays)."""
     offset = end - start
     distance = np.linalg.norm(offset, axis=-1, keepdims=True)
@@ -99,7 +99,7 @@ def generate(
     lean = catch_lean_deg + (finish_lean_deg - catch_lean_deg) * trunk_progress
     hip = np.stack([0.30 + 0.55 * legs, np.full(frames, HIP_HEIGHT)], axis=-1)
     ankle = np.zeros((frames, 2))
-    knee = _bend(ankle, hip, SHIN, THIGH, -1.0)
+    knee = bend(ankle, hip, SHIN, THIGH, -1.0)
 
     radians = np.radians(lean)
     shoulder = hip + TRUNK * np.stack([-np.sin(radians), np.cos(radians)], axis=-1)
@@ -109,7 +109,7 @@ def generate(
         [shoulder[:, 0] - np.sqrt(np.maximum(reach**2 - drop**2, 1e-6)), np.full(frames, HAND_HEIGHT)],
         axis=-1,
     )
-    elbow = _bend(shoulder, hand, UPPER_ARM, FOREARM, -1.0)
+    elbow = bend(shoulder, hand, UPPER_ARM, FOREARM, -1.0)
 
     head_centre = shoulder + HEAD * np.stack([-np.sin(radians), np.cos(radians)], axis=-1)
     nose = head_centre + np.array([-0.09, 0.0])
