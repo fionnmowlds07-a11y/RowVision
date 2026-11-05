@@ -260,6 +260,8 @@ ul.caution-box { padding-left: 34px; }
 .rating-note { margin-top: 2px; color: var(--ink-soft); font-size: 13px; }
 .band-poor .rating-value, .band-poor .rating-band { color: var(--danger); }
 
+.rating-notes { margin: 10px 0 0; padding: 8px 12px 8px 28px; background: var(--caution-bg); color: var(--caution); border-radius: 14px; font-size: 14px; font-weight: 500; }
+
 .overall { display: flex; align-items: center; gap: 10px; }
 .overall-bubble { display: grid; place-items: center; width: 74px; height: 74px; border-radius: 50%; background: var(--buoy); color: #fff; font-size: 24px; font-weight: 700; box-shadow: var(--lift); }
 .overall-text { font-size: 13px; color: var(--ink-soft); max-width: 18ch; }
