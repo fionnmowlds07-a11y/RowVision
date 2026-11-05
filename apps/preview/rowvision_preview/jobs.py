@@ -158,9 +158,11 @@ def load_detections(folder: Path, clip: str, source: Source) -> _SavedDetections
 
 
 def code_version() -> str:
-    """Hash the analysis code, so results from older code are not shown as current."""
+    """Hash the analysis code and targets, so older results are not shown as current."""
     digest = hashlib.sha256(str(RESULT_VERSION).encode())
-    for path in sorted(Path(rowvision.__file__).parent.glob("*.py")):
+    package = Path(rowvision.__file__).parent
+    targets = package.parent / "reference"
+    for path in [*sorted(package.glob("*.py")), *sorted(targets.glob("*.yaml"))]:
         digest.update(path.read_bytes())
     return digest.hexdigest()
 
