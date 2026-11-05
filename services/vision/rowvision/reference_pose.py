@@ -36,6 +36,14 @@ MIN_KNEE_DEG, MAX_KNEE_DEG = 40.0, 180.0
 MAX_LEAN_DEG = 60.0
 
 PIN_HEIGHT = 0.30
+BOAT_FLOOR = -0.14
+SEAT_HEIGHT = 0.17
+FOOTPLATE_ANGLE_DEG = 42.0
+FOOT_LENGTH = 0.27
+ANKLE_ABOVE_SOLE = 0.08
+ANKLE_ALONG_SOLE = 0.07
+FOOT_SPACING = 0.085
+"""Distance of each foot from the centreline. Shells are narrow, so feet sit closer than hips."""
 HAND_GAP = 0.25
 """Distance between the hands on a sweep oar."""
 MAX_TWIST_DEG = 14.0
@@ -73,6 +81,18 @@ def _oar(style: Style, side: int, hand_x: float, hand_z: float) -> tuple[Vector,
     pin = np.array([pin_x, side * pin_y, PIN_HEIGHT])
     towards_handle = np.array([along, -side * across, hand_z - PIN_HEIGHT]) / inboard
     return pin, towards_handle, pin - outboard * towards_handle
+
+
+def _foot() -> tuple[Vector, Vector]:
+    """Return heel and toe. The foot is strapped to the footplate, so it never moves.
+
+    The sole slopes up towards the stern, with the ankle sitting on the rower's side of it.
+    """
+    angle = math.radians(FOOTPLATE_ANGLE_DEG)
+    along = np.array([-math.cos(angle), math.sin(angle)])
+    towards_rower = np.array([math.sin(angle), math.cos(angle)])
+    heel = -(ANKLE_ABOVE_SOLE * towards_rower + ANKLE_ALONG_SOLE * along)
+    return heel, heel + FOOT_LENGTH * along
 
 
 def _elbow(shoulder: Vector, hand: Vector, side: int) -> Vector:
@@ -153,10 +173,15 @@ def pose_at(
             }
         )
 
+    heel, toe = _foot()
+
     def body_side(side: int) -> dict[str, list[float]]:
         width = side * HIP_WIDTH / 2
+        foot = side * FOOT_SPACING
         return {
-            "ankle": _rounded(_place(ankle, width)),
+            "heel": _rounded(_place(heel, foot)),
+            "toe": _rounded(_place(toe, foot)),
+            "ankle": _rounded(_place(ankle, foot)),
             "knee": _rounded(_place(knee, width)),
             "hip": _rounded(_place(hip, width)),
             "shoulder": _rounded(shoulders[side]),
@@ -169,6 +194,7 @@ def pose_at(
         "left": body_side(-1),
         "right": body_side(1),
         "head": _rounded(_place(head)),
+        "seat": _rounded(np.array([hip[0], 0.0, SEAT_HEIGHT])),
         "oars": oars,
         "twist_deg": round(math.degrees(abs(turn)), 1),
     }
