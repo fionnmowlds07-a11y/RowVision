@@ -65,7 +65,7 @@ def test_crew_scope_measures_every_seat() -> None:
 
 def test_seat_scope_does_far_less_pose_work_than_crew_scope() -> None:
     seat, crew = FakeBackend(4), FakeBackend(4)
-    run(seat, Request(boat_seats=4, seat=2))
+    run(seat, Request(boat_seats=4, seat=4))
     run(crew, Request(boat_seats=4, scope=Scope.CREW))
     assert seat.estimated_people < crew.estimated_people / 2
 
@@ -248,3 +248,31 @@ def test_a_short_clip_shows_its_angles_but_does_not_score_them() -> None:
     assert body.value is not None
     assert body.score is None
     assert "3 full strokes" in (body.reason or "")
+
+
+def test_a_rower_is_timed_against_the_seat_they_follow() -> None:
+    result = run(FakeBackend(4), Request(boat_seats=4, seat=1, side="bow"))
+    timing = result.rowers[0].timing
+    assert timing is not None
+    assert timing.leader_seat == 3
+    assert timing.catch_ms == pytest.approx(0, abs=70)
+
+
+def test_the_stroke_seat_has_no_timing_figure() -> None:
+    result = run(FakeBackend(4), Request(boat_seats=4, seat=4, side="stroke"))
+    assert result.rowers[0].timing is None
+
+
+def test_a_leader_out_of_view_gives_no_timing_figure() -> None:
+    result = run(FakeBackend(3), Request(boat_seats=8, seat=7, side="stroke", tap=None))
+    assert result.rowers[0].timing is not None
+    missing = run(FakeBackend(1), Request(boat_seats=2, seat=2, side="stroke"))
+    assert missing.rowers[0].timing is None
+
+
+def test_crew_scope_times_every_rower_without_extra_passes() -> None:
+    backend = FakeBackend(4)
+    result = run(backend, Request(boat_seats=4, scope=Scope.CREW, side="stroke"))
+    timed = {rower.seat: rower.timing for rower in result.rowers}
+    assert timed[4] is None
+    assert all(timed[seat] is not None for seat in (1, 2, 3))
