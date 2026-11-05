@@ -333,3 +333,14 @@ export function clipTime(frame, fps) {
 export function previewLabel(frame, frames, fps) {
   return `${clipTime(frame, fps)} of ${clipTime(Math.max(frames - 1, 0), fps)}`;
 }
+
+// Which frame playback should show now. Following the clock keeps real time even when slow frames
+// are skipped, so a rower's speed on screen is always true.
+export function playbackFrame(start, elapsedMs, fps, speed, lastFrame) {
+  return Math.min(start + Math.floor((elapsedMs / 1000) * fps * speed), lastFrame);
+}
+
+// Pressing play at the end starts again from the beginning.
+export function playStart(frame, lastFrame) {
+  return frame >= lastFrame ? 0 : frame;
+}
