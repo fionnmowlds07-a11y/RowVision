@@ -6,6 +6,7 @@
   <title>RowVision preview</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/style.css">
+  <script type="importmap">{"imports": {"three": "/vendor/three.module.min.js"}}</script>
 </head>
 <body>
   <main>
@@ -93,6 +94,24 @@
         <button value="cancel">Keep it hidden</button>
         <button value="show" id="reveal-confirm">Show score</button>
       </form>
+    </dialog>
+
+    <dialog id="model-dialog" aria-labelledby="model-title">
+      <h2 id="model-title"></h2>
+      <div id="model-view"></div>
+      <p id="model-caption"></p>
+      <p id="model-note" class="caution" hidden></p>
+      <div class="controls">
+        <button type="button" data-view="side">Side</button>
+        <button type="button" data-view="stern">From the stern</button>
+        <button type="button" data-view="above">From above</button>
+        <label class="toggle"><input id="model-yours" type="checkbox" checked> Show yours</label>
+        <button id="model-close" type="button">Close</button>
+      </div>
+      <p class="hint">Drag to rotate, scroll or pinch to zoom. <span class="key target">Teal is the
+        target</span>, <span class="key yours">orange is you</span>, and yellow shades the target
+        range. <span class="key port">Red is port</span> and
+        <span class="key starboard">green is starboard</span>.</p>
     </dialog>
   </main>
   <script type="module" src="/app.mjs"></script>

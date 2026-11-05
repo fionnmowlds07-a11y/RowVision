@@ -3,6 +3,7 @@ import {
   evidenceFrames,
   formatTarget,
   formatValue,
+  measureKind,
   median,
   overallVisible,
   sourceLink,
@@ -142,7 +143,7 @@ function evidenceBlock(metric, rower, handlers) {
     );
   }
   if (metric.target) block.append(sources(metric.target));
-  if (handlers.onModel) {
+  if (metric.name.endsWith("_deg")) {
     const model = element("button", null, "See this on the 3D model");
     model.type = "button";
     model.addEventListener("click", () => handlers.onModel(metric));
@@ -162,7 +163,7 @@ function evidenceBlock(metric, rower, handlers) {
     );
     figure.addEventListener("click", () => handlers.onFrame(item.frame));
     strip.append(figure);
-    handlers.onFreeze(canvas, item.frame);
+    handlers.onFreeze(canvas, item.frame, measureKind(metric.name));
   }
   block.append(strip);
   return block;

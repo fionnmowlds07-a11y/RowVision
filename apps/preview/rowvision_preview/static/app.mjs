@@ -8,8 +8,11 @@ import {
   centreOn,
   clampFrame,
   clampView,
+  formatTarget,
   formatValue,
   limbSegments,
+  modelRequest,
+  nearestMeasure,
   nextMarker,
   openingFrame,
   resultSummary,
@@ -54,6 +57,7 @@ let pollTimer = null;
 let stageName = null;
 let stageStart = 0;
 let view = FIT;
+let model = null;
 let panelState = { revealed: false, active: null };
 const pointers = new Map();
 let pinch = null;
@@ -153,11 +157,12 @@ function anglesAt(index) {
   return { trunk: trunk[index], knee: knee[index], elbow: elbow[index] };
 }
 
-function drawAngles(target, pose, index, size) {
+function drawAngles(target, pose, index, size, only = null) {
   if (!pose) return;
   target.font = `${11 * size}px system-ui, sans-serif`;
   target.lineWidth = 1.5 * size;
-  for (const item of angleMarks(pose, anglesAt(index))) {
+  const marks = angleMarks(pose, anglesAt(index));
+  for (const item of marks.filter(({ kind }) => !only || kind === only)) {
     const { start, end, anticlockwise } = arcBetween(item);
     const { x, y } = item.vertex;
     target.strokeStyle = ANGLE_COLOUR;
@@ -235,13 +240,61 @@ function updateReadout() {
 function updateLiveAngles() {
   const rower = result?.rower;
   if (!rower) {
-    $("live-angles").textContent = "";
+    $("live-angles").replaceChildren();
     return;
   }
-  const { trunk, knee, elbow } = anglesAt(frame);
+  const angles = anglesAt(frame);
   const text = (name, value) => (value === null ? "not seen" : formatValue(name, value));
-  $("live-angles").textContent =
-    `Body ${text("lean", trunk)} · Knee ${text("knee", knee)} · Elbow ${text("elbow", elbow)}`;
+  const items = [
+    ["trunk", "Body", text("lean", angles.trunk)],
+    ["knee", "Knee", text("knee", angles.knee)],
+    ["elbow", "Elbow", text("elbow", angles.elbow)],
+  ];
+  $("live-angles").replaceChildren(...items.map(([kind, name, value]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "link";
+    button.title = "See this angle on the 3D model";
+    button.textContent = `${name} ${value}`;
+    button.addEventListener("click", () => {
+      openModel(nearestMeasure(kind, frame, rower.catches, rower.finishes));
+    });
+    return button;
+  }));
+}
+
+function allMetrics() {
+  return result.rower.card.metrics;
+}
+
+async function openModel(name) {
+  const dialog = $("model-dialog");
+  const request = modelRequest(name, allMetrics());
+  const metric = allMetrics().find((item) => item.name === name);
+  $("model-title").textContent =
+    `${metric?.label ?? "Elbow at the finish"}: ${sideNames[result.settings?.side ?? $("side").value]}`;
+  const parts = [];
+  if (metric) {
+    parts.push(`Target ${formatTarget(name, metric.target)}`);
+    parts.push(`You ${formatValue(name, metric.value)}`);
+  }
+  $("model-caption").textContent = parts.join(" · ");
+  const note = request.assumed.length
+    ? `${request.assumed.join(" and ")} could not be measured reliably, so your pose uses the target there.`
+    : "";
+  $("model-note").textContent = note;
+  $("model-note").hidden = !note;
+  dialog.showModal();
+  try {
+    const { showModel } = await import("./model.mjs");
+    model?.close();
+    model = await showModel(
+      $("model-view"), request, result.settings?.side ?? $("side").value, $("model-yours").checked,
+    );
+  } catch (error) {
+    $("model-note").textContent = `The 3D model could not open. ${error.message}`;
+    $("model-note").hidden = false;
+  }
 }
 
 function goTo(target) {
@@ -316,7 +369,7 @@ function showSummary() {
   $("summary").textContent = rower ? resultSummary(result) : "No limb lines for this clip.";
 }
 
-function drawFreeze(target, index) {
+function drawFreeze(target, index, kind) {
   const pose = result.rower.poses[index];
   const centre = bodyCentre(pose);
   const picture = new Image();
@@ -329,7 +382,7 @@ function drawFreeze(target, index) {
     paint.imageSmoothingQuality = "high";
     paint.drawImage(picture, 0, 0, clip.width, clip.height);
     drawPose(paint, pose, 0.5);
-    drawAngles(paint, pose, index, 0.5);
+    drawAngles(paint, pose, index, 0.5, kind);
   };
   picture.src = frameUrl(index);
 }
@@ -349,6 +402,7 @@ function showPanel() {
       $("canvas").scrollIntoView({ behavior: "smooth", block: "center" });
     },
     onFreeze: drawFreeze,
+    onModel: (metric) => openModel(metric.name),
   });
 }
 
@@ -524,6 +578,16 @@ $("viewer").addEventListener("click", (event) => {
   }
 });
 
+$("model-dialog").addEventListener("click", (event) => {
+  const name = event.target.closest("button")?.dataset.view;
+  if (name) model?.setView(name);
+});
+$("model-yours").addEventListener("change", (event) => model?.setYours(event.target.checked));
+$("model-close").addEventListener("click", () => $("model-dialog").close());
+$("model-dialog").addEventListener("close", () => {
+  model?.close();
+  model = null;
+});
 $("show-lines").addEventListener("change", draw);
 $("show-angles").addEventListener("change", draw);
 $("zoom-in").addEventListener("click", () => zoomCentre(ZOOM_STEP));
