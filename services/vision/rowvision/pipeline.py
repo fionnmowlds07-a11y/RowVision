@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 
 from rowvision import skeleton as sk
+from rowvision.boats import Boat, boat_at, find_boats, overlap_frames, preview_frame
 from rowvision.metrics import StrokeMetrics, angle_series, per_stroke
 from rowvision.pose import PoseBackend
 from rowvision.seats import assign_seats, track_at
@@ -39,6 +40,10 @@ class Request:
     seat: int | None = None
     tap: tuple[int, float, float] | None = None
     """Frame, x and y where the athlete tapped themselves. Overrides `seat`."""
+    boats_in_video: int = 1
+    """How many boats the athlete says are in the video."""
+    boat_tap: tuple[int, float, float] | None = None
+    """Frame, x and y where the athlete tapped their boat."""
 
 
 @dataclass(frozen=True)
@@ -56,18 +61,47 @@ class RowerResult:
 
 
 @dataclass(frozen=True)
+class BoatChoice:
+    """One boat to show the athlete on the preview frame."""
+
+    outline: FloatArray | None
+    rowers: int
+    too_far: bool
+
+
+@dataclass(frozen=True)
+class Scouting:
+    """What the coarse pass found, ready for the athlete to choose from."""
+
+    tracks: list[Track]
+    boats: list[Boat]
+    preview: int
+    """Full-rate frame index showing the most boats."""
+
+    def choices(self) -> list[BoatChoice]:
+        frame = self.preview // COARSE_STEP
+        return [BoatChoice(boat.outline(frame), len(boat.rowers), boat.too_far) for boat in self.boats]
+
+
+@dataclass(frozen=True)
 class Analysis:
     fps: float
     frames: int
-    facing: int
-    seats_complete: bool
-    view_deg: float
-    shots: list[Shot]
+    facing: int = 0
+    seats_complete: bool = False
+    view_deg: float = float("nan")
+    shots: list[Shot] = field(default_factory=list)
     rowers: list[RowerResult] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    needs_boat_choice: bool = False
+    """True when the athlete must tap their boat before analysis can continue."""
+    boat_choices: list[BoatChoice] = field(default_factory=list)
+    preview: int = 0
+    overlap_share: float = 0.0
+    """Share of the chosen boat's frames dropped because another boat crossed it."""
 
 
-def _coarse_pass(
+def coarse_pass(
     read: FrameReader, frames: int, backend: PoseBackend
 ) -> tuple[list[FloatArray], list[FloatArray]]:
     points, scores = [], []
@@ -158,31 +192,79 @@ def _measure(
     )
 
 
-def scout(read: FrameReader, frames: int, fps: float, backend: PoseBackend) -> list[Track]:
-    """Find everyone in the clip from sampled frames."""
-    return track_people(*_coarse_pass(read, frames, backend), fps / COARSE_STEP)
+def scout(read: FrameReader, frames: int, fps: float, backend: PoseBackend) -> Scouting:
+    """Find every person and boat in the clip from sampled frames."""
+    coarse_fps = fps / COARSE_STEP
+    tracks = track_people(*coarse_pass(read, frames, backend), coarse_fps)
+    boats = find_boats(tracks, coarse_fps)
+    return Scouting(tracks, boats, preview_frame(boats) * COARSE_STEP)
+
+
+def needs_boat_choice(scouting: Scouting, request: Request) -> bool:
+    """Ask the athlete unless exactly one boat was stated and exactly one was found."""
+    if request.boat_tap is not None or not scouting.boats:
+        return False
+    return len(scouting.boats) > 1 or request.boats_in_video != 1
+
+
+def _chosen_boat(scouting: Scouting, request: Request) -> Boat | None:
+    if request.boat_tap is None:
+        return scouting.boats[0] if scouting.boats else None
+    frame, x, y = request.boat_tap
+    return boat_at(scouting.boats, frame // COARSE_STEP, np.array([x, y]))
+
+
+def _boat_warnings(boat: Boat, surplus: int, boat_seats: int, found: int, stated: int) -> list[str]:
+    warnings = []
+    if found != stated:
+        warnings.append(f"You said {stated} boat(s), but {found} were found. Check your selection.")
+    if boat.too_far:
+        warnings.append("This boat is too far away to analyse reliably.")
+    if surplus:
+        warnings.append(
+            f"More rowers were found than a {boat_seats}-seat boat holds, "
+            "so two boats may have been grouped together."
+        )
+    return warnings
 
 
 def analyse(
-    read: FrameReader, frames: int, fps: float, request: Request, backend: PoseBackend
+    read: FrameReader,
+    frames: int,
+    fps: float,
+    request: Request,
+    backend: PoseBackend,
+    scouting: Scouting | None = None,
 ) -> Analysis:
-    tracks = scout(read, frames, fps, backend)
+    """Measure the requested rowers, or stop and ask if the athlete must choose a boat first."""
+    found = scouting if scouting is not None else scout(read, frames, fps, backend)
+    if needs_boat_choice(found, request):
+        return Analysis(
+            fps,
+            frames,
+            needs_boat_choice=True,
+            boat_choices=found.choices(),
+            preview=found.preview,
+        )
+    boat = _chosen_boat(found, request)
+    if boat is None:
+        return Analysis(
+            fps, frames, warnings=["No rowers with a stroke rhythm were found in this video."]
+        )
+
     coarse_fps = fps / COARSE_STEP
-    assignment = assign_seats(tracks, request.boat_seats, coarse_fps)
+    assignment = assign_seats(boat.tracks, request.boat_seats, coarse_fps)
     rowers = list(assignment.seats.values())
 
     coarse_views = view_by_frame(rowers, coarse_fps)
-    if len(coarse_views):
-        nearest = np.minimum(np.arange(frames) // COARSE_STEP, len(coarse_views) - 1)
-        views = coarse_views[nearest]
-    else:
-        views = np.full(frames, np.nan)
+    nearest = np.minimum(np.arange(frames) // COARSE_STEP, max(len(coarse_views) - 1, 0))
+    views = coarse_views[nearest] if len(coarse_views) else np.full(frames, np.nan)
     shots = split_shots(views, fps)
     view = _usable_view(shots, views)
 
-    warnings: list[str] = []
-    if not rowers:
-        warnings.append("No rowers with a stroke rhythm were found in this video.")
+    warnings = _boat_warnings(
+        boat, assignment.surplus, request.boat_seats, len(found.boats), request.boats_in_video
+    )
     if rowers and not assignment.complete and request.tap is None:
         warnings.append(
             f"Only {len(rowers)} of {request.boat_seats} rowers were seen, "
@@ -194,10 +276,10 @@ def analyse(
 
     targets: list[tuple[int | None, Track]] = []
     if request.scope is Scope.CREW:
-        targets = [(seat, track) for seat, track in assignment.seats.items()]
+        targets = list(assignment.seats.items())
     elif request.tap is not None:
         frame, x, y = request.tap
-        chosen = track_at(tracks, frame // COARSE_STEP, np.array([x, y]))
+        chosen = track_at(boat.tracks, frame // COARSE_STEP, np.array([x, y]))
         if chosen is not None:
             seat = next((s for s, t in assignment.seats.items() if t is chosen), None)
             targets = [(seat, chosen)]
@@ -206,10 +288,31 @@ def analyse(
     elif rowers:
         warnings.append(f"Seat {request.seat} was not visible. Tap yourself on a frame to choose.")
 
+    others = [other for other in found.boats if other is not boat]
+    coarse_frames = len(boat.seen())
+    crossed = overlap_frames(boat, others, coarse_frames)
+    dropped = crossed[np.minimum(np.arange(frames) // COARSE_STEP, coarse_frames - 1)]
+    overlap_share = float(crossed.sum()) / max(int(boat.seen().sum()), 1)
+    if overlap_share:
+        warnings.append(
+            f"Another boat crossed yours for {overlap_share:.0%} of the time it was in view. "
+            "Those frames were left out."
+        )
+
     results = []
     for seat, track in targets:
         points, scores = _fine_pass(read, frames, track, backend)
+        points[dropped] = np.nan
+        scores[dropped] = 0
         results.append(_measure(seat, points, scores, assignment.facing, view, fps))
     return Analysis(
-        fps, frames, assignment.facing, assignment.complete, view, shots, results, warnings
+        fps,
+        frames,
+        assignment.facing,
+        assignment.complete,
+        view,
+        shots,
+        results,
+        warnings,
+        overlap_share=overlap_share,
     )
