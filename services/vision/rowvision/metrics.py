@@ -10,6 +10,7 @@ from rowvision.skeleton import FloatArray
 from rowvision.strokes import StrokeTimeline
 
 ONSET_FRACTION = 0.2
+MAX_STROKE_PERIODS = 1.6
 
 
 @dataclass(frozen=True)
@@ -71,7 +72,8 @@ def per_stroke(angles: AngleSeries, timeline: StrokeTimeline) -> list[StrokeMetr
     results = []
     for catch, next_catch in zip(timeline.catches, timeline.catches[1:]):
         finishes = [frame for frame in timeline.finishes if catch < frame < next_catch]
-        if not finishes:
+        too_long = timeline.period_frames and next_catch - catch > MAX_STROKE_PERIODS * timeline.period_frames
+        if not finishes or too_long:
             continue
         finish = finishes[0]
         results.append(
