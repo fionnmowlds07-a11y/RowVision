@@ -34,6 +34,8 @@ COARSE_STEP = 5
 BOX_MARGIN = 0.25
 MAX_BOX_GAP_FRAMES = 30
 MIN_CREW_FOR_TIMING = 3
+MIN_KNOWN_SHARE = 0.5
+"""A measure needs a believable reading on this share of strokes to be shown at all."""
 VIEW_WINDOW_SECONDS = 3.0
 MIN_VIEW_FRAMES = 4
 UNCORRECTABLE_VIEW_DEG = 60.0
@@ -244,7 +246,7 @@ def _measure(
     for name in names:
         values = np.array([getattr(stroke, name) for stroke in strokes], dtype=float)
         values = values[np.isfinite(values)]
-        if len(values):
+        if len(values) and len(values) >= MIN_KNOWN_SHARE * len(strokes):
             summary[name] = float(np.median(values))
             spread[name] = float(np.subtract(*np.percentile(values, [75, 25])))
     card = score_stroke(summary, spread, len(strokes), timeline.rate_spm, load_targets())
@@ -408,6 +410,10 @@ def analyse(
                 coverage=float(measured[in_view].mean()) if in_view.any() else 0.0,
                 agreement=None if agreement is None or np.isnan(agreement) else agreement,
             )
+        )
+    if results and not any(rower.strokes for rower in results):
+        warnings.append(
+            "No full strokes could be measured. Try a clip that shows more of the rower side-on."
         )
     return Analysis(
         fps,
