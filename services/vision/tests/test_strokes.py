@@ -30,11 +30,18 @@ def test_catches_and_finishes_land_near_true_frames() -> None:
     clip = generate(strokes=6, pixel_noise=1.0)
     timeline = detect_strokes(reach_signal(clip.points, clip.facing), clip.fps)
     tolerance = 0.2 * clip.fps
-    interior_catches = clip.catch_frames[1:]
-    for truth in interior_catches:
+    half_stroke = 60 / clip.rate_spm * clip.fps / 2
+    last = len(clip.points) - half_stroke
+    for truth in [frame for frame in clip.catch_frames if half_stroke <= frame <= last]:
         assert min(abs(found - truth) for found in timeline.catches) <= tolerance
-    for truth in clip.finish_frames:
+    for truth in [frame for frame in clip.finish_frames if half_stroke <= frame <= last]:
         assert min(abs(found - truth) for found in timeline.finishes) <= tolerance
+
+
+def test_strokes_cut_off_by_the_clip_edge_are_left_out() -> None:
+    clip = generate(strokes=6, pixel_noise=1.0)
+    timeline = detect_strokes(reach_signal(clip.points, clip.facing), clip.fps)
+    assert min(timeline.finishes) > 37
 
 
 def test_missing_frames_are_tolerated() -> None:
@@ -71,3 +78,24 @@ def test_motion_is_not_invented_across_a_long_gap() -> None:
     timeline = detect_strokes(reach, clip.fps)
     assert not any(150 <= frame < 300 for frame in timeline.catches + timeline.finishes)
     assert timeline.rate_spm == pytest.approx(24, abs=1.5)
+
+
+def test_noisy_flat_peaks_do_not_scatter_the_timing() -> None:
+    clip = generate(strokes=10)
+    reach = reach_signal(clip.points, clip.facing)
+    noisy = reach + np.random.default_rng(3).normal(0, 0.25, len(reach))
+    timeline = detect_strokes(noisy, clip.fps)
+    gaps = np.diff(timeline.catches)
+    assert np.abs(gaps - 75).max() <= 8
+
+
+def test_drive_length_stays_steady_on_noisy_signals() -> None:
+    clip = generate(strokes=10)
+    reach = reach_signal(clip.points, clip.facing)
+    noisy = reach + np.random.default_rng(5).normal(0, 0.25, len(reach))
+    timeline = detect_strokes(noisy, clip.fps)
+    drives = [
+        min(finish - catch for finish in timeline.finishes if finish > catch)
+        for catch in timeline.catches[:-1]
+    ]
+    assert np.ptp(drives) <= 12
