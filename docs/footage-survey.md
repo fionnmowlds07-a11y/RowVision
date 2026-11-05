@@ -35,7 +35,7 @@ Rowers found in each clip, against the crew visible in the footage. The boat cla
 | Two too many (eight) | 1 clip, small rowers |
 | No confirmed rowers (eight) | 1 clip, rowers about 25 px tall |
 
-In the last clip, the larger pose model confirmed 4 of 8 rowers, but took 204 seconds to scout a 14-second clip, roughly three times the estimated time for the standard model. Eights filmed from a distance remain the hardest case.
+In the last clip, the larger pose model confirmed 4 of 8 rowers, but took 204 seconds to scout a 14-second clip, roughly three times the estimated time for the standard model. Eights filmed from a distance remain the hardest case. When rowers are too small to measure, the app gives filming advice and no scores, rather than retrying with a slower model.
 
 Rowers move in time with their crew and a cox does not, so when a boat has too many people, anyone clearly out of time is dropped. In one coxed four, this removed a small track with little connection to the crew's stroke, which fits a cox but was not confirmed by eye.
 

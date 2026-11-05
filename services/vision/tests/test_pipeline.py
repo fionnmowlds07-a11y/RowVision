@@ -2,7 +2,15 @@ import numpy as np
 import pytest
 from crew import crew_detections, distant_people, two_boat_detections
 
-from rowvision.pipeline import COARSE_STEP, Analysis, Request, Scope, _boxes_for, analyse
+from rowvision.pipeline import (
+    COARSE_STEP,
+    FILM_CLOSER,
+    Analysis,
+    Request,
+    Scope,
+    _boxes_for,
+    analyse,
+)
 from rowvision.shots import ShotKind
 from rowvision.skeleton import FloatArray
 from rowvision.tracking import Track
@@ -93,7 +101,7 @@ def test_footage_with_no_rowers_is_reported() -> None:
     backend.scores = [np.zeros((0, 17))] * 300
     result = run(backend, Request(boat_seats=1, seat=1))
     assert result.rowers == []
-    assert any("No rowers" in warning for warning in result.warnings)
+    assert result.warnings == ["No rowers were found in this video."]
 
 
 def tap_on(result: Analysis, index: int) -> tuple[int, float, float]:
@@ -121,14 +129,24 @@ def test_analysis_continues_on_the_tapped_boat() -> None:
     assert [rower.seat for rower in result.rowers] == [2]
 
 
-def test_boat_class_applies_only_to_the_chosen_boat() -> None:
+def test_choosing_a_boat_too_far_away_gives_advice_and_no_scores() -> None:
     backend = FakeBackend(crossing=False)
     first = run(backend, Request(boat_seats=2, seat=1, boats_in_video=2))
-    index = next(i for i, choice in enumerate(first.boat_choices) if choice.people == 2)
+    index = next(i for i, choice in enumerate(first.boat_choices) if choice.too_far)
     request = Request(boat_seats=2, seat=1, boats_in_video=2, boat_tap=tap_on(first, index))
     result = run(backend, request)
-    assert result.seats_complete
-    assert any("too far away" in warning for warning in result.warnings)
+    assert result.rowers == []
+    assert result.warnings == [FILM_CLOSER]
+
+
+def test_only_distant_people_gives_advice_without_asking() -> None:
+    backend = FakeBackend(1)
+    backend.points = [distant_people(frame) for frame in range(300)]
+    backend.scores = [np.full((2, 17), 0.9)] * 300
+    result = run(backend, Request(boat_seats=8, seat=3))
+    assert not result.needs_boat_choice
+    assert result.rowers == []
+    assert result.warnings == [FILM_CLOSER]
 
 
 def test_unconfirmed_distant_group_does_not_trigger_a_question() -> None:
