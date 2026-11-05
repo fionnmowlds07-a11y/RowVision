@@ -43,6 +43,12 @@ RowVision gives coaching feedback, not medical advice. Spinal curvature and pelv
 
 No study found validates pose estimation for on-water rowing, so RowVision has to establish this itself. Research on other movements supports the approach and shows its limits. Single-camera sagittal measures can come close to marker-based results on the camera side, but the hidden side is much less reliable (Wade 2023). Camera angle and distance also affect accuracy (Wang 2024).
 
+## How the accuracy rating works
+
+The rating estimates the share of joint angles within 5° of the true value. It depends on how big the rower is in pixels, the camera angle, and how much the angle varies between strokes. Clip length, tracking coverage and crew rhythm do not change it. They appear as separate notes, because they say how much evidence there is, not how accurate an angle is.
+
+The keypoint error behind the rating is an assumption of 1.5 pixels until it is measured. Hand-labelled frames replace it through `services/vision/reference/calibration.yaml`, and the rating says "uncalibrated" until then. Tests on synthetic footage show the maths is right for a known error. They do not show what the error is on real footage.
+
 ## Review status
 
 These targets have not yet been reviewed by a coach.

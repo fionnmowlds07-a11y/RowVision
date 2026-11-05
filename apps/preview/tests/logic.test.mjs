@@ -3,6 +3,11 @@ import { test } from "node:test";
 
 import {
   FIT,
+  JOINT_ORDER,
+  labelCount,
+  labelResults,
+  labelView,
+  nextJoint,
   playStart,
   playbackFrame,
   clipTime,
@@ -385,4 +390,34 @@ test("playback stops at the last frame", () => {
 test("pressing play at the end restarts the clip", () => {
   assert.equal(playStart(500, 500), 0);
   assert.equal(playStart(120, 500), 120);
+});
+
+
+test("labelling moves through the joints in order", () => {
+  assert.equal(nextJoint({}), "shoulder");
+  assert.equal(nextJoint({ shoulder: [1, 2], elbow: null }), "wrist");
+  const done = Object.fromEntries(JOINT_ORDER.map((name) => [name, null]));
+  assert.equal(nextJoint(done), null);
+});
+
+test("a labelling frame centres on the rower", () => {
+  const view = labelView([400, 240], 200, 800, 480);
+  assert.equal(view.scale, 4);
+  assert.deepEqual(viewPoint(view, { x: 400, y: 240 }), { x: 400, y: 240 });
+});
+
+test("labelling progress reads plainly", () => {
+  assert.equal(labelCount({ labelled: 3, target: 100, available: 50 }), "3 of 100 frames labelled");
+  assert.match(labelCount({ labelled: 0, target: 100, available: 0 }), /Analyse a clip first/);
+});
+
+test("results stay quiet until there is something to report", () => {
+  assert.equal(labelResults({ keypoint_error_px: null }), "");
+  const text = labelResults({
+    keypoint_error_px: 2.34, trunk_within_5_deg: 81.2, knee_within_5_deg: null, labelled: 10, target: 100,
+  });
+  assert.match(text, /2\.3 pixels/);
+  assert.match(text, /81%/);
+  assert.doesNotMatch(text, /Knee/);
+  assert.match(text, /label more/);
 });
