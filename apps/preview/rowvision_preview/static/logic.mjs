@@ -319,3 +319,17 @@ export function labelSpot(kind, vertex, width, height, gap) {
   if (kind === "knee") return { x: vertex.x - width / 2, y: vertex.y - height - gap * 1.6 };
   return { x: vertex.x + gap, y: vertex.y - height / 2 };
 }
+
+// A clip preview opens part way through, as clips often start before the boat is in view.
+export function previewStart(frames) {
+  return Math.max(Math.floor(frames / 2), 0);
+}
+
+export function clipTime(frame, fps) {
+  const seconds = Math.floor(frame / fps);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+export function previewLabel(frame, frames, fps) {
+  return `${clipTime(frame, fps)} of ${clipTime(Math.max(frames - 1, 0), fps)}`;
+}
