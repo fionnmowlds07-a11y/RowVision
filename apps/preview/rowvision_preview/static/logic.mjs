@@ -380,3 +380,15 @@ export function labelResults(summary) {
   if (summary.labelled < summary.target) parts.push("This will settle as you label more.");
   return parts.join(" ");
 }
+
+// Comparing real rowers is only good to about two frames, so small gaps are not reported as gaps.
+export const TIMING_IN_TIME_MS = 50;
+export const TIMING_MAX_SPREAD_MS = 70;
+
+export function timingText(gap, spread) {
+  if (gap === null || gap === undefined) return "Not enough strokes";
+  if (spread === null || spread > TIMING_MAX_SPREAD_MS) return "Too variable to read on this footage";
+  if (Math.abs(gap) < TIMING_IN_TIME_MS) return "In time";
+  const size = Math.round(Math.abs(gap) / 10) * 10;
+  return `About ${size} ms ${gap > 0 ? "late" : "early"}`;
+}

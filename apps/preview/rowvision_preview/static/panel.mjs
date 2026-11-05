@@ -8,6 +8,7 @@ import {
   median,
   overallVisible,
   sourceLink,
+  timingText,
 } from "./logic.mjs";
 
 const MIN_STROKES = 3;
@@ -79,6 +80,23 @@ function phaseBlock(card) {
     );
     block.append(item);
   }
+  return block;
+}
+
+function timingBlock(timing) {
+  const block = element("div", "timing");
+  block.append(element("h3", "", `Timing against seat ${timing.leader_seat}`));
+  const rows = element("dl", "timing-rows");
+  for (const [name, gap, spread] of [
+    ["Catch", timing.catch_ms, timing.catch_spread_ms],
+    ["Finish", timing.finish_ms, timing.finish_spread_ms],
+  ]) {
+    rows.append(element("dt", "", name), element("dd", "", timingText(gap, spread)));
+  }
+  block.append(
+    rows,
+    element("p", "rating-note", `Trend across ${timing.strokes} strokes, from hand movement. Not scored, and good to about 50 ms.`),
+  );
   return block;
 }
 
@@ -196,4 +214,5 @@ export function renderPanel(container, rower, state, handlers) {
   notes.append(...rower.rating.warnings.map((text) => element("li", "", text)));
   const parts = rower.rating.warnings.length ? [headline, notes] : [headline];
   container.replaceChildren(...parts, phaseBlock(rower.card), list);
+  if (rower.timing) container.append(timingBlock(rower.timing));
 }

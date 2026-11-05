@@ -11,6 +11,7 @@ from rowvision.reference import load_targets
 from rowvision.reliability import Evidence, rate
 from rowvision.scoring import score_stroke
 from rowvision.shots import Shot, ShotKind
+from rowvision.timing import FollowTiming
 
 from rowvision_preview.results import (
     analysis_json,
@@ -42,6 +43,7 @@ def rower(frames: int = 4) -> Any:
         spread=spread,
         card=score_stroke(summary, spread, 8, 24, load_targets()),
         rating=rate(Evidence(25, 10, 2, 1, 8)),
+        timing=FollowTiming(8, 66.7, None, 33.3, None, 7),
     )
 
 
@@ -162,3 +164,11 @@ def test_summary_of_a_film_closer_result_has_no_scores() -> None:
     summary = result_summary("a.json", result)
     assert summary["film_closer"] is True
     assert summary["overall"] is None
+
+
+def test_timing_names_the_seat_being_followed() -> None:
+    timing = full_result()["rower"]["timing"]
+    assert timing["leader_seat"] == 8
+    assert timing["catch_ms"] == 66.7
+    assert timing["finish_ms"] is None
+    assert timing["strokes"] == 7
