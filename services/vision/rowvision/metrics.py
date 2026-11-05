@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 
 import numpy as np
+from numpy.typing import NDArray
 
 from rowvision import skeleton as sk
 from rowvision.geometry import joint_angle, lean_from_vertical, undo_foreshortening
@@ -10,6 +11,12 @@ from rowvision.skeleton import FloatArray
 from rowvision.strokes import StrokeTimeline
 
 ONSET_FRACTION = 0.2
+MIN_ANKLE_DROP_TRUNKS = 0.02
+"""Feet sit below the seat, so an ankle level with or above the hip has been misplaced."""
+MIN_SHIN_TO_THIGH, MAX_SHIN_TO_THIGH = 0.5, 1.7
+CATCH_KNEE_RANGE = (30.0, 115.0)
+FINISH_KNEE_RANGE = (130.0, 185.0)
+"""What a body can do at each moment. Values outside are misplaced joints, not poor technique."""
 MAX_STROKE_PERIODS = 1.6
 
 
@@ -38,14 +45,36 @@ class StrokeMetrics:
     """How far the legs lead the trunk off the catch, as a share of the drive. Positive is legs first."""
 
 
+def legs_believable(side_on: FloatArray) -> NDArray[np.bool_]:
+    """Return which frames have a lower leg a real body could make.
+
+    The hull hides the feet, so the pose model often guesses, and can put an ankle up by the hands.
+    Model confidence does not reliably show this, so the check uses anatomy instead.
+    """
+    hip, knee, ankle = sk.hips(side_on), sk.knees(side_on), sk.ankles(side_on)
+    trunk = np.linalg.norm(sk.shoulders(side_on) - hip, axis=-1)
+    shin = np.linalg.norm(knee - ankle, axis=-1)
+    thigh = np.linalg.norm(knee - hip, axis=-1)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        drop = (ankle[..., 1] - hip[..., 1]) / trunk
+        ratio = shin / thigh
+    return (drop >= MIN_ANKLE_DROP_TRUNKS) & (ratio >= MIN_SHIN_TO_THIGH) & (ratio <= MAX_SHIN_TO_THIGH)
+
+
+def _within(value: float, limits: tuple[float, float]) -> float:
+    """Return the value if a body could reach it, or NaN if it could not."""
+    return value if limits[0] <= value <= limits[1] else float("nan")
+
+
 def angle_series(points: FloatArray, facing: int, view_deg: float) -> AngleSeries:
     hip = sk.hips(points)
     side_on = undo_foreshortening(points, hip[:, None, :], view_deg)
     hip = sk.hips(side_on)
     shoulder = sk.shoulders(side_on)
+    knee = joint_angle(hip, sk.knees(side_on), sk.ankles(side_on))
     return AngleSeries(
         trunk_lean=lean_from_vertical(hip, shoulder, facing),
-        knee=joint_angle(hip, sk.knees(side_on), sk.ankles(side_on)),
+        knee=np.where(legs_believable(side_on), knee, np.nan),
         elbow=joint_angle(shoulder, sk.elbows(side_on), sk.wrists(side_on)),
     )
 
@@ -84,8 +113,8 @@ def per_stroke(angles: AngleSeries, timeline: StrokeTimeline) -> list[StrokeMetr
                 next_catch_frame=next_catch,
                 catch_lean_deg=float(angles.trunk_lean[catch]),
                 finish_lean_deg=float(angles.trunk_lean[finish]),
-                catch_knee_deg=float(angles.knee[catch]),
-                finish_knee_deg=float(angles.knee[finish]),
+                catch_knee_deg=_within(float(angles.knee[catch]), CATCH_KNEE_RANGE),
+                finish_knee_deg=_within(float(angles.knee[finish]), FINISH_KNEE_RANGE),
                 finish_elbow_deg=float(angles.elbow[finish]),
                 drive_share=(finish - catch) / (next_catch - catch),
                 legs_lead=_legs_lead(angles, catch, finish),

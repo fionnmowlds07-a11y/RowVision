@@ -223,3 +223,28 @@ def test_results_come_with_scores_and_a_rating() -> None:
     assert rower.card.overall is not None
     assert 0 <= rower.rating.accuracy <= 100
     assert not rower.rating.calibrated
+
+
+def test_a_measure_seen_on_too_few_strokes_is_not_reported() -> None:
+    backend = FakeBackend(4)
+    for people in backend.points:
+        people[:, 15:17] = people[:, 9:11]
+    result = run(backend, Request(boat_seats=4, seat=2))
+    rower = result.rowers[0]
+    assert "catch_knee_deg" not in rower.summary
+    knee = next(item for item in rower.card.metrics if item.name == "catch_knee_deg")
+    assert knee.score is None
+    assert knee.value is None
+    assert rower.summary["catch_lean_deg"] == pytest.approx(25, abs=5)
+
+
+def test_a_short_clip_shows_its_angles_but_does_not_score_them() -> None:
+    backend = FakeBackend(4)
+    backend.points = backend.points[:170]
+    backend.scores = backend.scores[:170]
+    rower = run(backend, Request(boat_seats=4, seat=2)).rowers[0]
+    body = next(item for item in rower.card.metrics if item.name == "catch_lean_deg")
+    assert 0 < len(rower.strokes) < 3
+    assert body.value is not None
+    assert body.score is None
+    assert "3 full strokes" in (body.reason or "")

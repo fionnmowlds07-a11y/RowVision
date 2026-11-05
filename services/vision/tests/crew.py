@@ -24,24 +24,26 @@ def crew_detections(
 
 
 def two_boat_detections(*, crossing: bool = False) -> tuple[list[FloatArray], list[FloatArray]]:
-    """Return a near four and a distant pair moving the opposite way.
+    """Return a near four and a pair moving the opposite way.
 
-    Without `crossing` the boats stay apart on screen. With it, the distant boat travels across
-    the near one, so their outlines overlap for part of the clip.
+    Without `crossing` the pair is far off, so its people are small. With it, the pair is close and
+    of a similar size, and travels across the four.
     """
     near_points, near_scores = crew_detections(4)
+    scale = 240 if crossing else 24
     far = [
-        generate(strokes=7, rate_spm=28, facing=1, pixels_per_metre=24, pixel_noise=0.1, seed=9 + i)
+        generate(strokes=7, rate_spm=28, facing=1, pixels_per_metre=scale, pixel_noise=0.1, seed=9 + i)
         for i in range(2)
     ]
     points, scores = [], []
     start = 1800.0 if crossing else FAR_BOAT_START_PX
     speed = -2.5 if crossing else -0.5
-    height = 330.0 if crossing else 0.0
-    for frame, (near, near_score) in enumerate(zip(near_points, near_scores)):
+    spacing = 300 if crossing else 50
+    height = 190.0 if crossing else -260.0
+    for frame, (near, near_score) in enumerate(zip(near_points, near_scores, strict=True)):
         people = np.stack([clip.points[frame] for clip in far])
-        people[..., 0] += start + np.arange(2)[:, None] * 50 + speed * frame
-        people[..., 1] += height - 260
+        people[..., 0] += start + np.arange(2)[:, None] * spacing + speed * frame
+        people[..., 1] += height
         points.append(np.concatenate([near, people]))
         scores.append(np.concatenate([near_score, np.full(people.shape[:2], 0.9)]))
     return points, scores
