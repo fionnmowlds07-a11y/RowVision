@@ -24,12 +24,12 @@ from rowvision.pose import PoseBackend
 from rowvision.skeleton import FloatArray
 
 from rowvision_preview.clips import ClipLibrary
-from rowvision_preview.results import analysis_json, boat_choices_json
+from rowvision_preview.results import analysis_json, boat_choices_json, result_summary
 
 BOAT_SEATS = {"1x": 1, "2x": 2, "2-": 2, "4x": 4, "4-": 4, "4+": 4, "8+": 8}
 """Rowing seats in each boat class. A cox has no seat number."""
 MAX_BOATS = 20
-RESULT_VERSION = 1
+RESULT_VERSION = 2
 """Raise this when the saved JSON changes shape, so older results are not reused."""
 
 
@@ -258,9 +258,24 @@ class Runner:
             job.boats = boat_choices_json(analysis.boat_choices)
             job.state = State.NEEDS_BOAT
             return
-        result = analysis_json(analysis)
+        result = {**analysis_json(analysis), "settings": asdict(job.settings), "code": code_version()}
         self._save(saved, result)
         self._finish(job, result)
+
+    def saved(self) -> list[dict[str, Any]]:
+        """Return a summary of each result saved by the current analysis code."""
+        summaries = []
+        for path in sorted(self._results.glob("*.json")):
+            result = json.loads(path.read_text())
+            if result.get("code") == code_version():
+                summaries.append(result_summary(path.name, result))
+        return summaries
+
+    def saved_result(self, name: str) -> dict[str, Any]:
+        """Return one saved result. Only names from the folder listing are accepted."""
+        known = {path.name: path for path in self._results.glob("*.json")}
+        result: dict[str, Any] = json.loads(known[name].read_text())
+        return result
 
     def _finish(self, job: Job, result: dict[str, Any]) -> None:
         job.result = result
