@@ -13,6 +13,7 @@ from fakes import FakeBackend, FakeSource, write_video
 
 from rowvision_preview.clips import ClipLibrary
 from rowvision_preview.jobs import Runner
+from rowvision_preview.labels import LabelStore
 from rowvision_preview.server import make_server
 
 CLIP = "clip (1).avi"
@@ -65,7 +66,8 @@ def client(tmp_path: Path) -> Iterator[Client]:
         lambda path: FakeSource(len(points)),
         lambda: FakeBackend(points, scores),
     )
-    server = make_server("127.0.0.1", 0, clips, runner)
+    labels = LabelStore(tmp_path / "results", tmp_path / "labels.json")
+    server = make_server("127.0.0.1", 0, clips, runner, labels)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     yield Client(server.server_address[1])
@@ -240,3 +242,22 @@ def test_saved_results_start_empty(client: Client) -> None:
 @pytest.mark.parametrize("name", ["missing.json", "..%2F..%2Fetc%2Fpasswd"])
 def test_only_saved_results_can_be_read(client: Client, name: str) -> None:
     assert client.call("GET", f"/api/results/{name}").status == 404
+
+
+def test_labelling_page_is_served(client: Client) -> None:
+    assert client.call("GET", "/label").status == 200
+    assert client.call("GET", "/label.mjs").status == 200
+
+
+def test_labelling_with_no_analysed_clips_says_so(client: Client) -> None:
+    assert client.call("GET", "/api/labels/next").json() == {"item": None}
+    assert client.call("GET", "/api/labels/summary").json()["available"] == 0
+
+
+def test_a_label_for_an_unknown_frame_is_refused(client: Client) -> None:
+    joints = dict.fromkeys(["shoulder", "elbow", "wrist", "hip", "knee", "ankle"])
+    assert client.post("/api/labels", {"id": "nope", "joints": joints}).status == 400
+
+
+def test_undo_with_no_labels_is_harmless(client: Client) -> None:
+    assert client.post("/api/labels/undo", {}).json() == {"undone": None}
