@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   FIT,
+  timingText,
   JOINT_ORDER,
   labelCount,
   labelResults,
@@ -420,4 +421,13 @@ test("results stay quiet until there is something to report", () => {
   assert.match(text, /81%/);
   assert.doesNotMatch(text, /Knee/);
   assert.match(text, /label more/);
+});
+
+
+test("timing only reports gaps it can stand behind", () => {
+  assert.equal(timingText(100, 40), "About 100 ms late");
+  assert.equal(timingText(-67, 34), "About 70 ms early");
+  assert.equal(timingText(30, 34), "In time");
+  assert.equal(timingText(120, 110), "Too variable to read on this footage");
+  assert.equal(timingText(null, null), "Not enough strokes");
 });

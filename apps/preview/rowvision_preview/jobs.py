@@ -95,6 +95,7 @@ class Settings:
             seat=self.seat,
             boats_in_video=self.boats_in_video,
             boat_tap=boat_tap,
+            side=self.side,
         )
 
 
