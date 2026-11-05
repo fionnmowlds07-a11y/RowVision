@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
+from itertools import pairwise
 from typing import Any
 
 import numpy as np
@@ -161,7 +162,7 @@ def _boxes_for(track: Track, frames: int) -> FloatArray:
     boxes = np.stack([np.interp(every, positions, corners[:, i]) for i in range(4)], axis=1)
     boxes[(every < positions[0]) | (every > positions[-1])] = np.nan
     # Across a long gap the camera moves, so an interpolated box could land on a neighbour.
-    for before, after in zip(positions[:-1], positions[1:], strict=True):
+    for before, after in pairwise(positions):
         if after - before > MAX_BOX_GAP_FRAMES:
             boxes[before + 1 : after] = np.nan
     return boxes
