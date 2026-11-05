@@ -27,6 +27,7 @@ from rowvision.view import estimate_view_deg
 
 COARSE_STEP = 5
 BOX_MARGIN = 0.25
+MAX_BOX_GAP_FRAMES = 30
 VIEW_WINDOW_SECONDS = 3.0
 MIN_VIEW_FRAMES = 4
 UNCORRECTABLE_VIEW_DEG = 60.0
@@ -159,6 +160,10 @@ def _boxes_for(track: Track, frames: int) -> FloatArray:
     every = np.arange(frames)
     boxes = np.stack([np.interp(every, positions, corners[:, i]) for i in range(4)], axis=1)
     boxes[(every < positions[0]) | (every > positions[-1])] = np.nan
+    # Across a long gap the camera moves, so an interpolated box could land on a neighbour.
+    for before, after in zip(positions[:-1], positions[1:], strict=True):
+        if after - before > MAX_BOX_GAP_FRAMES:
+            boxes[before + 1 : after] = np.nan
     return boxes
 
 

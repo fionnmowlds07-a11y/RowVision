@@ -2,9 +2,10 @@ import numpy as np
 import pytest
 from crew import crew_detections, distant_people, two_boat_detections
 
-from rowvision.pipeline import Analysis, Request, Scope, analyse
+from rowvision.pipeline import COARSE_STEP, Analysis, Request, Scope, _boxes_for, analyse
 from rowvision.shots import ShotKind
 from rowvision.skeleton import FloatArray
+from rowvision.tracking import Track
 
 FPS = 30.0
 
@@ -173,3 +174,13 @@ def test_frames_where_another_boat_crosses_are_dropped() -> None:
     assert 0 < result.overlap_share < 1
     assert any("crossed yours" in warning for warning in result.warnings)
     assert np.isnan(result.rowers[0].points[:, 5, 0]).any()
+
+
+def test_boxes_are_not_interpolated_across_a_long_gap() -> None:
+    points = np.full((40, 17, 2), np.nan)
+    points[:10] = 100.0 + np.arange(17.0)[:, None]
+    points[30:] = 500.0 + np.arange(17.0)[:, None]
+    boxes = _boxes_for(Track(points, np.ones((40, 17))), 40 * COARSE_STEP)
+    assert np.isfinite(boxes[5 * COARSE_STEP]).all()
+    assert np.isnan(boxes[20 * COARSE_STEP]).all()
+    assert np.isfinite(boxes[35 * COARSE_STEP]).all()
