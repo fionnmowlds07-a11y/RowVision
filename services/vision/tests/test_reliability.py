@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import pytest
 from hypothesis import given
@@ -5,10 +7,13 @@ from hypothesis import strategies as st
 
 from rowvision.metrics import angle_series
 from rowvision.reliability import (
+    ASSUMED_KEYPOINT_ERROR_PX,
     Band,
+    Calibration,
     Evidence,
     angle_error_deg,
     band_for,
+    load_calibration,
     rate,
     share_within_tolerance,
 )
@@ -94,3 +99,69 @@ def test_accuracy_is_always_a_valid_percentage(
     trunk: float, view: float, spread: float, coverage: float, strokes: int, agreement: float | None
 ) -> None:
     assert 0 <= rate(Evidence(trunk, view, spread, coverage, strokes, agreement)).accuracy <= 100
+
+
+GOOD_FOOTAGE = Evidence(trunk_px=60, view_deg=10, stroke_spread_deg=2, coverage=1, strokes=12)
+
+
+def test_a_short_clip_does_not_lower_accuracy_but_is_flagged() -> None:
+    short = rate(Evidence(60, 10, 2, 1, 2))
+    assert short.accuracy == pytest.approx(rate(GOOD_FOOTAGE).accuracy)
+    assert any("2 full strokes" in warning for warning in short.warnings)
+
+
+def test_partial_tracking_does_not_lower_accuracy_but_is_flagged() -> None:
+    partial = rate(Evidence(60, 10, 2, 0.3, 12))
+    assert partial.accuracy == pytest.approx(rate(GOOD_FOOTAGE).accuracy)
+    assert any("part of the video" in warning for warning in partial.warnings)
+
+
+def test_weak_crew_rhythm_does_not_lower_accuracy_but_is_flagged() -> None:
+    weak = rate(Evidence(60, 10, 2, 1, 12, 0.1))
+    assert weak.accuracy == pytest.approx(rate(GOOD_FOOTAGE).accuracy)
+    assert any("crew's rhythm" in warning for warning in weak.warnings)
+
+
+def test_the_side_on_sculler_from_the_real_clip_is_not_poor() -> None:
+    assert rate(Evidence(29.5, 12.5, 0, 0.99, 2)).band is Band.GOOD
+
+
+def test_two_strokes_cannot_show_a_spread() -> None:
+    assert rate(Evidence(60, 10, 30, 1, 2)).accuracy == rate(Evidence(60, 10, 0, 1, 2)).accuracy
+
+
+def test_one_stroke_reads_properly() -> None:
+    assert any("Only 1 full stroke was" in item for item in rate(Evidence(60, 10, 2, 1, 1)).warnings)
+
+
+def test_a_measured_error_replaces_the_assumption() -> None:
+    assumed = rate(GOOD_FOOTAGE, Calibration(ASSUMED_KEYPOINT_ERROR_PX, False))
+    measured = rate(GOOD_FOOTAGE, Calibration(4.0, True))
+    assert measured.accuracy < assumed.accuracy
+    assert measured.calibrated
+    assert not assumed.calibrated
+
+
+def calibration_file(folder: Path, error: float | None, frames: int) -> Path:
+    path = folder / "calibration.yaml"
+    value = "null" if error is None else error
+    path.write_text(f"keypoint_error_px: {value}\nlabelled_frames: {frames}\n")
+    return path
+
+
+def test_no_measurement_keeps_the_assumption(tmp_path: Path) -> None:
+    loaded = load_calibration(calibration_file(tmp_path, None, 0))
+    assert loaded == Calibration(ASSUMED_KEYPOINT_ERROR_PX, False)
+
+
+def test_too_few_labels_do_not_count_as_calibrated(tmp_path: Path) -> None:
+    loaded = load_calibration(calibration_file(tmp_path, 2.2, 40))
+    assert loaded == Calibration(ASSUMED_KEYPOINT_ERROR_PX, False)
+
+
+def test_enough_labels_calibrate_the_rating(tmp_path: Path) -> None:
+    assert load_calibration(calibration_file(tmp_path, 2.2, 120)) == Calibration(2.2, True)
+
+
+def test_the_repository_starts_uncalibrated() -> None:
+    assert not load_calibration().calibrated
