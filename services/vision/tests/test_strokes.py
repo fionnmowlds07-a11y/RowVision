@@ -62,3 +62,12 @@ def test_false_peak_between_strokes_is_dropped() -> None:
     false_peak = true_catches[2] + 30
     reach[false_peak - 2 : false_peak + 3] = reach.max() * 1.05
     assert false_peak not in detect_strokes(reach, clip.fps).catches
+
+
+def test_motion_is_not_invented_across_a_long_gap() -> None:
+    clip = generate(strokes=8)
+    reach = reach_signal(clip.points, clip.facing)
+    reach[150:300] = np.nan
+    timeline = detect_strokes(reach, clip.fps)
+    assert not any(150 <= frame < 300 for frame in timeline.catches + timeline.finishes)
+    assert timeline.rate_spm == pytest.approx(24, abs=1.5)
