@@ -344,3 +344,39 @@ export function playbackFrame(start, elapsedMs, fps, speed, lastFrame) {
 export function playStart(frame, lastFrame) {
   return frame >= lastFrame ? 0 : frame;
 }
+
+// Labelling. The order follows the body, so the hand moves steadily from top to bottom.
+export const JOINT_ORDER = ["shoulder", "elbow", "wrist", "hip", "knee", "ankle"];
+
+export function jointName(name) {
+  return name;
+}
+
+// The next joint without an answer, or null when the frame is finished.
+export function nextJoint(clicks) {
+  return JOINT_ORDER.find((name) => !(name in clicks)) ?? null;
+}
+
+export function labelView(centre, span, width, height) {
+  const scale = Math.min(Math.max(width / span, 1), MAX_ZOOM);
+  return centreOn({ scale, x: 0, y: 0 }, { x: centre[0], y: centre[1] }, width, height);
+}
+
+export function labelCount({ labelled, target, available }) {
+  if (available === 0) return "No analysed clips yet. Analyse a clip first.";
+  return `${labelled} of ${target} frames labelled`;
+}
+
+// Plain results once there is enough to say anything.
+export function labelResults(summary) {
+  if (summary.keypoint_error_px === null) return "";
+  const parts = [`Joints differ from your clicks by about ${summary.keypoint_error_px.toFixed(1)} pixels.`];
+  if (summary.trunk_within_5_deg !== null) {
+    parts.push(`Body angle is within 5° on ${Math.round(summary.trunk_within_5_deg)}% of frames.`);
+  }
+  if (summary.knee_within_5_deg !== null) {
+    parts.push(`Knee angle is within 5° on ${Math.round(summary.knee_within_5_deg)}% of frames.`);
+  }
+  if (summary.labelled < summary.target) parts.push("This will settle as you label more.");
+  return parts.join(" ");
+}
