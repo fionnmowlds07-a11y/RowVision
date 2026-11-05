@@ -65,8 +65,9 @@ class BoatChoice:
     """One boat to show the athlete on the preview frame."""
 
     outline: FloatArray | None
-    rowers: int
+    people: int
     too_far: bool
+    confirmed: bool
 
 
 @dataclass(frozen=True)
@@ -80,7 +81,10 @@ class Scouting:
 
     def choices(self) -> list[BoatChoice]:
         frame = self.preview // COARSE_STEP
-        return [BoatChoice(boat.outline(frame), len(boat.rowers), boat.too_far) for boat in self.boats]
+        return [
+            BoatChoice(boat.outline(frame), len(boat.members), boat.too_far, boat.confirmed)
+            for boat in self.boats
+        ]
 
 
 @dataclass(frozen=True)
@@ -201,23 +205,33 @@ def scout(read: FrameReader, frames: int, fps: float, backend: PoseBackend) -> S
 
 
 def needs_boat_choice(scouting: Scouting, request: Request) -> bool:
-    """Ask the athlete unless exactly one boat was stated and exactly one was found."""
+    """Ask the athlete unless exactly one boat was stated and exactly one was confirmed.
+
+    Distant unconfirmed boats do not trigger a question on their own, because they may be people
+    on the bank. They are listed when the athlete is asked.
+    """
     if request.boat_tap is not None or not scouting.boats:
         return False
-    return len(scouting.boats) > 1 or request.boats_in_video != 1
+    confirmed = sum(boat.confirmed for boat in scouting.boats)
+    return confirmed != 1 or request.boats_in_video != 1
 
 
 def _chosen_boat(scouting: Scouting, request: Request) -> Boat | None:
     if request.boat_tap is None:
-        return scouting.boats[0] if scouting.boats else None
+        return next((boat for boat in scouting.boats if boat.confirmed), None)
     frame, x, y = request.boat_tap
     return boat_at(scouting.boats, frame // COARSE_STEP, np.array([x, y]))
 
 
-def _boat_warnings(boat: Boat, surplus: int, boat_seats: int, found: int, stated: int) -> list[str]:
+def _boat_warnings(
+    boat: Boat, surplus: int, boat_seats: int, boats: list[Boat], stated: int
+) -> list[str]:
     warnings = []
-    if found != stated:
-        warnings.append(f"You said {stated} boat(s), but {found} were found. Check your selection.")
+    confirmed = sum(item.confirmed for item in boats)
+    if not confirmed <= stated <= len(boats):
+        warnings.append(
+            f"You said {stated} boat(s), but {len(boats)} were found. Check your selection."
+        )
     if boat.too_far:
         warnings.append("This boat is too far away to analyse reliably.")
     if surplus:
@@ -263,7 +277,7 @@ def analyse(
     view = _usable_view(shots, views)
 
     warnings = _boat_warnings(
-        boat, assignment.surplus, request.boat_seats, len(found.boats), request.boats_in_video
+        boat, assignment.surplus, request.boat_seats, found.boats, request.boats_in_video
     )
     if rowers and not assignment.complete and request.tap is None:
         warnings.append(

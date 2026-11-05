@@ -29,12 +29,13 @@ def main() -> None:
         boats = find_boats(tracks, coarse_fps)
         print(f"{number:02d} {path.stem}: {frames / fps:.0f}s, {len(tracks)} tracks", flush=True)
         for boat in boats:
-            views = view_by_frame(boat.rowers, coarse_fps)
+            views = view_by_frame(boat.members, coarse_fps)
             shots = split_shots(views, coarse_fps)
             parts = [f"{shot.kind.value}:{shot.frames / coarse_fps:.0f}s" for shot in shots]
             view = float(np.nanmedian(views)) if np.isfinite(views).any() else float("nan")
             print(
-                f"   boat: {len(boat.rowers)} rowing, trunk {boat.trunk_px:.0f}px, "
+                f"   {'boat' if boat.confirmed else 'distant?'}: {len(boat.rowers)} rowing, "
+                f"{len(boat.tracks)} people, trunk {boat.trunk_px:.0f}px, "
                 f"seen {boat.seen().mean():.0%}, view {view:.0f}, {parts}",
                 flush=True,
             )
