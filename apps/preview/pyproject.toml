@@ -1,0 +1,24 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.mypy]
+packages = ["rowvision_preview"]
+strict = true
+mypy_path = "../../services/vision"
+
+[[tool.mypy.overrides]]
+module = ["cv2.*"]
+ignore_missing_imports = true
+
+# The vision service is checked by its own CI job, to its own settings.
+[[tool.mypy.overrides]]
+module = ["rowvision.*"]
+follow_imports = "silent"
+
+[tool.coverage.report]
+exclude_also = ["if __name__ == .__main__.:"]
