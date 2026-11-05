@@ -30,8 +30,9 @@ class StrokeMetrics:
     catch_lean_deg: float
     finish_lean_deg: float
     catch_knee_deg: float
+    finish_knee_deg: float
     finish_elbow_deg: float
-    drive_ratio: float
+    drive_share: float
     """Share of the stroke cycle spent on the drive."""
     legs_lead: float
     """How far the legs lead the trunk off the catch, as a share of the drive. Positive is legs first."""
@@ -84,8 +85,9 @@ def per_stroke(angles: AngleSeries, timeline: StrokeTimeline) -> list[StrokeMetr
                 catch_lean_deg=float(angles.trunk_lean[catch]),
                 finish_lean_deg=float(angles.trunk_lean[finish]),
                 catch_knee_deg=float(angles.knee[catch]),
+                finish_knee_deg=float(angles.knee[finish]),
                 finish_elbow_deg=float(angles.elbow[finish]),
-                drive_ratio=(finish - catch) / (next_catch - catch),
+                drive_share=(finish - catch) / (next_catch - catch),
                 legs_lead=_legs_lead(angles, catch, finish),
             )
         )

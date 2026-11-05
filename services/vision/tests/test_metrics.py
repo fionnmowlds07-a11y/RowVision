@@ -33,7 +33,7 @@ def test_stroke_metrics_match_generated_values() -> None:
     for stroke in strokes:
         assert stroke.catch_lean_deg == pytest.approx(28, abs=0.5)
         assert stroke.finish_lean_deg == pytest.approx(-18, abs=0.5)
-        assert stroke.drive_ratio == pytest.approx(0.4, abs=0.02)
+        assert stroke.drive_share == pytest.approx(0.4, abs=0.02)
 
 
 def test_legs_lead_the_trunk_in_a_good_drive() -> None:
