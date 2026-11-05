@@ -1,0 +1,38 @@
+# Source footage shows identifiable people: never commit it
+*.mp4
+*.mov
+*.m4v
+*.avi
+*.webm
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+.next/
+dist/
+cdk.out/
+
+# Model weights and generated output
+models/
+*.onnx
+outputs/
+
+# Local config and test reports
+.env
+.env.local
+reports/
+playwright-report/
+test-results/
+
+# Frames or overlays from real footage must stay local (public repo, identifiable athletes)
+private/
+samples/
