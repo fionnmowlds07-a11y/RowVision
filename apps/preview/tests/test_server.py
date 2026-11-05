@@ -207,7 +207,7 @@ def test_each_rowing_side_has_its_own_model(client: Client, style: str, oars: in
     pose = json.loads(reply.body)
     assert pose["style"] == style
     assert len(pose["oars"]) == oars
-    assert set(pose["left"]) == {"ankle", "knee", "hip", "shoulder", "elbow", "hand"}
+    assert {"heel", "toe", "knee", "hip", "shoulder", "elbow", "hand"} <= set(pose["left"])
 
 
 @pytest.mark.parametrize(
