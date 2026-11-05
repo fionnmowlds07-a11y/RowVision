@@ -1,0 +1,88 @@
+import numpy as np
+import pytest
+
+from rowvision.synthetic import generate
+from rowvision.timing import follow_timing, leader_seat
+
+
+@pytest.mark.parametrize(
+    ("seat", "boats", "side", "leader"),
+    [
+        (5, 8, "stroke", 8),
+        (3, 8, "bow", 7),
+        (7, 8, "bow", 8),
+        (8, 8, "stroke", None),
+        (1, 4, "bow", 3),
+        (2, 4, "stroke", 4),
+        (3, 4, "bow", 4),
+        (4, 4, "stroke", None),
+        (1, 2, "bow", 2),
+        (1, 4, "scull", 4),
+        (1, 2, "scull", 2),
+        (1, 1, "scull", None),
+    ],
+)
+def test_each_seat_follows_the_right_rower(
+    seat: int, boats: int, side: str, leader: int | None
+) -> None:
+    assert leader_seat(seat, boats, side) == leader
+
+
+def delayed(frames: int) -> tuple[np.ndarray, np.ndarray, float]:
+    clip = generate(strokes=10, rate_spm=24)
+    return np.roll(clip.points, frames, axis=0), clip.points, clip.fps
+
+
+def test_a_late_rower_reads_as_late() -> None:
+    mine, leader, fps = delayed(3)
+    timing = follow_timing(mine, leader, 8, -1, fps)
+    assert timing is not None
+    assert timing.catch_ms == pytest.approx(100, abs=1)
+    assert timing.finish_ms == pytest.approx(100, abs=1)
+    assert timing.leader_seat == 8
+
+
+def test_an_early_rower_reads_as_early() -> None:
+    mine, leader, fps = delayed(-2)
+    timing = follow_timing(mine, leader, 8, -1, fps)
+    assert timing is not None
+    assert timing.catch_ms == pytest.approx(-67, abs=1)
+
+
+def test_rowers_in_time_read_as_zero() -> None:
+    mine, leader, fps = delayed(0)
+    timing = follow_timing(mine, leader, 8, -1, fps)
+    assert timing is not None
+    assert timing.catch_ms == 0
+    assert timing.catch_spread_ms == 0
+
+
+def test_too_few_strokes_give_no_figure() -> None:
+    clip = generate(strokes=2)
+    assert follow_timing(clip.points, clip.points, 8, -1, clip.fps) is None
+
+
+def test_no_rhythm_gives_no_figure() -> None:
+    still = np.tile(generate().points[:1], (200, 1, 1))
+    assert follow_timing(still, still, 8, -1, 30) is None
+
+
+@pytest.mark.parametrize("seed", range(6))
+def test_noise_does_not_invent_a_timing_gap(seed: int) -> None:
+    """Two rowers in perfect time, with separate pose noise, must read close to zero."""
+    leader = generate(strokes=10, pixel_noise=0.5, seed=seed)
+    follower = generate(strokes=10, pixel_noise=0.5, seed=seed + 50)
+    timing = follow_timing(follower.points, leader.points, 8, -1, leader.fps)
+    assert timing is not None
+    assert timing.catch_ms is not None
+    assert abs(timing.catch_ms) <= 34
+
+
+@pytest.mark.parametrize("frames", [2, 4])
+def test_a_real_gap_survives_noise(frames: int) -> None:
+    leader = generate(strokes=10, pixel_noise=1.0, seed=1)
+    follower = generate(strokes=10, pixel_noise=1.0, seed=2)
+    moved = np.roll(follower.points, frames, axis=0)
+    timing = follow_timing(moved, leader.points, 8, -1, leader.fps)
+    assert timing is not None
+    assert timing.catch_ms == pytest.approx(frames / leader.fps * 1000, abs=34)
