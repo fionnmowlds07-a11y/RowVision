@@ -187,7 +187,7 @@ def test_a_job_runs_from_start_to_result(client: Client) -> None:
     saved = client.call("GET", "/api/results").json()["results"]
     assert [item["settings"]["clip"] for item in saved] == [CLIP]
     assert saved[0]["band"] == status["result"]["rower"]["rating"]["band"]
-    reopened = client.call("GET", f"/api/results/{saved[0]['name']}").json()
+    reopened = client.call("GET", f"/api/results/{quote(saved[0]['name'])}").json()
     assert reopened["rower"]["card"] == status["result"]["rower"]["card"]
 
 
