@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from rowvision import skeleton as sk
-from rowvision.metrics import angle_series, per_stroke
+from rowvision.metrics import AngleSeries, angle_series, legs_believable, per_stroke
 from rowvision.strokes import StrokeTimeline, detect_strokes, reach_signal
 from rowvision.synthetic import SyntheticClip, generate
 
@@ -74,3 +74,34 @@ def test_the_synthetic_rower_has_a_human_shape() -> None:
     # Image y increases downwards, so a smaller value is higher up.
     assert catch[sk.LEFT_KNEE, 1] < catch[sk.LEFT_HIP, 1]
     assert finish[sk.LEFT_ELBOW, 1] > finish[sk.LEFT_SHOULDER, 1]
+
+
+def misplaced_ankle(clip: SyntheticClip, frames: slice) -> np.ndarray:
+    """Move the ankles up to the hands, as the pose model does when the hull hides the feet."""
+    points = clip.points.copy()
+    points[frames, sk.LEFT_ANKLE] = points[frames, sk.LEFT_WRIST]
+    points[frames, sk.RIGHT_ANKLE] = points[frames, sk.RIGHT_WRIST]
+    return points
+
+
+def test_an_ankle_above_the_hip_is_not_believed() -> None:
+    clip = generate()
+    assert legs_believable(clip.points).all()
+    assert not legs_believable(misplaced_ankle(clip, slice(None))).any()
+
+
+def test_an_impossible_leg_gives_no_knee_angle() -> None:
+    clip = generate()
+    points = misplaced_ankle(clip, slice(40, 60))
+    knee = angle_series(points, clip.facing, 0).knee
+    assert np.isnan(knee[40:60]).all()
+    assert np.isfinite(knee[:40]).all()
+
+
+def test_a_straight_leg_at_the_catch_is_never_reported() -> None:
+    clip = generate()
+    angles = angle_series(clip.points, clip.facing, 0)
+    forced = AngleSeries(angles.trunk_lean, np.full_like(angles.knee, 157.0), angles.elbow)
+    strokes = per_stroke(forced, true_timeline(clip))
+    assert all(np.isnan(stroke.catch_knee_deg) for stroke in strokes)
+    assert all(stroke.finish_knee_deg == 157 for stroke in strokes)
