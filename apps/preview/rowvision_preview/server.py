@@ -26,6 +26,7 @@ STATIC_FILES = {
     "/model.mjs": ("model.mjs", "text/javascript; charset=utf-8"),
     "/vendor/three.module.min.js": ("vendor/three.module.min.js", "text/javascript; charset=utf-8"),
     "/vendor/OrbitControls.js": ("vendor/OrbitControls.js", "text/javascript; charset=utf-8"),
+    "/vendor/rubik.woff2": ("vendor/rubik.woff2", "font/woff2"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
 MAX_BODY_BYTES = 10_000
