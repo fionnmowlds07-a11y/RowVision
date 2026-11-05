@@ -13,6 +13,10 @@ SMOOTHING_SECONDS = 0.15
 HARMONIC_TOLERANCE = 0.85
 RHYTHM_TOLERANCE = 0.12
 MAX_GAP_SECONDS = 1.0
+MIN_STROKES_FOR_SHAPE = 3
+ALIGN_SEARCH_SHARE = 0.3
+ALIGN_PASSES = 2
+MIN_EVENT_SPACING = 0.7
 MIN_REACH_RANGE = 0.3
 """Smallest hand travel, in trunk lengths, that counts as rowing. Excludes a still cox."""
 
@@ -110,6 +114,63 @@ def _drop_outliers(frames: list[int], lag: int) -> list[int]:
     return kept
 
 
+def _window(signal: FloatArray, centre: int, half: int) -> FloatArray | None:
+    if centre - half < 0 or centre + half + 1 > len(signal):
+        return None
+    return signal[centre - half : centre + half + 1]
+
+
+def _stroke_shape(signal: FloatArray, events: list[int], half: int) -> FloatArray | None:
+    windows = [window for e in events if (window := _window(signal, e, half)) is not None]
+    return np.median(windows, axis=0) if len(windows) >= MIN_STROKES_FOR_SHAPE else None
+
+
+def _align_to_shape(signal: FloatArray, events: list[int], lag: int, sign: int) -> list[int]:
+    """Place each event by matching the whole stroke to the rower's average stroke.
+
+    The catch and finish are broad, flat peaks, so noise in one keypoint can move the single
+    highest point a long way. Matching a full stroke uses every frame of it instead. `sign` is 1
+    for maxima and -1 for minima.
+    """
+    half = lag // 2
+    search = max(round(lag * ALIGN_SEARCH_SHARE), 1)
+    aligned = list(events)
+    for _ in range(ALIGN_PASSES):
+        shape = _stroke_shape(signal, aligned, half)
+        if shape is None:
+            return aligned
+        centred = shape - shape.mean()
+        moved = []
+        for event in aligned:
+            best, best_score = event, -np.inf
+            for shift in range(-search, search + 1):
+                window = _window(signal, event + shift, half)
+                if window is None:
+                    continue
+                score = float(np.dot(window - window.mean(), centred))
+                if score > best_score:
+                    best, best_score = event + shift, score
+            moved.append(best)
+        aligned = moved
+    shape = _stroke_shape(signal, aligned, half)
+    if shape is None:
+        return aligned
+    # The shape's own peak marks where the event sits within the matched stroke.
+    peak = int(np.argmax(sign * shape)) - half
+    # Strokes cut off by the clip edge cannot be matched, so they are left out.
+    placed = sorted({event + peak for event in aligned if _window(signal, event, half) is not None})
+    return _spaced(placed, lag)
+
+
+def _spaced(events: list[int], lag: int) -> list[int]:
+    """Drop events too close to the one before, which come from strokes cut off by the clip edge."""
+    kept: list[int] = []
+    for event in events:
+        if not kept or event - kept[-1] >= MIN_EVENT_SPACING * lag:
+            kept.append(event)
+    return kept
+
+
 def _detect_run(reach: FloatArray, fps: float) -> StrokeTimeline:
     """Analyse one continuous stretch of footage."""
     smoothed = _smooth(_fill_gaps(reach), fps)
@@ -119,8 +180,8 @@ def _detect_run(reach: FloatArray, fps: float) -> StrokeTimeline:
     if lag == 0:
         return StrokeTimeline([], [], 0.0, 0.0)
     spacing = int(lag * 0.6)
-    catches = _drop_outliers(_peaks(smoothed, spacing), lag)
-    finishes = _drop_outliers(_peaks(-smoothed, spacing), lag)
+    catches = _align_to_shape(smoothed, _drop_outliers(_peaks(smoothed, spacing), lag), lag, 1)
+    finishes = _align_to_shape(smoothed, _drop_outliers(_peaks(-smoothed, spacing), lag), lag, -1)
     return StrokeTimeline(catches, finishes, 60 * fps / lag, regularity, float(lag))
 
 
