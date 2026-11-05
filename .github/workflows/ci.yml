@@ -42,3 +42,32 @@ jobs:
         run: mypy rowvision
       - name: Unit and synthetic ground-truth tests
         run: pytest --cov=rowvision --cov-report=term --cov-fail-under=90
+
+  preview:
+    name: Preview page
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/preview
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/vision/pyproject.toml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install
+        run: pip install -e "../../services/vision[dev]"
+      - name: Lint
+        run: ruff check .
+      - name: Type check
+        run: mypy
+      - name: Server tests
+        run: pytest --cov=rowvision_preview --cov-report=term --cov-fail-under=90
+      - name: Page tests
+        run: node --test tests/logic.test.mjs
+      - name: Check start script
+        run: shellcheck start.sh
