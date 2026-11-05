@@ -22,6 +22,7 @@ STATIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/app.mjs": ("app.mjs", "text/javascript; charset=utf-8"),
     "/logic.mjs": ("logic.mjs", "text/javascript; charset=utf-8"),
+    "/panel.mjs": ("panel.mjs", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
 MAX_BODY_BYTES = 10_000

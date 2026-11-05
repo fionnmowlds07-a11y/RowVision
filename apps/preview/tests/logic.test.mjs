@@ -2,6 +2,20 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  FIT,
+  angleMarks,
+  arcBetween,
+  bodyCentre,
+  centreOn,
+  clampView,
+  evidenceFrames,
+  formatTarget,
+  formatValue,
+  median,
+  overallVisible,
+  sourceLink,
+  viewPoint,
+  zoomAt,
   boatAt,
   boatLabel,
   clampFrame,
@@ -114,4 +128,110 @@ test("the summary leaves out what is unknown", () => {
   assert.equal(resultSummary({ rower, view_deg: null }), "Seat unknown · 1 catches · 0 finishes");
   const known = { seat: 2, catches: [], finishes: [], rate_spm: 24.04 };
   assert.match(resultSummary({ rower: known, view_deg: 12.4 }), /24\.0 strokes a minute · camera 12°/);
+});
+
+
+test("a Poor overall score stays hidden until the warning is accepted", () => {
+  assert.equal(overallVisible({ band: "Poor" }, false), false);
+  assert.equal(overallVisible({ band: "Poor" }, true), true);
+  assert.equal(overallVisible({ band: "Fair" }, false), true);
+  assert.equal(overallVisible({ band: "Excellent" }, false), true);
+});
+
+test("values read in rowing terms", () => {
+  assert.equal(formatValue("catch_lean_deg", 25.4), "25° forward");
+  assert.equal(formatValue("finish_lean_deg", -22.6), "23° back");
+  assert.equal(formatValue("catch_knee_deg", 50.2), "50°");
+  assert.equal(formatValue("drive_share", 0.42), "42%");
+  assert.equal(formatValue("catch_knee_deg", null), "not measured");
+});
+
+test("targets read in rowing terms", () => {
+  assert.equal(formatTarget("catch_lean_deg", { low: 20, high: 35 }), "20–35° forward");
+  assert.equal(formatTarget("finish_lean_deg", { low: -30, high: -15 }), "15–30° back");
+  assert.equal(formatTarget("drive_share", { low: 0.34, high: 0.44 }), "34–44%");
+  assert.equal(formatTarget("legs_lead", { low: 0, high: null }), "at least 0%");
+  assert.equal(formatTarget("catch_knee_deg", null), "no target");
+});
+
+test("evidence uses the frame each measure was read on", () => {
+  const strokes = [{ catch_frame: 10, finish_frame: 40, catch_lean_deg: 25, finish_lean_deg: -20 }];
+  assert.deepEqual(evidenceFrames("catch_lean_deg", strokes), [{ stroke: 1, frame: 10, value: 25 }]);
+  assert.deepEqual(evidenceFrames("finish_lean_deg", strokes), [{ stroke: 1, frame: 40, value: -20 }]);
+  assert.equal(evidenceFrames("drive_share", strokes)[0].frame, 10);
+});
+
+test("sources link to PubMed or to their own page", () => {
+  assert.equal(sourceLink("39275598").href, "https://pubmed.ncbi.nlm.nih.gov/39275598/");
+  assert.equal(sourceLink("https://example.org/model.pdf").label, "example.org");
+});
+
+function pose() {
+  const joints = Array(17).fill(null);
+  const place = (left, right, x, y) => {
+    joints[left] = [x, y, 0.9];
+    joints[right] = [x, y, 0.9];
+  };
+  place(5, 6, 90, 40);
+  place(7, 8, 70, 60);
+  place(9, 10, 50, 60);
+  place(11, 12, 100, 80);
+  place(13, 14, 60, 60);
+  place(15, 16, 30, 90);
+  return joints;
+}
+
+test("each visible angle gets a mark", () => {
+  const marks = angleMarks(pose(), { trunk: 14, knee: 90, elbow: null });
+  assert.deepEqual(marks.map((item) => item.kind), ["trunk", "knee"]);
+  assert.equal(marks[0].label, "14° forward");
+});
+
+test("angles on unsure joints are flagged", () => {
+  const unsure = pose();
+  unsure[13] = [60, 60, 0.1];
+  const [, knee] = angleMarks(unsure, { trunk: 14, knee: 90, elbow: null });
+  assert.equal(knee.sure, false);
+});
+
+test("a frame with no pose has no angle marks", () => {
+  assert.deepEqual(angleMarks(null, {}), []);
+});
+
+test("arcs take the short way round", () => {
+  const vertex = { x: 0, y: 0 };
+  const short = arcBetween({ vertex, a: { x: 1, y: 0 }, b: { x: 0, y: 1 } });
+  assert.equal(short.anticlockwise, false);
+  const reverse = arcBetween({ vertex, a: { x: 0, y: 1 }, b: { x: 1, y: 0 } });
+  assert.equal(reverse.anticlockwise, true);
+});
+
+test("zooming keeps the pointer's spot in place", () => {
+  const zoomed = zoomAt(FIT, { x: 400, y: 200 }, 2, 800, 400);
+  assert.equal(zoomed.scale, 2);
+  assert.deepEqual(viewPoint(zoomed, { x: 400, y: 200 }), { x: 400, y: 200 });
+});
+
+test("the view cannot leave the video or zoom out past it", () => {
+  assert.deepEqual(clampView({ scale: 0.5, x: 90, y: -5 }, 800, 400), FIT);
+  const edge = clampView({ scale: 2, x: 900, y: 900 }, 800, 400);
+  assert.deepEqual(edge, { scale: 2, x: 400, y: 200 });
+  assert.equal(clampView({ scale: 99, x: 0, y: 0 }, 800, 400).scale, 12);
+});
+
+test("following centres the rower where the edges allow", () => {
+  const view = centreOn({ scale: 4, x: 0, y: 0 }, { x: 400, y: 200 }, 800, 400);
+  assert.deepEqual(view, { scale: 4, x: 300, y: 150 });
+});
+
+test("the body centre ignores missing joints", () => {
+  assert.deepEqual(bodyCentre([[0, 0, 1], null, [10, 20, 1]]), { x: 5, y: 10 });
+  assert.equal(bodyCentre(null), null);
+  assert.equal(bodyCentre([null]), null);
+});
+
+test("the median skips missing values", () => {
+  assert.equal(median([3, null, 1, 2]), 2);
+  assert.equal(median([1, 2]), 1.5);
+  assert.equal(median([null]), null);
 });

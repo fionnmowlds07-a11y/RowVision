@@ -11,6 +11,16 @@
   <main>
     <h1>RowVision preview</h1>
 
+    <details id="saved-area" hidden>
+      <summary>Saved results</summary>
+      <div class="table-scroll">
+        <table class="metrics">
+          <thead><tr><th>Clip</th><th>Boat</th><th>Seat</th><th>Accuracy</th><th>Overall</th></tr></thead>
+          <tbody id="saved"></tbody>
+        </table>
+      </div>
+    </details>
+
     <form id="setup">
       <label>Clip <select id="clip" required></select></label>
       <label>Boat class <select id="boat-class" required></select></label>
@@ -44,6 +54,7 @@
       <p id="summary"></p>
       <div id="timeline" role="presentation"><div id="cursor"></div></div>
       <p id="readout" aria-live="polite"></p>
+      <p id="live-angles"></p>
       <div class="controls">
         <button type="button" data-jump="catches:-1" title="C with Shift">&#9664; Catch</button>
         <button type="button" data-jump="finishes:-1" title="F with Shift">&#9664; Finish</button>
@@ -54,14 +65,34 @@
         <button type="button" data-jump="finishes:1" title="F">Finish &#9654;</button>
         <button type="button" data-jump="catches:1" title="C">Catch &#9654;</button>
         <label class="toggle"><input id="show-lines" type="checkbox" checked> Limb lines</label>
+        <label class="toggle"><input id="show-angles" type="checkbox" checked> Angles</label>
+      </div>
+      <div class="controls">
+        <button id="zoom-in" type="button" title="Plus key">Zoom in</button>
+        <button id="zoom-out" type="button" title="Minus key">Zoom out</button>
+        <button id="zoom-fit" type="button" title="0 key">Fit</button>
+        <button id="zoom-rower" type="button" title="Z key">Zoom to rower</button>
+        <label class="toggle"><input id="follow" type="checkbox"> Follow rower</label>
       </div>
       <p class="hint">
         Keys: Left and Right step one frame, with Shift ten. C and F jump to the next catch or
-        finish, with Shift the previous one. L hides the lines.
+        finish, with Shift the previous one. L hides the lines and A the angles. Use the scroll
+        wheel or pinch to zoom, and drag to move around.
         <span class="key left">Left side</span> <span class="key right">right side</span>.
         Dashed lines are joints the model was unsure of.
       </p>
+      <section id="panel" aria-label="Scores and evidence"></section>
     </section>
+
+    <dialog id="reveal-dialog">
+      <h2>Show the score anyway?</h2>
+      <p>This footage is rated Poor, so the overall score will be misleading. Treat it as a rough
+        guide only, and don't use it to judge your technique.</p>
+      <form method="dialog" class="dialog-actions">
+        <button value="cancel">Keep it hidden</button>
+        <button value="show" id="reveal-confirm">Show score</button>
+      </form>
+    </dialog>
   </main>
   <script type="module" src="/app.mjs"></script>
 </body>
