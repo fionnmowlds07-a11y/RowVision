@@ -8,7 +8,14 @@ from typing import Any
 import numpy as np
 
 from rowvision import skeleton as sk
-from rowvision.boats import Boat, boat_at, find_boats, overlap_frames, preview_frame
+from rowvision.boats import (
+    Boat,
+    boat_at,
+    find_boats,
+    fit_to_seats,
+    overlap_frames,
+    preview_frame,
+)
 from rowvision.metrics import StrokeMetrics, angle_series, per_stroke
 from rowvision.pose import PoseBackend
 from rowvision.seats import assign_seats, track_at
@@ -267,7 +274,9 @@ def analyse(
         )
 
     coarse_fps = fps / COARSE_STEP
-    assignment = assign_seats(boat.tracks, request.boat_seats, coarse_fps)
+    assignment = assign_seats(
+        fit_to_seats(boat.crew(), request.boat_seats), request.boat_seats, coarse_fps
+    )
     rowers = list(assignment.seats.values())
 
     coarse_views = view_by_frame(rowers, coarse_fps)

@@ -6,6 +6,7 @@ from itertools import combinations
 import numpy as np
 from numpy.typing import NDArray
 
+from rowvision import skeleton as sk
 from rowvision.seats import is_rowing
 from rowvision.skeleton import FloatArray
 from rowvision.tracking import MAX_SIZE_RATIO, Track
@@ -13,6 +14,9 @@ from rowvision.tracking import MAX_SIZE_RATIO, Track
 BoolArray = NDArray[np.bool_]
 
 MIN_SHARED_SECONDS = 1.0
+MIN_SHARED_FRAMES = 3
+SAME_SEAT_TRUNKS = 1.2
+"""Rowers in an eight sit about 2.5 trunk lengths apart, so this separates neighbours."""
 SAME_LINE_TRUNKS = 1.2
 """Most that rowers in one boat differ in height in the frame, in trunk lengths."""
 MIN_ANALYSIS_TRUNK_PX = 15.0
@@ -51,6 +55,23 @@ class Boat:
     def too_far(self) -> bool:
         return self.trunk_px < MIN_ANALYSIS_TRUNK_PX
 
+    def crew(self) -> list[Track]:
+        """Return the rowers from the shot showing the most of the crew.
+
+        People in shots with no frames in common cannot be matched to each other, so seats come
+        from one shot only.
+        """
+        links = [
+            (first, second)
+            for first, second in combinations(range(len(self.rowers)), 2)
+            if _shared_frames(self.rowers[first], self.rowers[second]).sum() >= MIN_SHARED_FRAMES
+        ]
+        groups = _components(len(self.rowers), links)
+        if not groups:
+            return []
+        best = max(groups, key=len)
+        return [self.rowers[index] for index in best]
+
     def seen(self) -> BoolArray:
         """Return a mask of frames where anyone counted in the boat is visible."""
         return np.any([np.isfinite(track.centre()[:, 0]) for track in self.members], axis=0)
@@ -71,6 +92,102 @@ class Boat:
                 points[:, 1].max() + margin,
             ]
         )
+
+
+def _shared_frames(first: Track, second: Track) -> BoolArray:
+    return np.isfinite(first.centre()[:, 0]) & np.isfinite(second.centre()[:, 0])
+
+
+def _frame_trunks(track: Track) -> FloatArray:
+    return np.linalg.norm(sk.shoulders(track.points) - sk.hips(track.points), axis=-1)
+
+
+def _positions_along_boat(rowers: list[Track]) -> FloatArray:
+    """Place rowers on one line, in trunk lengths, from their gaps while both are in view.
+
+    Solving all the gaps together links people who were never on screen at the same time, through
+    the rowers who overlap both. Positions are only comparable where such a chain exists.
+    """
+    rows = []
+    gaps = []
+    for first, second in combinations(range(len(rowers)), 2):
+        shared = _shared_frames(rowers[first], rowers[second])
+        if shared.sum() < MIN_SHARED_FRAMES:
+            continue
+        offset = rowers[first].centre()[shared, 0] - rowers[second].centre()[shared, 0]
+        # Per-frame size, because zooming changes the distance between seats in pixels.
+        sizes = (_frame_trunks(rowers[first])[shared] + _frame_trunks(rowers[second])[shared]) / 2
+        row = np.zeros(len(rowers))
+        row[first], row[second] = 1, -1
+        rows.append(row)
+        gaps.append(float(np.nanmedian(offset / sizes)))
+    if not rows:
+        return np.zeros(len(rowers))
+    return np.linalg.lstsq(np.array(rows), np.array(gaps), rcond=None)[0]
+
+
+def _joined(first: Track, second: Track) -> Track:
+    points, scores = first.points.copy(), first.scores.copy()
+    missing = ~np.isfinite(points[:, 5, 0]) & np.isfinite(second.points[:, 5, 0])
+    points[missing] = second.points[missing]
+    scores[missing] = second.scores[missing]
+    return Track(points, scores)
+
+
+def _merge_same_seat(rowers: list[Track]) -> list[Track]:
+    """Join tracks of one person: same place in the boat, and almost never on screen together."""
+    positions = _positions_along_boat(rowers)
+    connected = _components(
+        len(rowers),
+        [
+            (first, second)
+            for first, second in combinations(range(len(rowers)), 2)
+            if _shared_frames(rowers[first], rowers[second]).sum() >= MIN_SHARED_FRAMES
+        ],
+    )
+    merged: list[Track] = []
+    for group in connected:
+        slots: list[tuple[float, Track]] = []
+        for index in sorted(group, key=lambda item: rowers[item].coverage, reverse=True):
+            track = rowers[index]
+            for slot, (position, existing) in enumerate(slots):
+                overlap = int(_shared_frames(existing, track).sum())
+                shortest = min(existing.coverage, track.coverage) * len(track.points)
+                close = abs(position - positions[index]) <= SAME_SEAT_TRUNKS
+                if close and overlap <= MAX_DISJOINT_OVERLAP * shortest:
+                    slots[slot] = (position, _joined(existing, track))
+                    break
+            else:
+                slots.append((float(positions[index]), track))
+        merged.extend(track for _, track in slots)
+    return merged
+
+
+def fit_to_seats(rowers: list[Track], seats: int) -> list[Track]:
+    """Merge the closest tracks that never overlap until the crew fits the boat class.
+
+    The athlete has told us how many people are in the boat, which is stronger evidence than any
+    distance limit. Tracks seen together are always different people, so they are never merged.
+    """
+    crew = list(rowers)
+    while len(crew) > seats:
+        positions = _positions_along_boat(crew)
+        best: tuple[float, int, int] | None = None
+        for first, second in combinations(range(len(crew)), 2):
+            overlap = int(_shared_frames(crew[first], crew[second]).sum())
+            shortest = min(crew[first].coverage, crew[second].coverage) * len(crew[first].points)
+            if overlap > MAX_DISJOINT_OVERLAP * shortest:
+                continue
+            gap = abs(float(positions[first] - positions[second]))
+            if best is None or gap < best[0]:
+                best = (gap, first, second)
+        if best is None:
+            return crew
+        _, first, second = best
+        joined = _joined(crew[first], crew[second])
+        crew = [track for index, track in enumerate(crew) if index not in (first, second)]
+        crew.append(joined)
+    return crew
 
 
 def _same_boat(first: Track, second: Track, fps: float) -> bool:
@@ -150,11 +267,11 @@ def find_boats(tracks: list[Track], fps: float) -> list[Boat]:
         people = [tracks[index] for index in group]
         rowers = [track for track in people if is_rowing(track, fps)]
         if rowers:
-            boats.append(Boat(people, rowers))
+            boats.append(Boat(people, _merge_same_seat(rowers)))
     confirmed = sorted(
         _merge_separate_shots(boats), key=lambda boat: int(boat.seen().sum()), reverse=True
     )
-    claimed = {id(track) for boat in confirmed for track in boat.rowers}
+    claimed = {id(track) for boat in confirmed for track in boat.tracks}
     spare = [track for track in tracks if id(track) not in claimed]
     return confirmed + _distant_groups(spare, fps)
 
