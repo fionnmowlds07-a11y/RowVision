@@ -3,6 +3,7 @@ import {
   evidenceFrames,
   formatTarget,
   formatValue,
+  laneMarks,
   measureKind,
   median,
   overallVisible,
@@ -25,11 +26,15 @@ function element(tag, className, text) {
 
 function ratingBlock(rating) {
   const block = element("div", `rating band-${rating.band.toLowerCase()}`);
-  block.append(
+  const line = element("div", "rating-line");
+  line.append(
     element("span", "rating-value", `${Math.round(rating.accuracy)}%`),
     element("span", "rating-band", rating.band),
+  );
+  block.append(
+    line,
     element(
-      "span",
+      "p",
       "rating-note",
       rating.calibrated
         ? "Estimated accuracy"
@@ -43,18 +48,18 @@ function overallBlock(rower, revealed, onReveal) {
   const block = element("div", "overall");
   const { overall } = rower.card;
   if (overall === null) {
-    block.append(element("span", "muted", "No overall score: nothing could be measured reliably."));
+    block.append(element("p", "overall-text", "No overall score: nothing could be measured reliably."));
   } else if (overallVisible(rower.rating, revealed)) {
-    block.append(element("span", "overall-value", String(Math.round(overall))));
-    block.append(element("span", "muted", "Overall score"));
+    const text = element("p", "overall-text", "Overall score");
     if (rower.rating.band === "Poor") {
-      block.append(element("span", "caution", "Likely to be misleading on this footage"));
+      text.append(element("span", "caution-tag", "Likely to be misleading on this footage"));
     }
+    block.append(element("span", "overall-bubble", String(Math.round(overall))), text);
   } else {
     const button = element("button", null, "Show score anyway");
     button.type = "button";
     button.addEventListener("click", onReveal);
-    block.append(element("span", "muted", "Overall score hidden, as the accuracy is Poor."), button);
+    block.append(element("p", "overall-text", "Overall score hidden, as the accuracy is Poor."), button);
   }
   return block;
 }
@@ -66,41 +71,50 @@ function phaseBlock(card) {
     const item = element("div", "phase");
     item.append(
       element("span", "phase-value", score === undefined ? "–" : String(Math.round(score))),
-      element("span", "muted", label),
+      element("span", "phase-name", label),
     );
     block.append(item);
   }
   return block;
 }
 
-function metricRow(metric, active, onOpen) {
-  const row = element("tr", metric.name === active ? "active" : "");
-  const name = element("td");
-  const button = element("button", "link", metric.label);
-  button.type = "button";
-  button.setAttribute("aria-expanded", String(metric.name === active));
-  button.addEventListener("click", () => onOpen(metric));
-  name.append(button);
-  const score = metric.score === null ? "Not scored" : String(Math.round(metric.score));
-  row.append(
-    name,
-    element("td", "", formatValue(metric.name, metric.value)),
-    element("td", "", formatTarget(metric.name, metric.target)),
-    element("td", metric.score === null ? "muted" : "", score),
-  );
-  return row;
+function miniLane(metric) {
+  const marks = laneMarks(metric.value, metric.target);
+  if (!marks) return null;
+  const lane = element("span", "mini-lane");
+  lane.setAttribute("aria-hidden", "true");
+  const band = element("span", "mini-band");
+  band.style.left = `${marks.bandStart}%`;
+  band.style.width = `${marks.bandWidth}%`;
+  const buoy = element("span", "mini-buoy");
+  buoy.style.left = `${marks.buoy}%`;
+  lane.append(band, buoy);
+  return lane;
 }
 
-function metricsTable(metrics, active, onOpen) {
-  const table = element("table", "metrics");
-  const head = element("tr");
-  for (const title of ["Measure", "You", "Target", "Score"]) head.append(element("th", "", title));
-  const thead = element("thead");
-  thead.append(head);
-  const body = element("tbody");
-  body.append(...metrics.map((metric) => metricRow(metric, active, onOpen)));
-  table.append(thead, body);
-  return table;
+function measureItem(metric, active, rower, handlers) {
+  const open = metric.name === active;
+  const item = element("li", open ? "measure open" : "measure");
+  const row = element("button", "measure-row");
+  row.type = "button";
+  row.setAttribute("aria-expanded", String(open));
+  row.addEventListener("click", () => handlers.onOpen(metric));
+  const scored = metric.score !== null;
+  const detail = element("span", "measure-detail");
+  detail.append(
+    element("span", "", `You ${formatValue(metric.name, metric.value)}`),
+    element("span", "", metric.target ? `Target ${formatTarget(metric.name, metric.target)}` : "No target yet"),
+  );
+  row.append(
+    element("span", "measure-name", metric.label),
+    element("span", scored ? "measure-score" : "measure-score none", scored ? String(Math.round(metric.score)) : "Not scored"),
+    detail,
+  );
+  const lane = miniLane(metric);
+  if (lane) row.append(lane);
+  item.append(row);
+  if (open) item.append(evidenceBlock(metric, rower, handlers));
+  return item;
 }
 
 // Elbow angle has no target, but the athlete should still see it.
@@ -135,8 +149,7 @@ function sources(target) {
 
 function evidenceBlock(metric, rower, handlers) {
   const block = element("div", "evidence");
-  block.append(element("h3", "", metric.label));
-  if (metric.reason) block.append(element("p", "caution", metric.reason));
+  if (metric.reason) block.append(element("p", "caution-note", metric.reason));
   if (metric.spread !== null && metric.spread !== undefined) {
     block.append(
       element("p", "muted", `Typical stroke-to-stroke spread: ${formatValue(metric.name, metric.spread).replace(/ (back|forward)$/, "")}`),
@@ -144,7 +157,7 @@ function evidenceBlock(metric, rower, handlers) {
   }
   if (metric.target) block.append(sources(metric.target));
   if (metric.name.endsWith("_deg")) {
-    const model = element("button", null, "See this on the 3D model");
+    const model = element("button", "model-button", "See this on the 3D model");
     model.type = "button";
     model.addEventListener("click", () => handlers.onModel(metric));
     block.append(model);
@@ -171,13 +184,9 @@ function evidenceBlock(metric, rower, handlers) {
 
 export function renderPanel(container, rower, state, handlers) {
   const metrics = [...rower.card.metrics, elbowMetric(rower)];
-  const top = element("div", "score-top");
-  top.append(
-    ratingBlock(rower.rating),
-    overallBlock(rower, state.revealed, handlers.onReveal),
-    phaseBlock(rower.card),
-  );
-  container.replaceChildren(top, metricsTable(metrics, state.active, handlers.onOpen));
-  const chosen = metrics.find((metric) => metric.name === state.active);
-  if (chosen) container.append(evidenceBlock(chosen, rower, handlers));
+  const headline = element("div", "headline");
+  headline.append(ratingBlock(rower.rating), overallBlock(rower, state.revealed, handlers.onReveal));
+  const list = element("ul", "measures");
+  list.append(...metrics.map((metric) => measureItem(metric, state.active, rower, handlers)));
+  container.replaceChildren(headline, phaseBlock(rower.card), list);
 }

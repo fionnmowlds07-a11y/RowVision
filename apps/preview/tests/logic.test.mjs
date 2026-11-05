@@ -3,6 +3,12 @@ import { test } from "node:test";
 
 import {
   FIT,
+  labelSpot,
+  STACK_AT,
+  VIDEO_DEFAULT,
+  laneMarks,
+  savedShare,
+  videoLayout,
   measureKind,
   modelRequest,
   nearestMeasure,
@@ -292,4 +298,56 @@ test("a freeze frame shows only the angle being checked", () => {
   assert.equal(measureKind("finish_knee_deg"), "knee");
   assert.equal(measureKind("finish_elbow_deg"), "elbow");
   assert.equal(measureKind("drive_share"), null);
+});
+
+
+test("the scores sit beside the video until the video gets large", () => {
+  assert.deepEqual(videoLayout(62, 1400), { video: 62, stacked: false });
+  assert.equal(videoLayout(STACK_AT, 1400).stacked, false);
+  assert.equal(videoLayout(STACK_AT + 1, 1400).stacked, true);
+});
+
+test("narrow screens always stack", () => {
+  assert.equal(videoLayout(50, 700).stacked, true);
+});
+
+test("the video size stays within its limits", () => {
+  assert.equal(videoLayout(10, 1400).video, 40);
+  assert.equal(videoLayout(140, 1400).video, 100);
+});
+
+test("a missing or damaged saved size falls back to the default", () => {
+  assert.equal(savedShare(null), VIDEO_DEFAULT);
+  assert.equal(savedShare("nonsense"), VIDEO_DEFAULT);
+  assert.equal(savedShare("70"), 70);
+  assert.equal(savedShare("500"), 100);
+});
+
+test("the small lane places the buoy against the target band", () => {
+  const inside = laneMarks(25, { low: 20, high: 35 });
+  assert.ok(inside.buoy > inside.bandStart && inside.buoy < inside.bandStart + inside.bandWidth);
+  const beyond = laneMarks(50, { low: 20, high: 35 });
+  assert.ok(beyond.buoy > beyond.bandStart + beyond.bandWidth);
+  assert.ok(beyond.buoy <= 100);
+});
+
+test("an open-ended target still has a band", () => {
+  const marks = laneMarks(0.1, { low: 0, high: null });
+  assert.ok(marks.bandWidth > 0);
+});
+
+test("a measure with no target or value has no lane", () => {
+  assert.equal(laneMarks(5, null), null);
+  assert.equal(laneMarks(null, { low: 1, high: 2 }), null);
+});
+
+
+test("angle labels sit on different sides of their joints", () => {
+  const vertex = { x: 100, y: 100 };
+  const trunk = labelSpot("trunk", vertex, 40, 15, 14);
+  const knee = labelSpot("knee", vertex, 40, 15, 14);
+  const elbow = labelSpot("elbow", vertex, 40, 15, 14);
+  assert.ok(trunk.x + 40 <= vertex.x);
+  assert.ok(knee.y + 15 <= vertex.y);
+  assert.ok(elbow.x >= vertex.x);
 });
