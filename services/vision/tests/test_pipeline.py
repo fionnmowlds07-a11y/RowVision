@@ -215,3 +215,11 @@ def test_small_boats_use_their_own_timing() -> None:
     result = run(FakeBackend(2), Request(boat_seats=2, seat=1))
     assert result.rowers[0].rate_spm == pytest.approx(24, abs=1)
     assert len(result.rowers[0].strokes) >= 3
+
+
+def test_results_come_with_scores_and_a_rating() -> None:
+    result = run(FakeBackend(4), Request(boat_seats=4, seat=2))
+    rower = result.rowers[0]
+    assert rower.card.overall is not None
+    assert 0 <= rower.rating.accuracy <= 100
+    assert not rower.rating.calibrated

@@ -12,6 +12,7 @@ from rowvision import skeleton as sk
 from rowvision.boats import (
     Boat,
     boat_at,
+    crew_agreement,
     find_boats,
     fit_to_seats,
     overlap_frames,
@@ -19,6 +20,9 @@ from rowvision.boats import (
 )
 from rowvision.metrics import StrokeMetrics, angle_series, per_stroke
 from rowvision.pose import PoseBackend
+from rowvision.reference import load_targets
+from rowvision.reliability import Evidence, Rating, rate
+from rowvision.scoring import ScoreCard, score_stroke
 from rowvision.seats import assign_seats, track_at
 from rowvision.shots import Shot, ShotKind, split_shots
 from rowvision.skeleton import FloatArray
@@ -72,6 +76,8 @@ class RowerResult:
     """Median of each measure across strokes. Single strokes on small rowers are too noisy to use."""
     spread: dict[str, float]
     """Interquartile range of each measure, showing how far the median can be trusted."""
+    card: ScoreCard
+    rating: Rating
 
 
 @dataclass(frozen=True)
@@ -224,11 +230,15 @@ def _measure(
     view: float,
     fps: float,
     shared: StrokeTimeline | None = None,
+    *,
+    trunk_px: float,
+    coverage: float,
+    agreement: float | None = None,
 ) -> RowerResult:
     timeline = shared if shared is not None else detect_strokes(reach_signal(points, facing), fps)
     strokes = per_stroke(angle_series(points, facing, view), timeline)
-    names = ("catch_lean_deg", "finish_lean_deg", "catch_knee_deg", "finish_elbow_deg",
-             "drive_ratio", "legs_lead")  # fmt: skip
+    names = ("catch_lean_deg", "finish_lean_deg", "catch_knee_deg", "finish_knee_deg",
+             "finish_elbow_deg", "drive_share", "legs_lead")  # fmt: skip
     summary: dict[str, float] = {}
     spread: dict[str, float] = {}
     for name in names:
@@ -237,8 +247,21 @@ def _measure(
         if len(values):
             summary[name] = float(np.median(values))
             spread[name] = float(np.subtract(*np.percentile(values, [75, 25])))
+    card = score_stroke(summary, spread, len(strokes), timeline.rate_spm, load_targets())
+    evidence = Evidence(
+        trunk_px, view, spread.get("catch_lean_deg", 0.0), coverage, len(strokes), agreement
+    )
     return RowerResult(
-        seat, points, scores, timeline.rate_spm, timeline.regularity, strokes, summary, spread
+        seat,
+        points,
+        scores,
+        timeline.rate_spm,
+        timeline.regularity,
+        strokes,
+        summary,
+        spread,
+        card,
+        rate(evidence),
     )
 
 
@@ -363,12 +386,29 @@ def analyse(
         )
 
     shared = crew_timeline(rowers, assignment.facing, frames, fps)
+    agreements = dict(zip(map(id, rowers), crew_agreement(rowers), strict=True))
+    in_view = boat.seen()[np.minimum(np.arange(frames) // COARSE_STEP, coarse_frames - 1)]
     results = []
     for seat, track in targets:
         points, scores = _fine_pass(read, frames, track, backend)
         points[dropped] = np.nan
         scores[dropped] = 0
-        results.append(_measure(seat, points, scores, assignment.facing, view, fps, shared))
+        measured = np.isfinite(points[:, sk.LEFT_SHOULDER, 0])
+        agreement = agreements.get(id(track))
+        results.append(
+            _measure(
+                seat,
+                points,
+                scores,
+                assignment.facing,
+                view,
+                fps,
+                shared,
+                trunk_px=track.trunk(),
+                coverage=float(measured[in_view].mean()) if in_view.any() else 0.0,
+                agreement=None if agreement is None or np.isnan(agreement) else agreement,
+            )
+        )
     return Analysis(
         fps,
         frames,
