@@ -20,6 +20,8 @@
       <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
       <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
       <symbol id="i-rower" viewBox="0 0 24 24"><circle cx="12" cy="7" r="3"/><path d="M6 21c0-5 2.5-8 6-8s6 3 6 8"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
       <symbol id="i-saved" viewBox="0 0 24 24"><path d="M6 4h12v17l-6-4-6 4z"/></symbol>
       <symbol id="i-cube" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"/></symbol>
     </defs>
@@ -97,6 +99,16 @@
             <div id="live-angles"></div>
           </div>
           <div class="toolbar">
+            <div class="group" role="group" aria-label="Playback">
+              <button id="play" type="button" class="primary" title="Play or pause (Space)"><svg class="icon"><use id="play-icon" href="#i-play"/></svg><span id="play-text">Play</span></button>
+              <label class="speed">Speed
+                <select id="speed">
+                  <option value="1">Full</option>
+                  <option value="0.5">Half</option>
+                  <option value="0.25">Quarter</option>
+                </select>
+              </label>
+            </div>
             <div class="group" role="group" aria-label="Move through the video">
               <button type="button" data-jump="catches:-1" title="Previous catch (Shift + C)"><svg class="icon"><use href="#i-back-far"/></svg>Catch</button>
               <button type="button" data-jump="finishes:-1" title="Previous finish (Shift + F)"><svg class="icon"><use href="#i-back-far"/></svg>Finish</button>
@@ -122,7 +134,7 @@
           </div>
           <details class="keys">
             <summary>Keys and legend</summary>
-            <p>Left and Right step one frame, with Shift ten. C and F jump to the next catch or
+            <p>Space plays and pauses. Left and Right step one frame, with Shift ten. C and F jump to the next catch or
               finish, with Shift the previous one. L hides the limbs and A the angles. Plus, Minus,
               0 and Z control zoom. Scroll or pinch to zoom, and drag to move around.
               <span class="key left">Left side</span>, <span class="key right">right side</span>.

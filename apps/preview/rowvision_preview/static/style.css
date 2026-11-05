@@ -228,6 +228,9 @@ ul.caution-box { padding-left: 34px; }
 .toolbar button.primary { background: var(--buoy); }
 .toolbar button.primary:hover { background: #a93809; }
 .push { margin-left: auto; }
+#play { min-width: 104px; }
+.speed { display: inline-flex; align-items: center; gap: 6px; margin-left: 6px; font-size: 14px; font-weight: 500; }
+.speed select { min-height: 36px; background: var(--pontoon); box-shadow: var(--lift); font-size: 14px; }
 .toggles { gap: 12px; }
 .switch { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; cursor: pointer; }
 .switch input { width: 17px; height: 17px; margin: 0; }
