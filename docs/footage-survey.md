@@ -1,6 +1,6 @@
 # Footage survey
 
-Thirteen unique real clips were reviewed to set requirements. A fourteenth file was a byte-for-byte duplicate, so ingest should detect repeat uploads by checksum. The clips stay out of this repository.
+Fourteen unique real clips were reviewed to set requirements. One clip existed in two places as a byte-for-byte copy, so ingest should detect repeat uploads by checksum. The clips stay out of this repository.
 
 ## What real uploads look like
 
