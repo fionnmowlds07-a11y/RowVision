@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   FIT,
+  ratingNote,
   timingText,
   JOINT_ORDER,
   labelCount,
@@ -430,4 +431,11 @@ test("timing only reports gaps it can stand behind", () => {
   assert.equal(timingText(30, 34), "In time");
   assert.equal(timingText(120, 110), "Too variable to read on this footage");
   assert.equal(timingText(null, null), "Not enough strokes");
+});
+
+
+test("the rating says how far it has been checked", () => {
+  assert.match(ratingNote({ calibrated: false, labelled_frames: 0 }), /not yet checked/);
+  assert.match(ratingNote({ calibrated: false, labelled_frames: 78 }), /78 hand-labelled frames so far/);
+  assert.match(ratingNote({ calibrated: true, labelled_frames: 120 }), /calibrated on 120/);
 });

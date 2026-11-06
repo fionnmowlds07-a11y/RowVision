@@ -84,6 +84,7 @@ def _rating(rating: Rating) -> dict[str, Any]:
         "accuracy": _finite(rating.accuracy),
         "band": rating.band.value,
         "calibrated": rating.calibrated,
+        "labelled_frames": rating.labelled_frames,
         "warnings": rating.warnings,
     }
 
