@@ -4,6 +4,8 @@ import { test } from "node:test";
 import {
   FIT,
   ratingNote,
+  TARGET_WINDOW,
+  targetMarks,
   timingText,
   JOINT_ORDER,
   labelCount,
@@ -433,9 +435,90 @@ test("timing only reports gaps it can stand behind", () => {
   assert.equal(timingText(null, null), "Not enough strokes");
 });
 
-
 test("the rating says how far it has been checked", () => {
   assert.match(ratingNote({ calibrated: false, labelled_frames: 0 }), /not yet checked/);
   assert.match(ratingNote({ calibrated: false, labelled_frames: 78 }), /78 hand-labelled frames so far/);
   assert.match(ratingNote({ calibrated: true, labelled_frames: 120 }), /calibrated on 120/);
+});
+
+function targetRower(overrides = {}) {
+  const metric = (name, low, high, score = 80) => ({ name, score, target: { low, high } });
+  return {
+    catches: [100],
+    finishes: [130],
+    angles: { trunk: Array(200).fill(25), knee: Array(200).fill(50) },
+    card: {
+      metrics: [
+        metric("catch_lean_deg", 20, 35),
+        metric("finish_lean_deg", -30, -15),
+        metric("catch_knee_deg", 45, 60),
+        metric("finish_knee_deg", 165, 180, null),
+      ],
+    },
+    ...overrides,
+  };
+}
+
+function targetPose() {
+  const pose = Array(17).fill(null);
+  const joint = (left, right, x, y) => {
+    pose[left] = [x, y, 0.9];
+    pose[right] = [x, y, 0.9];
+  };
+  joint(5, 6, 100, 50);
+  joint(11, 12, 100, 100);
+  joint(13, 14, 140, 100);
+  joint(15, 16, 140, 140);
+  return pose;
+}
+
+function degreesFromUp(vertex, point) {
+  return (Math.atan2(point.x - vertex.x, vertex.y - point.y) * 180) / Math.PI;
+}
+
+test("targets only show close to a catch or finish", () => {
+  const rower = targetRower();
+  assert.deepEqual(targetMarks(targetPose(), 115, rower, 1, 0), []);
+  assert.equal(targetMarks(targetPose(), 100 + TARGET_WINDOW, rower, 1, 0).length, 2);
+  assert.deepEqual(targetMarks(targetPose(), 100 + TARGET_WINDOW + 1, rower, 1, 0), []);
+  assert.deepEqual(targetMarks(null, 100, rower, 1, 0), []);
+});
+
+test("a trunk target leans the way the rower faces, by the target angle", () => {
+  const [right] = targetMarks(targetPose(), 100, targetRower(), 1, 0);
+  assert.ok(Math.abs(degreesFromUp(right.vertex, right.low) - 20) < 1e-6);
+  assert.ok(Math.abs(degreesFromUp(right.vertex, right.high) - 35) < 1e-6);
+  const [left] = targetMarks(targetPose(), 100, targetRower(), -1, 0);
+  assert.ok(Math.abs(degreesFromUp(left.vertex, left.high) + 35) < 1e-6);
+});
+
+test("a target is squeezed along the boat when the camera is not side-on", () => {
+  const [flat] = targetMarks(targetPose(), 100, targetRower(), 1, 0);
+  const [angled] = targetMarks(targetPose(), 100, targetRower(), 1, 60);
+  assert.ok(Math.abs((angled.high.x - 100) / (flat.high.x - 100) - 0.5) < 1e-6);
+  assert.equal(angled.high.y, flat.high.y);
+});
+
+test("a knee target opens from the thigh towards the shin", () => {
+  const knee = targetMarks(targetPose(), 100, targetRower(), 1, 0)[1];
+  const opening = (edge) => {
+    const thigh = Math.atan2(100 - knee.vertex.y, 100 - knee.vertex.x);
+    const shin = Math.atan2(edge.y - knee.vertex.y, edge.x - knee.vertex.x);
+    return Math.abs(Math.atan2(Math.sin(shin - thigh), Math.cos(shin - thigh)) * 180) / Math.PI;
+  };
+  assert.ok(Math.abs(opening(knee.low) - 45) < 1e-6);
+  assert.ok(Math.abs(opening(knee.high) - 60) < 1e-6);
+  assert.ok(knee.low.x < knee.vertex.x && knee.low.y > knee.vertex.y);
+});
+
+test("a measure that is not scored gets no target", () => {
+  const marks = targetMarks(targetPose(), 130, targetRower(), 1, 0);
+  assert.deepEqual(marks.map(({ kind }) => kind), ["trunk"]);
+});
+
+test("a target says whether the measured angle is inside it", () => {
+  const rower = targetRower({ angles: { trunk: Array(200).fill(10), knee: Array(200).fill(50) } });
+  const [trunk, knee] = targetMarks(targetPose(), 100, rower, 1, 0);
+  assert.equal(trunk.inside, false);
+  assert.equal(knee.inside, true);
 });
