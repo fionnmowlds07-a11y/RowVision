@@ -4,4 +4,4 @@
 # called calibrated at the full count. Labels themselves stay in the private folder.
 
 keypoint_error_px: 2.0
-labelled_frames: 78
+labelled_frames: 108
