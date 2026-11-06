@@ -32,7 +32,7 @@ def rower(frames: int = 4) -> Any:
     points[1] = 10.04
     points[2, 5] = (3.0, 4.0)
     scores = np.full((frames, 17), 0.5)
-    summary = {"catch_lean_deg": 25.0, "catch_knee_deg": 50.0}
+    summary = {"catch_lean_deg": 28.0, "catch_knee_deg": 50.0}
     spread = {"catch_lean_deg": 2.0, "catch_knee_deg": 40.0}
     return SimpleNamespace(
         seat=3,
@@ -114,9 +114,9 @@ def test_every_measure_carries_its_evidence() -> None:
     metric = next(
         item for item in full_result()["rower"]["card"]["metrics"] if item["name"] == "catch_lean_deg"
     )
-    assert metric["value"] == 25
+    assert metric["value"] == 28
     assert metric["spread"] == 2
-    assert metric["target"]["low"] == 20
+    assert metric["target"]["low"] == 26
     assert metric["target"]["sources"]
     assert metric["score"] == 100
 

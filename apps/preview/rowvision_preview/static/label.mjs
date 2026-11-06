@@ -92,7 +92,7 @@ async function showSummary() {
   const summary = await api("/api/labels/summary");
   $("count").textContent = labelCount(summary);
   $("bar").max = summary.target;
-  $("bar").value = Math.min(summary.labelled, summary.target);
+  $("bar").value = Math.min(summary.usable, summary.target);
   const text = labelResults(summary);
   $("results").hidden = !text;
   $("results-text").textContent = text;

@@ -5,10 +5,10 @@ from rowvision.scoring import Phase, score_stroke, score_value
 
 GOOD = {
     "catch_lean_deg": 28.0,
-    "catch_knee_deg": 50.0,
+    "catch_knee_deg": 52.0,
     "legs_lead": 0.1,
     "finish_lean_deg": -22.0,
-    "finish_knee_deg": 165.0,
+    "finish_knee_deg": 177.0,
     "drive_share": 0.42,
 }
 STEADY = dict.fromkeys(GOOD, 0.01)
