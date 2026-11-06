@@ -3,7 +3,7 @@ import pytest
 from crew import crew_detections, two_boat_detections
 
 from rowvision.skeleton import FloatArray
-from rowvision.tracking import Track, clean_detections, track_people
+from rowvision.tracking import Track, _zoom, clean_detections, track_people
 
 FPS = 30
 
@@ -112,3 +112,13 @@ def test_one_person_changing_size_is_not_a_zoom() -> None:
         middle = frame[0].mean(axis=0)
         frame[0] = (frame[0] - middle) * 1.5 + middle
     assert len(track_people(grown, scores, FPS)) >= 4
+
+
+def test_a_zoom_needs_the_whole_crew_to_fit() -> None:
+    before = np.column_stack([np.arange(8.0) * 100, np.full(8, 200.0)])
+    sizes = np.full(8, 40.0)
+    after = before * 0.5 + 30
+    assert _zoom(before, sizes, after, sizes * 0.5) is not None
+    assert _zoom(before, sizes, after[:4], sizes[:4] * 0.5) is None, "half the crew left the frame"
+    assert _zoom(before[:4], sizes[:4], after[:4], sizes[:4] * 0.5) is None, "too few to be sure"
+    assert _zoom(before, sizes, before + 5, sizes) is None, "same size is not a zoom"
