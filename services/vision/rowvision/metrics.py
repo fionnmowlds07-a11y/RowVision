@@ -66,7 +66,7 @@ def _within(value: float, limits: tuple[float, float]) -> float:
     return value if limits[0] <= value <= limits[1] else float("nan")
 
 
-def angle_series(points: FloatArray, facing: int, view_deg: float) -> AngleSeries:
+def angle_series(points: FloatArray, facing: int, view_deg: float | FloatArray) -> AngleSeries:
     hip = sk.hips(points)
     side_on = undo_foreshortening(points, hip[:, None, :], view_deg)
     hip = sk.hips(side_on)

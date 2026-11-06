@@ -105,3 +105,13 @@ def test_a_straight_leg_at_the_catch_is_never_reported() -> None:
     strokes = per_stroke(forced, true_timeline(clip))
     assert all(np.isnan(stroke.catch_knee_deg) for stroke in strokes)
     assert all(stroke.finish_knee_deg == 157 for stroke in strokes)
+
+
+def test_a_camera_that_swings_is_corrected_frame_by_frame() -> None:
+    side_on, angled = generate(view_deg=0), generate(view_deg=45)
+    points = np.concatenate([side_on.points, angled.points])
+    truth = np.concatenate([side_on.trunk_lean_deg, angled.trunk_lean_deg])
+    views = np.repeat([0.0, 45.0], [len(side_on.points), len(angled.points)])
+    assert np.abs(angle_series(points, side_on.facing, views).trunk_lean - truth).max() < 1
+    one_figure = angle_series(points, side_on.facing, 22.5).trunk_lean
+    assert np.abs(one_figure - truth).max() > 3
