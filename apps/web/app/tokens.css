@@ -1,0 +1,25 @@
+/* The values come from DESIGN.md. tests/tokens.test.ts keeps the two in step. */
+:root {
+  --ground: #070b09;
+  --on-ground: #ffffff;
+  --on-ground-soft: #b5c7bc;
+  --panel: #121a15;
+  --ink: #ffffff;
+  --ink-soft: #a9bdb0;
+  --quiet: #1f2b24;
+  --stage: #000000;
+  --on-stage: #ffffff;
+  --highlight: #35d07f;
+  --on-highlight: #04140b;
+  --link: #7fe3ad;
+  --caution-bg: #fff1d6;
+  --caution: #6b4700;
+  --danger: #ff8f85;
+
+  --radius-panel: 14px;
+  --radius-button: 10px;
+  --radius-field: 8px;
+
+  --font-display: "Bricolage Grotesque Variable", sans-serif;
+  --font-text: "DM Sans Variable", sans-serif;
+}
