@@ -42,6 +42,8 @@ Each rower is compared with the seat they follow: stroke side with stroke, bow s
 
 ## Labelling frames
 
+**Label blades** opens a page for marking where a rower's blade is, which trains the blade detector. It uses the newest result of each clip. Click the blade, then press **A** if it is above the water or **W** if it is in the water. Press **S** if it can't be seen. Labels stay in `private/labels/blades.json`.
+
 **Label frames** opens a page for measuring how accurate the pose model really is. It picks up to 8 frames from each analysed clip, across the whole stroke. Click each joint on the side nearest the camera, or press **Can't see this joint**. The model's answer is never shown, so your clicks stay independent.
 
 - **S** marks a joint as hidden, **Z** undoes a click, and **Enter** saves.
