@@ -20,6 +20,7 @@ let image = null;
 let view = null;
 let clicks = {};
 let order = []; // Joints in the order they were answered, for undo.
+let saving = false; // A save in progress ignores extra presses.
 
 async function api(path, body) {
   const response = await fetch(path, body === undefined ? undefined : {
@@ -78,10 +79,12 @@ function update() {
     }
     return entry;
   }));
-  $("save").disabled = !item || current !== null;
-  $("hidden").disabled = !item || current === null;
-  $("undo-click").disabled = order.length === 0;
-  $("skip").disabled = !item;
+  $("save").disabled = saving || !item || current !== null;
+  $("save").textContent = saving ? "Saving..." : "Save and next";
+  $("hidden").disabled = saving || !item || current === null;
+  $("undo-click").disabled = saving || order.length === 0;
+  $("skip").disabled = saving || !item;
+  $("undo-frame").disabled = saving;
   draw();
 }
 
@@ -127,24 +130,31 @@ async function load() {
 
 function answer(value) {
   const current = nextJoint(clicks);
-  if (!item || !current) return;
+  if (saving || !item || !current) return;
   clicks[current] = value;
   order.push(current);
   update();
 }
 
 function undoClick() {
+  if (saving) return;
   const last = order.pop();
   if (last) delete clicks[last];
   update();
 }
 
 async function submit(joints) {
+  if (saving) return;
+  saving = true;
+  update();
   try {
     await api("/api/labels", { id: item.id, joints });
+    saving = false;
     await load();
   } catch (error) {
-    showError(error.message);
+    saving = false;
+    update();
+    showError(`That frame was not saved, so press Save again. ${error.message}`);
   }
 }
 
@@ -164,10 +174,16 @@ $("skip").addEventListener("click", () => {
   submit(Object.fromEntries(JOINT_ORDER.map((name) => [name, null])));
 });
 $("undo-frame").addEventListener("click", async () => {
+  if (saving) return;
+  saving = true;
+  update();
   try {
     await api("/api/labels/undo", {});
+    saving = false;
     await load();
   } catch (error) {
+    saving = false;
+    update();
     showError(error.message);
   }
 });

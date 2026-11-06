@@ -6,6 +6,7 @@ athletes, so they are kept in the private folder and never committed.
 
 import json
 import math
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -107,6 +108,9 @@ class LabelStore:
     def __init__(self, results: Path, path: Path) -> None:
         self._results = results
         self._path = path
+        self._lock = threading.Lock()
+        self._sample_key: list[tuple[str, int]] | None = None
+        self._sample_items: list[dict[str, Any]] = []
 
     def _records(self) -> dict[str, dict[str, Any]]:
         if not self._path.exists():
@@ -121,7 +125,15 @@ class LabelStore:
         partial.replace(self._path)
 
     def _sample(self) -> list[dict[str, Any]]:
-        """Return frames to label, grouped by clip so that clips load once each."""
+        """Return frames to label, reading the large result files only when they change."""
+        key = sorted((path.name, path.stat().st_mtime_ns) for path in self._results.glob("*.json"))
+        if key != self._sample_key:
+            self._sample_items = self._read_sample()
+            self._sample_key = key
+        return self._sample_items
+
+    def _read_sample(self) -> list[dict[str, Any]]:
+        """Read frames to label, grouped by clip so that clips load once each."""
         items: dict[str, dict[str, Any]] = {}
         for path in sorted(self._results.glob("*.json")):
             result = json.loads(path.read_text())
@@ -144,15 +156,17 @@ class LabelStore:
 
     def next_item(self) -> dict[str, Any] | None:
         """Return the next frame to label, without the model's answer."""
-        done = self._records()
-        for item in self._sample():
-            if item["id"] not in done:
-                return {key: value for key, value in item.items() if key != "model"}
+        with self._lock:
+            done = self._records()
+            for item in self._sample():
+                if item["id"] not in done:
+                    return {key: value for key, value in item.items() if key != "model"}
         return None
 
     def save(self, item_id: str, clicks: dict[str, Any]) -> None:
         """Store a label with the model's joints as they stood, so later changes cannot alter it."""
-        item = next((entry for entry in self._sample() if entry["id"] == item_id), None)
+        with self._lock:
+            item = next((entry for entry in self._sample() if entry["id"] == item_id), None)
         if item is None:
             raise ValueError("That frame is not in the labelling set.")
         if set(clicks) != set(JOINTS):
@@ -165,22 +179,27 @@ class LabelStore:
             )
             if not valid:
                 raise ValueError("Each joint must be an x and y position, or null.")
-        records = self._records()
-        records[item_id] = {"clicks": clicks, "model": item["model"]}
-        self._write(records)
+        # One writer at a time, or two quick saves could lose a label or collide on the file.
+        with self._lock:
+            records = self._records()
+            records[item_id] = {"clicks": clicks, "model": item["model"]}
+            self._write(records)
 
     def undo(self) -> str | None:
         """Remove the newest label, so the frame comes up again. Returns its id."""
-        records = self._records()
-        if not records:
-            return None
-        newest = list(records)[-1]
-        del records[newest]
-        self._write(records)
-        return newest
+        with self._lock:
+            records = self._records()
+            if not records:
+                return None
+            newest = list(records)[-1]
+            del records[newest]
+            self._write(records)
+            return newest
 
     def summary(self) -> dict[str, Any]:
-        records = self._records()
+        with self._lock:
+            records = self._records()
+            available = len(self._sample())
         by_joint: dict[str, list[float]] = {name: [] for name in JOINTS}
         hidden = dict.fromkeys(JOINTS, 0)
         trunk_errors: list[float] = []
@@ -208,7 +227,7 @@ class LabelStore:
             "labelled": len(records),
             "usable": usable,
             "target": TARGET_FRAMES,
-            "available": len(self._sample()),
+            "available": available,
             "keypoint_error_px": per_axis,
             "trunk_within_5_deg": _share_within(trunk_errors),
             "knee_within_5_deg": _share_within(knee_errors),
