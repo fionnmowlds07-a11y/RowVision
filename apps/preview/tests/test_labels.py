@@ -1,4 +1,5 @@
 import json
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -171,3 +172,51 @@ def test_end_on_frames_are_not_offered(tmp_path: Path) -> None:
         store.save(item["id"], clicks())
     assert frames
     assert min(frames) >= 100
+
+
+def test_quick_repeat_saves_do_not_collide_or_lose_labels(store: LabelStore) -> None:
+    """Pressing save twice sends two saves at once, which once froze the page."""
+    items = []
+    while (item := store.next_item()) is not None:
+        items.append(item)
+        store.save(item["id"], clicks())
+    for item in items:
+        store.undo()
+    errors: list[Exception] = []
+
+    def save(item_id: str) -> None:
+        try:
+            store.save(item_id, clicks())
+        except Exception as error:  # noqa: BLE001
+            errors.append(error)
+
+    threads = [
+        threading.Thread(target=save, args=(item["id"],)) for item in items for _ in range(6)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert errors == []
+    assert store.summary()["labelled"] == len(items)
+
+
+def test_result_files_are_only_read_again_when_they_change(
+    store: LabelStore, tmp_path: Path, monkeypatch: Any
+) -> None:
+    reads = 0
+    original = store._read_sample
+
+    def counted() -> list[dict[str, Any]]:
+        nonlocal reads
+        reads += 1
+        return original()
+
+    monkeypatch.setattr(store, "_read_sample", counted)
+    for _ in range(5):
+        store.next_item()
+        store.summary()
+    assert reads == 1
+    write_result(tmp_path / "results", "b.mp4")
+    store.next_item()
+    assert reads == 2
