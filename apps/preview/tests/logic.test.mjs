@@ -411,8 +411,8 @@ test("a labelling frame centres on the rower", () => {
 });
 
 test("labelling progress reads plainly", () => {
-  assert.equal(labelCount({ labelled: 3, target: 100, available: 50 }), "3 of 100 frames labelled");
-  assert.match(labelCount({ labelled: 0, target: 100, available: 0 }), /Analyse a clip first/);
+  assert.equal(labelCount({ usable: 3, target: 100, available: 50 }), "3 of 100 usable frames labelled");
+  assert.match(labelCount({ usable: 0, target: 100, available: 0 }), /Analyse a clip first/);
 });
 
 test("results stay quiet until there is something to report", () => {
