@@ -3,6 +3,8 @@ import { test } from "node:test";
 
 import {
   FIT,
+  uploadProblem,
+  uploadText,
   overallGap,
   ratingNote,
   TARGET_WINDOW,
@@ -528,4 +530,16 @@ test("a missing overall score says what it needs", () => {
   assert.match(overallGap(2, {}, 3), /at least 3 full strokes/);
   assert.match(overallGap(5, {}, 3), /nothing could be measured/);
   assert.match(overallGap(5, { rhythm: 100 }, 3), /both the catch and the finish/);
+});
+
+test("a file is checked before it is uploaded", () => {
+  assert.equal(uploadProblem({ name: "Launch.MOV", size: 100 }), null);
+  assert.match(uploadProblem({ name: "notes.pdf", size: 100 }), /not supported/);
+  assert.match(uploadProblem({ name: "clip.mp4", size: 0 }), /empty/);
+  assert.match(uploadProblem({ name: "clip.mp4", size: 5 * 1024 ** 3 }), /too big/);
+});
+
+test("upload progress reads plainly, then says it is checking", () => {
+  assert.equal(uploadText("a.mp4", 25, 100), "Adding a.mp4: 25%");
+  assert.equal(uploadText("a.mp4", 100, 100), "Checking a.mp4...");
 });

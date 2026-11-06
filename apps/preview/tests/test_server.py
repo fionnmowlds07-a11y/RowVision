@@ -58,7 +58,7 @@ def client(tmp_path: Path) -> Iterator[Client]:
     videos.mkdir()
     write_video(videos / CLIP)
     points, scores = crew_detections(4)
-    clips = ClipLibrary(videos)
+    clips = ClipLibrary(videos, tmp_path / "uploads")
     runner = Runner(
         clips,
         tmp_path / "results",
@@ -261,3 +261,39 @@ def test_a_label_for_an_unknown_frame_is_refused(client: Client) -> None:
 
 def test_undo_with_no_labels_is_harmless(client: Client) -> None:
     assert client.post("/api/labels/undo", {}).json() == {"undone": None}
+
+
+def upload(client: Client, name: str, body: bytes, kind: str = "application/octet-stream") -> Reply:
+    return client.call("POST", f"/api/clips?name={quote(name)}", body, {"Content-Type": kind})
+
+
+@pytest.fixture
+def video_bytes(tmp_path: Path) -> bytes:
+    path = tmp_path / "source.avi"
+    write_video(path, frames=5)
+    return path.read_bytes()
+
+
+def test_an_added_video_can_be_opened(client: Client, video_bytes: bytes) -> None:
+    reply = upload(client, "launch one.avi", video_bytes)
+    assert reply.status == 200
+    assert reply.json() == {"clip": "launch one.avi"}
+    assert "launch one.avi" in client.call("GET", "/api/clips").json()["clips"]
+    assert client.call("GET", f"/api/clips/{quote('launch one.avi')}").json()["frames"] == 5
+
+
+def test_a_file_that_is_not_a_video_is_refused(client: Client, tmp_path: Path) -> None:
+    reply = upload(client, "fake.avi", b"not a video at all")
+    assert reply.status == 400
+    assert "could not be read" in reply.json()["error"]
+    assert list((tmp_path / "uploads").iterdir()) == []
+
+
+def test_a_video_cannot_be_posted_by_a_plain_form(client: Client, video_bytes: bytes) -> None:
+    kind = "application/x-www-form-urlencoded"
+    assert upload(client, "a.avi", video_bytes, kind).status == 400
+
+
+def test_an_upload_needs_a_name(client: Client, video_bytes: bytes) -> None:
+    headers = {"Content-Type": "application/octet-stream"}
+    assert client.call("POST", "/api/clips", video_bytes, headers).status == 400
