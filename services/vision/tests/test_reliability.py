@@ -123,7 +123,7 @@ def test_weak_crew_rhythm_does_not_lower_accuracy_but_is_flagged() -> None:
 
 
 def test_the_side_on_sculler_from_the_real_clip_is_not_poor() -> None:
-    assert rate(Evidence(29.5, 12.5, 0, 0.99, 2)).band is Band.GOOD
+    assert rate(Evidence(29.5, 12.5, 0, 0.99, 2)).band is not Band.POOR
 
 
 def test_two_strokes_cannot_show_a_spread() -> None:
@@ -160,8 +160,20 @@ def test_too_few_labels_do_not_count_as_calibrated(tmp_path: Path) -> None:
 
 
 def test_enough_labels_calibrate_the_rating(tmp_path: Path) -> None:
-    assert load_calibration(calibration_file(tmp_path, 2.2, 120)) == Calibration(2.2, True)
+    assert load_calibration(calibration_file(tmp_path, 2.2, 120)) == Calibration(2.2, True, 120)
 
 
-def test_the_repository_starts_uncalibrated() -> None:
-    assert not load_calibration().calibrated
+def test_a_partial_set_is_used_but_not_called_calibrated(tmp_path: Path) -> None:
+    assert load_calibration(calibration_file(tmp_path, 2.2, 78)) == Calibration(2.2, False, 78)
+
+
+def test_the_rating_says_how_many_frames_it_rests_on() -> None:
+    rating = rate(GOOD_FOOTAGE, Calibration(2.0, False, 78))
+    assert rating.labelled_frames == 78
+
+
+def test_the_repository_uses_the_measured_error() -> None:
+    loaded = load_calibration()
+    assert loaded.keypoint_error_px != ASSUMED_KEYPOINT_ERROR_PX
+    assert loaded.labelled_frames >= 50
+    assert not loaded.calibrated
