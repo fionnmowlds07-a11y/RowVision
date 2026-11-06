@@ -222,7 +222,7 @@ def test_results_come_with_scores_and_a_rating() -> None:
     rower = result.rowers[0]
     assert rower.card.overall is not None
     assert 0 <= rower.rating.accuracy <= 100
-    assert not rower.rating.calibrated
+    assert rower.rating.calibrated
 
 
 def test_a_measure_seen_on_too_few_strokes_is_not_reported() -> None:

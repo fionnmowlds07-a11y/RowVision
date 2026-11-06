@@ -6,6 +6,7 @@ import {
   laneMarks,
   measureKind,
   median,
+  overallGap,
   overallVisible,
   ratingNote,
   sourceLink,
@@ -45,9 +46,7 @@ function overallBlock(rower, revealed, onReveal) {
   const block = element("div", "overall");
   const { overall } = rower.card;
   if (overall === null) {
-    const reason = rower.strokes.length < MIN_STROKES
-      ? `No overall score: it needs at least ${MIN_STROKES} full strokes.`
-      : "No overall score: nothing could be measured reliably.";
+    const reason = overallGap(rower.strokes.length, rower.card.phases, MIN_STROKES);
     block.append(element("p", "overall-text", reason));
   } else if (overallVisible(rower.rating, revealed)) {
     const text = element("p", "overall-text", "Overall score");

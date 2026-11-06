@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   FIT,
+  overallGap,
   ratingNote,
   TARGET_WINDOW,
   targetMarks,
@@ -521,4 +522,10 @@ test("a target says whether the measured angle is inside it", () => {
   const [trunk, knee] = targetMarks(targetPose(), 100, rower, 1, 0);
   assert.equal(trunk.inside, false);
   assert.equal(knee.inside, true);
+});
+
+test("a missing overall score says what it needs", () => {
+  assert.match(overallGap(2, {}, 3), /at least 3 full strokes/);
+  assert.match(overallGap(5, {}, 3), /nothing could be measured/);
+  assert.match(overallGap(5, { rhythm: 100 }, 3), /both the catch and the finish/);
 });

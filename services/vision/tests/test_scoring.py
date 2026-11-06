@@ -1,7 +1,7 @@
 import pytest
 
 from rowvision.reference import Target, load_targets
-from rowvision.scoring import Phase, score_stroke, score_value
+from rowvision.scoring import ROUGH_GUIDE, Phase, score_stroke, score_value
 
 GOOD = {
     "catch_lean_deg": 28.0,
@@ -52,11 +52,11 @@ def test_poor_catch_lowers_only_the_catch_score() -> None:
 
 
 def test_inconsistent_measure_is_not_scored_and_says_why() -> None:
-    result = card(GOOD, {**STEADY, "catch_knee_deg": 58.0})
-    knee = next(metric for metric in result.metrics if metric.name == "catch_knee_deg")
-    assert knee.score is None
-    assert knee.reason is not None and "inconsistent" in knee.reason
-    assert result.phases[Phase.CATCH] == 100
+    result = card(GOOD, {**STEADY, "catch_lean_deg": 58.0})
+    lean = next(metric for metric in result.metrics if metric.name == "catch_lean_deg")
+    assert lean.score is None
+    assert lean.reason is not None and "inconsistent" in lean.reason
+    assert Phase.CATCH not in result.phases
 
 
 def test_unmeasured_value_is_never_given_a_number() -> None:
@@ -70,3 +70,23 @@ def test_too_few_strokes_scores_nothing() -> None:
     result = card(GOOD, strokes=2)
     assert result.overall is None
     assert result.phases == {}
+
+
+def test_knee_angles_are_shown_but_never_scored() -> None:
+    result = card({**GOOD, "catch_knee_deg": 120.0, "finish_knee_deg": 120.0})
+    knees = [metric for metric in result.metrics if "knee" in metric.name]
+    assert [metric.value for metric in knees] == [120.0, 120.0]
+    assert all(metric.score is None and metric.reason == ROUGH_GUIDE for metric in knees)
+    assert result.overall == 100
+
+
+def test_five_degrees_outside_an_angle_target_scores_half() -> None:
+    result = card({**GOOD, "catch_lean_deg": 36.0})
+    assert result.phases[Phase.CATCH] == pytest.approx(50)
+
+
+@pytest.mark.parametrize("missing", ["catch_lean_deg", "finish_lean_deg"])
+def test_no_overall_score_without_both_catch_and_finish(missing: str) -> None:
+    result = card({key: value for key, value in GOOD.items() if key != missing})
+    assert result.overall is None
+    assert result.phases
