@@ -21,7 +21,7 @@ MAX_STITCH_SECONDS = 3.0
 STITCH_DISTANCE_TRUNKS = 2.0
 ZOOM_MIN_RATIO = 1.25
 """A change in everyone's size this big between detections means the camera zoomed."""
-ZOOM_MIN_PEOPLE = 4
+ZOOM_MIN_PEOPLE = 5
 ZOOM_FIT_TRUNKS = 0.6
 ZOOM_MIN_FIT = 0.75
 """The share of people who must land on a detection, and agree in size, for a zoom to count."""
@@ -137,9 +137,11 @@ def _zoom(
     A zoom moves each rower by a different amount, far too much for matching by distance, and the
     person who lands nearest is often someone else. Everyone keeps their place relative to one
     another, so the zoom is the scale and shift that lands the most tracks on detections. People
-    coming and going also move the median size, so most of them must fit, each at the same scale.
+    coming and going also move the median size, so the crew must stay the same size, and most of
+    them must fit, each at the same scale. A small crew gives too little to tell the two apart.
     """
-    if min(len(previous), len(found)) < ZOOM_MIN_PEOPLE:
+    fewer, more = sorted((len(previous), len(found)))
+    if fewer < ZOOM_MIN_PEOPLE or fewer < ZOOM_MIN_FIT * more:
         return None
     scale = float(np.median(found_sizes) / np.median(sizes))
     if max(scale, 1 / scale) < ZOOM_MIN_RATIO:
@@ -156,7 +158,7 @@ def _zoom(
         fit = (int(within.sum()), -float(gaps.min(axis=1)[within].sum()))
         if best is None or fit > best:
             best, moved, nearest, close = fit, scaled + shift, gaps.argmin(axis=1), within
-    if best is None or best[0] < ZOOM_MIN_FIT * min(len(previous), len(found)):
+    if best is None or best[0] < max(ZOOM_MIN_PEOPLE, ZOOM_MIN_FIT * fewer):
         return None
     ratios = found_sizes[nearest[close]] / (sizes[close] * scale)
     agreeing = np.mean((ratios > 1 / ZOOM_SIZE_AGREEMENT) & (ratios < ZOOM_SIZE_AGREEMENT))
