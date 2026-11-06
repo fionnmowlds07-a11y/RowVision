@@ -7,6 +7,7 @@ import {
   measureKind,
   median,
   overallVisible,
+  ratingNote,
   sourceLink,
   timingText,
 } from "./logic.mjs";
@@ -35,13 +36,7 @@ function ratingBlock(rating) {
   );
   block.append(
     line,
-    element(
-      "p",
-      "rating-note",
-      rating.calibrated
-        ? "Estimated accuracy"
-        : "Estimated accuracy, not yet checked against hand-labelled footage",
-    ),
+    element("p", "rating-note", ratingNote(rating)),
   );
   return block;
 }
