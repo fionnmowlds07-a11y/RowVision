@@ -9,7 +9,15 @@ from test_labels import pose
 from rowvision_preview.blades import FRAMES_PER_CLIP, FRAMES_PER_TURN, BladeStore
 
 
-def write_result(folder: Path, name: str, clip: str, seat: int = 1, frames: int = 500) -> None:
+def write_result(
+    folder: Path,
+    name: str,
+    clip: str,
+    seat: int = 1,
+    frames: int = 500,
+    side: str = "bow",
+    facing: int = -1,
+) -> None:
     folder.mkdir(exist_ok=True)
     strokes = [
         {"catch_frame": start, "finish_frame": start + 20, "next_catch_frame": start + 60}
@@ -17,7 +25,8 @@ def write_result(folder: Path, name: str, clip: str, seat: int = 1, frames: int 
     ]
     poses: list[Any] = [pose() for _ in range(frames)]
     result = {
-        "settings": {"clip": clip, "seat": seat, "side": "bow"},
+        "settings": {"clip": clip, "seat": seat, "side": side},
+        "facing": facing,
         "rower": {"poses": poses, "strokes": strokes},
     }
     (folder / name).write_text(json.dumps(result))
@@ -130,3 +139,33 @@ def test_undo_brings_the_frame_back(store: BladeStore) -> None:
     assert following is not None
     assert following["id"] == item["id"]
     assert store.undo() is None
+
+
+def test_rowers_with_a_blade_on_the_far_side_are_left_out(tmp_path: Path) -> None:
+    results = tmp_path / "results"
+    write_result(results, "far.json", "far.mp4", side="bow", facing=1)
+    write_result(results, "near.json", "near.mp4", side="stroke", facing=1)
+    write_result(results, "single.json", "single.mp4", side="scull", facing=1)
+    store = BladeStore(results, tmp_path / "blades.json")
+    assert {item["clip"] for item in walk(store)} == {"near.mp4", "single.mp4"}
+
+
+def test_a_sweep_rower_is_left_out_when_the_direction_is_unknown(tmp_path: Path) -> None:
+    results = tmp_path / "results"
+    write_result(results, "a.json", "a.mp4", side="stroke", facing=0)
+    assert BladeStore(results, tmp_path / "blades.json").next_item() is None
+
+
+def test_old_far_side_labels_stay_saved_but_do_not_count(tmp_path: Path) -> None:
+    results = tmp_path / "results"
+    write_result(results, "a.json", "a.mp4", side="bow", facing=-1)
+    store = BladeStore(results, tmp_path / "blades.json")
+    item = store.next_item()
+    assert item is not None
+    store.save(item["id"], [1, 2], "air")
+    write_result(results, "a.json", "a.mp4", side="stroke", facing=-1)
+    os.utime(results / "a.json", (9, 9))
+    summary = store.summary()
+    assert (summary["usable"], summary["available"]) == (0, 0)
+    assert store.undo() is None, "undo must not remove a label that no longer counts"
+    assert item["id"] in json.loads((tmp_path / "blades.json").read_text())
