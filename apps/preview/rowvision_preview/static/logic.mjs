@@ -468,3 +468,22 @@ export function ratingNote({ calibrated, labelled_frames: frames }) {
   if (frames) return `Estimated accuracy, based on ${frames} hand-labelled frames so far`;
   return "Estimated accuracy, not yet checked against hand-labelled footage";
 }
+
+export const VIDEO_SUFFIXES = [".mp4", ".mov", ".m4v", ".avi", ".webm"];
+export const MAX_UPLOAD_BYTES = 4 * 1024 ** 3;
+export const DROP_HINT = "MP4, MOV, M4V, AVI or WebM, up to 4 GB. It stays on this computer.";
+
+// Why a file cannot be added, or null. The server checks again, as this only saves a wasted upload.
+export function uploadProblem({ name, size }) {
+  const lower = name.toLowerCase();
+  if (!VIDEO_SUFFIXES.some((suffix) => lower.endsWith(suffix))) {
+    return "That file type is not supported. Use an MP4, MOV, M4V, AVI or WebM.";
+  }
+  if (size === 0) return "That file is empty.";
+  return size > MAX_UPLOAD_BYTES ? "That video is too big. The limit is 4 GB." : null;
+}
+
+export function uploadText(name, loaded, total) {
+  if (loaded >= total) return `Checking ${name}...`;
+  return `Adding ${name}: ${Math.round((loaded / total) * 100)}%`;
+}

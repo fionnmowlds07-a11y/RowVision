@@ -96,6 +96,22 @@ class Handler(BaseHTTPRequestHandler):
             return None
         return body
 
+    def _upload(self) -> None:
+        """Save a video sent as the raw body. The binary type stops other sites posting by form."""
+        self.close_connection = True  # A refused body is left unread.
+        names = parse_qs(urlsplit(self.path).query).get("name")
+        if self.headers.get("Content-Type") != "application/octet-stream" or not names:
+            self._error(HTTPStatus.BAD_REQUEST, "Send the video as a file with its name.")
+            return
+        try:
+            clip = self.clips.add(names[0], self.rfile, int(self.headers.get("Content-Length") or 0))
+        except ValueError as error:
+            self._error(HTTPStatus.BAD_REQUEST, str(error))
+        except OSError:
+            self._error(HTTPStatus.INSUFFICIENT_STORAGE, "The video could not be saved. Check disk space.")
+        else:
+            self._json({"clip": clip})
+
     def do_GET(self) -> None:
         if not self._host_allowed():
             return
@@ -167,10 +183,13 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         if not self._host_allowed():
             return
+        path = urlsplit(self.path).path
+        if path == "/api/clips":
+            self._upload()
+            return
         body = self._body()
         if body is None:
             return
-        path = urlsplit(self.path).path
         try:
             if path == "/api/job":
                 self.runner.start(Settings.parse(body, self.clips.names()))
@@ -215,7 +234,7 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
 
-    clips = ClipLibrary(args.videos)
+    clips = ClipLibrary(args.videos, args.private / "uploads")
     runner = Runner(
         clips, args.private / "preview" / "results", args.private / "detections",
         VideoReader, RtmBackend,
