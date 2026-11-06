@@ -51,10 +51,10 @@ def test_predicted_accuracy_matches_measured_accuracy(pixels_per_metre: float, n
     assert predicted == pytest.approx(measured, abs=4)
 
 
-def test_clear_footage_rates_highly_and_is_marked_uncalibrated() -> None:
+def test_clear_footage_rates_highly_and_is_marked_calibrated() -> None:
     rating = rate(CLEAR)
     assert rating.band is Band.EXCELLENT
-    assert not rating.calibrated
+    assert rating.calibrated
     assert rating.warnings == []
 
 
@@ -175,5 +175,5 @@ def test_the_rating_says_how_many_frames_it_rests_on() -> None:
 def test_the_repository_uses_the_measured_error() -> None:
     loaded = load_calibration()
     assert loaded.keypoint_error_px != ASSUMED_KEYPOINT_ERROR_PX
-    assert loaded.labelled_frames >= 50
-    assert not loaded.calibrated
+    assert loaded.labelled_frames >= 100
+    assert loaded.calibrated

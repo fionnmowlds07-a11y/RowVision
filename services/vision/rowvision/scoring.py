@@ -8,6 +8,9 @@ import numpy as np
 from rowvision.reference import Target, Targets
 
 MIN_STROKES = 3
+ANGLE_FALLOFF_DEG = 10.0
+ROUGH_GUIDE = "Shown as a rough guide. Knee angles depend on body proportions and are hard to measure."
+NEEDED_FOR_OVERALL = ("catch", "finish")
 
 
 class Phase(StrEnum):
@@ -25,14 +28,20 @@ class MetricRule:
     """How far outside the target a value scores zero."""
     max_spread: float
     """Interquartile range across strokes above which the measure is not scored."""
+    scored: bool = True
+    """False for a measure shown as a rough guide only."""
 
 
 RULES = {
-    "catch_lean_deg": MetricRule(Phase.CATCH, "Body angle at the catch", 15.0, 10.0),
-    "catch_knee_deg": MetricRule(Phase.CATCH, "Knee angle at the catch", 15.0, 10.0),
+    "catch_lean_deg": MetricRule(Phase.CATCH, "Body angle at the catch", ANGLE_FALLOFF_DEG, 10.0),
+    "catch_knee_deg": MetricRule(
+        Phase.CATCH, "Knee angle at the catch", ANGLE_FALLOFF_DEG, 10.0, scored=False
+    ),
     "legs_lead": MetricRule(Phase.DRIVE, "Legs before body", 0.2, 0.3),
-    "finish_lean_deg": MetricRule(Phase.FINISH, "Layback at the finish", 15.0, 10.0),
-    "finish_knee_deg": MetricRule(Phase.FINISH, "Knee angle at the finish", 15.0, 10.0),
+    "finish_lean_deg": MetricRule(Phase.FINISH, "Layback at the finish", ANGLE_FALLOFF_DEG, 10.0),
+    "finish_knee_deg": MetricRule(
+        Phase.FINISH, "Knee angle at the finish", ANGLE_FALLOFF_DEG, 10.0, scored=False
+    ),
     "drive_share": MetricRule(Phase.RHYTHM, "Drive and recovery rhythm", 0.1, 0.05),
 }
 
@@ -56,6 +65,7 @@ class ScoreCard:
     phases: dict[Phase, float]
     """Only phases with at least one scored measure appear."""
     overall: float | None
+    """Only given when the catch and finish were both scored, so easy measures cannot stand alone."""
 
 
 def score_value(value: float, target: Target, falloff: float) -> float:
@@ -81,6 +91,8 @@ def _score_metric(
     value = summary.get(name)
     if value is None or not np.isfinite(value):
         return skip("Could not be seen reliably in this video.")
+    if not rule.scored:
+        return skip(ROUGH_GUIDE, value)
     if strokes < MIN_STROKES:
         return skip(f"Needs at least {MIN_STROKES} full strokes.", value)
     if spread.get(name, 0.0) > rule.max_spread:
@@ -108,5 +120,6 @@ def score_stroke(
         scores = [m.score for m in metrics if m.phase is phase and m.score is not None]
         if scores:
             phases[phase] = float(np.mean(scores))
-    overall = float(np.mean(list(phases.values()))) if phases else None
+    complete = all(Phase(name) in phases for name in NEEDED_FOR_OVERALL)
+    overall = float(np.mean(list(phases.values()))) if complete else None
     return ScoreCard(metrics, phases, overall)

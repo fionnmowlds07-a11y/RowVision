@@ -21,7 +21,9 @@ This was a structured search, not a formal systematic review. No study was score
 
 The target ranges are RowVision's own judgement from these figures. No study states them as ideal values.
 
-Each angle target is 5° wide, so that scores separate good technique from very good technique. The studies report wider spreads between rowers, so each range is our choice of a point near the middle of the published values, not a finding. Rowers who differ from it by build or coaching style will lose points, and a coach should review all four.
+Each angle target is 5° wide, so that scores separate good technique from very good technique. The studies report wider spreads between rowers, so each range is our choice of a point near the middle of the published values, not a finding. Rowers who differ from it by build or coaching style will lose points, and a coach should review all four. A body angle loses half its points 5° outside the target and all of them at 10°. An overall score is only given when the catch and the finish were both scored, so a clip cannot score highly on rhythm alone.
+
+Knee angles are shown as a rough guide and do not count towards any score. They depend on body proportions, and on 99 labelled frames they matched the labeller within 5° only 21% of the time.
 
 The finish knee target sits straighter than the studies report. Those figures come from rowing machines, and legs are normally flat at the finish on the water, so a fully straight leg is not penalised.
 
@@ -49,18 +51,17 @@ No study found validates pose estimation for on-water rowing, so RowVision has t
 
 The rating estimates the share of joint angles within 5° of the true value. It depends on how big the rower is in pixels, the camera angle, and how much the angle varies between strokes. Clip length, tracking coverage and crew rhythm do not change it. They appear as separate notes, because they say how much evidence there is, not how accurate an angle is.
 
-The rating uses a keypoint error measured against hand-labelled real footage, stored in `services/vision/reference/calibration.yaml`. It was first assumed to be 1.5 pixels. On 78 usable labelled frames, the value that matches real body angle accuracy is 2.0 pixels.
+The rating uses a keypoint error measured against hand-labelled real footage, stored in `services/vision/reference/calibration.yaml`. It was first assumed to be 1.5 pixels. On 108 usable labelled frames from 12 clips, the value that matches real body angle accuracy is 2.0 pixels.
 
-| Measured on 78 labelled frames | Result |
+| Measured on 108 labelled frames | Result |
 |---|---|
-| Body angle within 5° of the labeller | 50% overall, 54% on side-on shots, 44% on oblique shots |
+| Body angle within 5° of the labeller | 48% overall, 54% on side-on shots, 43% on oblique shots |
 | Typical body angle gap | 5° |
-| Knee angle within 5° | 26%, with a typical gap of about 13° |
-| Typical joint gap, nearest side | About 2–3 pixels for shoulder, elbow, wrist and knee; 4.7 for hip; 7.9 for ankle |
+| Knee angle within 5° | 21%, with a typical gap of about 18° |
 
 These results have limits. Hand labels on small, blurry rowers carry their own error, so the true accuracy is probably somewhat better than measured. The set is small, so the body angle figure could be about 10 points either way. Rowers in these clips had trunks of about 17–32 pixels, so nothing here shows how the app performs on sharper or closer footage. Within that range, accuracy did not clearly improve with rower size. The rating formula assumes it does, which is not yet proven.
 
-The app says the rating is based on labelled frames so far until 100 usable frames are reached.
+"Calibrated" means the rating now rests on 100 or more usable frames. It does not mean the figure is exact.
 
 ## Review status
 
