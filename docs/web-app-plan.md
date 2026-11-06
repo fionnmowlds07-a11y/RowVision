@@ -36,7 +36,7 @@ The first version is a private preview for adults the owner knows personally. It
 | After 30 days | Scores only. Video, frames and joint positions are deleted, so that clip's frame viewer stops working. |
 | Training use | Uploaded clips may be used for training. The owner tells testers in person. No notice in the app. |
 | Training footage | A "Keep for training" button on the admin page copies a chosen clip to a private store, outside the 30-day deletion. All other clips are deleted on time. |
-| Look | Chosen in two mock-up rounds and recorded in `DESIGN.md`: deep green, white and black, with Sprint's fonts and layouts on phone. |
+| Look | Chosen in two mock-up rounds and recorded in `DESIGN.md`: option B, black and green. |
 | Custom colours | Athletes can change the ground and highlight colours, starting from the club greens (#116). |
 | Bad results | "Something wrong?" on each result: a short form saved with the clip and listed for the admin. |
 | Hosting | Decided when the owner is ready for testers. Hosted and self-hosted Supabase use the same code. |
