@@ -67,7 +67,7 @@ Video sits on the left and scores on the right. Drag the handle between them, or
 - If the analysis needs a boat choice, the job stops and keeps the boats it found, and carries on after the tap.
 - Coarse detections saved by `services/vision/scripts/cache_detections.py` in `private/detections/` are used when they match the clip, which skips the first pass.
 - Results are saved to `private/preview/results/` as JSON and reused. The file name includes a hash of the analysis code, so results from older code are never shown as current.
-- `rowvision_preview/clips.py` serves frames from the same decoder as the analysis, not a browser video element. Real clips have variable timing, so a browser cannot be trusted to show the frame a pose was measured on. Seeking takes most of a second, so the open clip is decoded once into memory, and no frames are written to disk.
+- `rowvision_preview/clips.py` serves frames from the same decoder as the analysis, not a browser video element. Real clips have variable timing, so a browser cannot be trusted to show the frame a pose was measured on. Seeking takes most of a second, so the open clip is decoded once into memory, and no frames are written to disk. Clips wider than 1280 pixels also keep a small copy of each frame, which is what plays. Pausing returns to the full frame.
 
 ## Privacy
 

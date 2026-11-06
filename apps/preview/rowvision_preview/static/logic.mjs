@@ -500,3 +500,11 @@ export function uploadText(name, loaded, total) {
   if (loaded >= total) return `Checking ${name}...`;
   return `Adding ${name}: ${Math.round((loaded / total) * 100)}%`;
 }
+
+export const MAX_CANVAS_WIDTH = 1920;
+
+// Canvas pixels per video pixel. Small clips get extra so lines stay sharp when enlarged, and large
+// ones get fewer, as repainting a very large canvas on every frame makes playback stutter.
+export function canvasScaleFor(videoWidth) {
+  return Math.min(2, MAX_CANVAS_WIDTH / videoWidth);
+}
