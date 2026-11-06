@@ -16,6 +16,7 @@ import {
   limbSegments,
   modelRequest,
   nearestMeasure,
+  targetMarks,
   nextMarker,
   openingFrame,
   playStart,
@@ -39,6 +40,7 @@ const PREFETCH_FRAMES = 6;
 const SCALE = 2; // Canvas pixels per video pixel, so lines stay sharp when the page enlarges them.
 const COLOURS = { left: "#22d3ee", right: "#e879f9", centre: "#fde047" };
 const ANGLE_COLOUR = "#fde047";
+const TARGET_COLOURS = { inside: "74, 222, 128", outside: "251, 146, 60" };
 const ZOOM_STEP = 1.5;
 const ROWER_ZOOM = 5;
 const FREEZE_SPAN = 120; // Video pixels across a freeze frame.
@@ -240,6 +242,7 @@ function draw() {
     return;
   }
   const pose = result?.rower?.poses[frame];
+  if ($("show-targets").checked) drawTargets(context, pose, frame, 1 / view.scale);
   if ($("show-lines").checked) drawPose(context, pose, 1 / view.scale);
   if ($("show-angles").checked) drawAngles(context, pose, frame, 1 / view.scale);
 }
@@ -288,6 +291,24 @@ function drawAngles(target, pose, index, size, only = null) {
     target.fill();
     target.fillStyle = "#fff";
     target.fillText(label, spot.x + 4 * size, spot.y + 11 * size);
+  }
+}
+
+function drawTargets(target, pose, index, size, only = null) {
+  const { rower, facing, view_deg: viewDeg } = result;
+  for (const item of targetMarks(pose, index, rower, facing, viewDeg)) {
+    if (only && item.kind !== only) continue;
+    const colour = TARGET_COLOURS[item.inside ? "inside" : "outside"];
+    target.beginPath();
+    target.moveTo(item.vertex.x, item.vertex.y);
+    target.lineTo(item.low.x, item.low.y);
+    target.lineTo(item.high.x, item.high.y);
+    target.closePath();
+    target.fillStyle = `rgba(${colour}, 0.3)`;
+    target.fill();
+    target.strokeStyle = `rgb(${colour})`;
+    target.lineWidth = 1 * size;
+    target.stroke();
   }
 }
 
@@ -529,6 +550,7 @@ function drawFreeze(target, index, kind) {
     paint.setTransform(scale, 0, 0, scale, -x * scale, -y * scale);
     paint.imageSmoothingQuality = "high";
     paint.drawImage(picture, 0, 0, clip.width, clip.height);
+    drawTargets(paint, pose, index, 0.5, kind);
     drawPose(paint, pose, 0.5);
     drawAngles(paint, pose, index, 0.5, kind);
   };
@@ -776,6 +798,7 @@ $("resize").addEventListener("keydown", (event) => {
 
 $("show-lines").addEventListener("change", draw);
 $("show-angles").addEventListener("change", draw);
+$("show-targets").addEventListener("change", draw);
 $("zoom-in").addEventListener("click", () => zoomCentre(ZOOM_STEP));
 $("zoom-out").addEventListener("click", () => zoomCentre(1 / ZOOM_STEP));
 $("zoom-fit").addEventListener("click", () => setView(FIT));
@@ -869,6 +892,9 @@ document.addEventListener("keydown", (event) => {
     draw();
   } else if (key === "a") {
     $("show-angles").checked = !$("show-angles").checked;
+    draw();
+  } else if (key === "t") {
+    $("show-targets").checked = !$("show-targets").checked;
     draw();
   } else if (key === "+" || key === "=") zoomCentre(ZOOM_STEP);
   else if (key === "-") zoomCentre(1 / ZOOM_STEP);

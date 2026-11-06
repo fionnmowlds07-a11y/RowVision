@@ -179,6 +179,69 @@ export function angleMarks(pose, angles) {
   ];
 }
 
+// Frames either side of a catch or finish that still show its target, so it can be seen in play.
+export const TARGET_WINDOW = 2;
+
+function phaseAt(frame, rower) {
+  const near = (frames) => frames.some((marker) => Math.abs(marker - frame) <= TARGET_WINDOW);
+  if (near(rower.catches)) return "catch";
+  return near(rower.finishes) ? "finish" : null;
+}
+
+function scoredTarget(rower, name) {
+  const metric = rower.card.metrics.find((item) => item.name === name);
+  return metric && metric.score !== null ? metric.target : null;
+}
+
+function trunkEdge(hip, shoulder, degrees, facing, squeeze) {
+  const length = Math.hypot((shoulder.x - hip.x) / squeeze, shoulder.y - hip.y);
+  const lean = (degrees * Math.PI) / 180;
+  return {
+    x: hip.x + facing * Math.sin(lean) * length * squeeze,
+    y: hip.y - Math.cos(lean) * length,
+  };
+}
+
+function shinEdge(knee, hip, ankle, degrees, squeeze) {
+  const thigh = { x: (hip.x - knee.x) / squeeze, y: hip.y - knee.y };
+  const shin = { x: (ankle.x - knee.x) / squeeze, y: ankle.y - knee.y };
+  const side = thigh.x * shin.y - thigh.y * shin.x < 0 ? -1 : 1;
+  const turn = Math.atan2(thigh.y, thigh.x) + (side * degrees * Math.PI) / 180;
+  const length = Math.hypot(shin.x, shin.y);
+  return { x: knee.x + Math.cos(turn) * length * squeeze, y: knee.y + Math.sin(turn) * length };
+}
+
+function wedge(kind, vertex, target, value, edge) {
+  if (value === null || value === undefined) return [];
+  const inside = value >= target.low && value <= target.high;
+  return [{ kind, vertex, low: edge(target.low), high: edge(target.high), inside }];
+}
+
+// Where the trunk and shin should be at a catch or finish, as wedges from the athlete's own joints.
+// Only scored measures get one, and targets are squeezed to match a camera that is not side-on.
+export function targetMarks(pose, frame, rower, facing, viewDeg) {
+  const phase = pose && phaseAt(frame, rower);
+  if (!phase) return [];
+  const squeeze = Math.cos(((viewDeg ?? 0) * Math.PI) / 180);
+  const hip = middle(pose, 11, 12);
+  const shoulder = middle(pose, 5, 6);
+  const knee = middle(pose, 13, 14);
+  const ankle = middle(pose, 15, 16);
+  const lean = scoredTarget(rower, `${phase}_lean_deg`);
+  const bend = scoredTarget(rower, `${phase}_knee_deg`);
+  const { trunk, knee: kneeAngles } = rower.angles;
+  return [
+    ...(lean && hip && shoulder
+      ? wedge("trunk", hip, lean, trunk[frame], (degrees) =>
+          trunkEdge(hip, shoulder, degrees, facing, squeeze))
+      : []),
+    ...(bend && hip && knee && ankle
+      ? wedge("knee", knee, bend, kneeAngles[frame], (degrees) =>
+          shinEdge(knee, hip, ankle, degrees, squeeze))
+      : []),
+  ];
+}
+
 // Canvas arc settings for the short way round between two rays from a vertex.
 export function arcBetween({ vertex, a, b }) {
   const start = Math.atan2(a.y - vertex.y, a.x - vertex.x);
