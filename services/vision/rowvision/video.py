@@ -5,6 +5,9 @@ from typing import Any
 
 import cv2
 
+MAX_STEP_FRAMES = 120
+"""Stepping this far forward beats seeking, which took about 2 seconds a frame on phone footage."""
+
 
 class VideoReader:
     def __init__(self, path: Path) -> None:
@@ -16,7 +19,11 @@ class VideoReader:
         self._next = 0
 
     def __call__(self, index: int) -> Any:
-        if index != self._next:
+        ahead = index - self._next
+        if 0 < ahead <= MAX_STEP_FRAMES:
+            for _ in range(ahead):
+                self._capture.grab()
+        elif ahead != 0:
             self._capture.set(cv2.CAP_PROP_POS_FRAMES, index)
         ok, frame = self._capture.read()
         if not ok:
