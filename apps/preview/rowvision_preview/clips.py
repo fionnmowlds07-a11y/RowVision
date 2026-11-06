@@ -4,10 +4,15 @@ Frames come from the same decoder the analysis reads, not a browser video elemen
 variable timing, so a browser could not be relied on to show the frame an overlay was measured on.
 
 Seeking in these clips takes most of a second, which is too slow for stepping backwards. So the open
-clip is decoded once, in order, to JPEGs held in memory. Nothing is written to disk.
+clip is decoded once, in order, to JPEGs held in memory. The only thing written to disk is a video
+the athlete adds, which is kept in the private folder.
 """
 
+import hashlib
+import io
+import re
 import threading
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,6 +21,37 @@ from rowvision.video import VideoReader
 
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi", ".webm"}
 JPEG_QUALITY = 85
+MAX_UPLOAD_BYTES = 4 * 1024**3
+CHUNK_BYTES = 1024 * 1024
+
+
+class UploadError(ValueError):
+    """The video could not be added. The message is written for the athlete."""
+
+
+def _digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        while chunk := file.read(CHUNK_BYTES):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _safe_name(name: str) -> str:
+    """Return a plain file name, with any folders and awkward characters taken out."""
+    path = Path(name.replace("\\", "/"))
+    suffix = path.suffix.lower()
+    if suffix not in VIDEO_SUFFIXES:
+        raise UploadError("That file type is not supported. Use an MP4, MOV, M4V, AVI or WebM.")
+    stem = re.sub(r"[^\w .()-]", "_", path.stem).strip(" .")
+    return f"{stem or 'clip'}{suffix}"
+
+
+def _readable(path: Path) -> bool:
+    try:
+        return VideoReader(path).frames > 0
+    except (ValueError, OSError):
+        return False
 
 
 @dataclass(frozen=True)
@@ -72,24 +108,74 @@ class _DecodedClip:
 
 
 class ClipLibrary:
-    def __init__(self, folder: Path) -> None:
+    def __init__(self, folder: Path, uploads: Path | None = None) -> None:
         self._folder = folder
+        self._uploads = uploads
         self._lock = threading.Lock()
         self._open_name: str | None = None
         self._clip: _DecodedClip | None = None
 
+    def _folders(self) -> list[Path]:
+        folders = [self._folder, self._uploads]
+        return [folder for folder in folders if folder is not None and folder.is_dir()]
+
     def names(self) -> list[str]:
         return sorted(
-            item.name
-            for item in self._folder.iterdir()
-            if item.is_file() and item.suffix.lower() in VIDEO_SUFFIXES
+            {
+                item.name
+                for folder in self._folders()
+                for item in folder.iterdir()
+                if item.is_file()
+                and item.suffix.lower() in VIDEO_SUFFIXES
+                and not item.name.startswith(".")
+            }
         )
 
     def path(self, name: str) -> Path:
-        """Return a clip's path. Names are checked against the folder, so paths cannot escape it."""
+        """Return a clip's path. Names are checked against the folders, so paths cannot escape."""
         if name not in self.names():
             raise KeyError(name)
-        return self._folder / name
+        return next(folder / name for folder in self._folders() if (folder / name).is_file())
+
+    def add(self, name: str, source: io.BufferedIOBase, length: int) -> str:
+        """Save a video from `source` and return its clip name.
+
+        The same video added twice keeps one copy and one name, so its saved results still match.
+        A different video with a name already in use gets a new name.
+        """
+        if self._uploads is None:
+            raise UploadError("This server cannot accept videos.")
+        safe = _safe_name(name)
+        if not 0 < length <= MAX_UPLOAD_BYTES:
+            raise UploadError("That video is too big. The limit is 4 GB.")
+        self._uploads.mkdir(parents=True, exist_ok=True)
+        partial = self._uploads / f".{uuid.uuid4().hex}{Path(safe).suffix}"
+        try:
+            digest = self._receive(source, length, partial)
+            if not _readable(partial):
+                raise UploadError("That file could not be read as a video.")
+            if safe in self.names():
+                if _digest(self.path(safe)) == digest:
+                    return safe
+                safe = f"{Path(safe).stem}-{digest[:8]}{Path(safe).suffix}"
+            if safe not in self.names():
+                partial.replace(self._uploads / safe)
+            return safe
+        finally:
+            partial.unlink(missing_ok=True)
+
+    def _receive(self, source: io.BufferedIOBase, length: int, target: Path) -> str:
+        digest = hashlib.sha256()
+        left = length
+        with target.open("wb") as file:
+            while left:
+                chunk = source.read(min(CHUNK_BYTES, left))
+                if not chunk:
+                    raise UploadError("The video did not finish uploading. Try again.")
+                file.write(chunk)
+                digest.update(chunk)
+                left -= len(chunk)
+        return digest.hexdigest()
 
     def _open(self, name: str) -> _DecodedClip:
         """Return the decoded clip, replacing the last one so that only one is held in memory."""

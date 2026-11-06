@@ -2,6 +2,7 @@ import {
   FIT,
   VIDEO_MAX,
   VIDEO_MIN,
+  DROP_HINT,
   angleMarks,
   arcBetween,
   boatAt,
@@ -17,6 +18,8 @@ import {
   modelRequest,
   nearestMeasure,
   targetMarks,
+  uploadProblem,
+  uploadText,
   nextMarker,
   openingFrame,
   playStart,
@@ -96,9 +99,26 @@ function fillSeats() {
   $("side").replaceChildren(...sides.map((side) => new Option(sideNames[side], side)));
 }
 
+let selected = null;
+let uploading = false;
+
+function chooseClip(name) {
+  selected = name;
+  $("clip-name").textContent = name ?? "";
+  $("setup").hidden = !name;
+}
+
+function showDropZone(message = DROP_HINT, problem = false) {
+  $("drop-zone").hidden = false;
+  $("drop-zone").classList.toggle("busy", uploading);
+  $("drop-status").textContent = message;
+  $("drop-status").classList.toggle("problem", problem);
+  $("upload-bar").hidden = !uploading;
+}
+
 // After a reload, show the settings of the job the server still holds.
 function fillForm(settings) {
-  $("clip").value = settings.clip;
+  chooseClip(settings.clip);
   $("boat-class").value = settings.boat_class;
   fillSeats();
   $("seat").value = settings.seat;
@@ -108,7 +128,7 @@ function fillForm(settings) {
 
 function hideResults() {
   for (const id of [
-    "welcome", "clip-preview", "progress", "failed", "film-closer", "warnings", "picker", "stage-area", "viewer",
+    "drop-zone", "clip-preview", "progress", "failed", "film-closer", "warnings", "picker", "stage-area", "viewer",
     "panel", "resize",
   ]) {
     $(id).hidden = true;
@@ -130,7 +150,7 @@ async function showClipPreview(name) {
   picker = null;
   hideResults();
   if (!name) {
-    $("welcome").hidden = false;
+    showDropZone();
     return;
   }
   $("clip-preview").hidden = false;
@@ -679,7 +699,7 @@ async function render(job) {
   clearTimeout(pollTimer);
   analysing = job.state === "running";
   if (job.state === "idle" || job.state === "cancelled") {
-    await showClipPreview($("clip").value);
+    await showClipPreview(selected);
     return;
   }
   previewTicket += 1;
@@ -715,13 +735,100 @@ async function submit(path, body) {
 }
 
 $("boat-class").addEventListener("change", fillSeats);
-$("clip").addEventListener("change", () => showClipPreview($("clip").value));
+function sendVideo(file) {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("POST", `/api/clips?name=${encodeURIComponent(file.name)}`);
+    request.setRequestHeader("Content-Type", "application/octet-stream");
+    request.responseType = "json";
+    request.upload.addEventListener("progress", ({ loaded, total }) => {
+      $("upload-bar").value = loaded / total;
+      $("drop-status").textContent = uploadText(file.name, loaded, total);
+    });
+    request.addEventListener("load", () => {
+      if (request.status === 200) resolve(request.response.clip);
+      else reject(new Error(request.response?.error ?? "The video could not be added."));
+    });
+    request.addEventListener("error", () => reject(new Error("The upload stopped. Try again.")));
+    request.send(file);
+  });
+}
+
+async function addVideo(file) {
+  if (uploading) return;
+  if (analysing) {
+    $("form-error").textContent = "Wait for the analysis to finish, or cancel it, before adding a video.";
+    $("form-error").hidden = false;
+    return;
+  }
+  clearTimeout(pollTimer);
+  previewTicket += 1;
+  result = null;
+  picker = null;
+  hideResults();
+  chooseClip(null);
+  const problem = uploadProblem(file);
+  if (problem) {
+    showDropZone(problem, true);
+    return;
+  }
+  uploading = true;
+  $("upload-bar").value = 0;
+  showDropZone(uploadText(file.name, 0, file.size));
+  try {
+    const name = await sendVideo(file);
+    uploading = false;
+    chooseClip(name);
+    await showClipPreview(name);
+  } catch (error) {
+    uploading = false;
+    showDropZone(error.message, true);
+  }
+}
+
+let dragDepth = 0;
+const carriesFiles = (event) => event.dataTransfer?.types.includes("Files");
+
+window.addEventListener("dragenter", (event) => {
+  if (!carriesFiles(event)) return;
+  event.preventDefault();
+  dragDepth += 1;
+  document.body.classList.add("dragging");
+});
+window.addEventListener("dragover", (event) => {
+  if (carriesFiles(event)) event.preventDefault();
+});
+window.addEventListener("dragleave", (event) => {
+  if (!carriesFiles(event)) return;
+  dragDepth = Math.max(dragDepth - 1, 0);
+  document.body.classList.toggle("dragging", dragDepth > 0);
+});
+window.addEventListener("drop", (event) => {
+  if (!carriesFiles(event)) return;
+  event.preventDefault();
+  dragDepth = 0;
+  document.body.classList.remove("dragging");
+  const [file] = event.dataTransfer.files;
+  if (file) addVideo(file);
+});
+
+const pickVideo = () => $("video-file").click();
+$("drop-zone").addEventListener("click", (event) => {
+  if (!uploading && event.target.id !== "video-file") pickVideo();
+});
+$("change-video").addEventListener("click", pickVideo);
+$("video-file").addEventListener("click", (event) => event.stopPropagation());
+$("video-file").addEventListener("change", (event) => {
+  const [file] = event.target.files;
+  event.target.value = "";
+  if (file) addVideo(file);
+});
 $("preview-frame").addEventListener("input", showPreviewFrame);
 
 $("setup").addEventListener("submit", (event) => {
   event.preventDefault();
   submit("/api/job", {
-    clip: $("clip").value,
+    clip: selected,
     boat_class: $("boat-class").value,
     boats_in_video: Number($("boats").value),
     seat: Number($("seat").value),
@@ -907,11 +1014,10 @@ document.addEventListener("keydown", (event) => {
 async function start() {
   videoShare = savedShare(readStoredSize());
   applyLayout();
-  const { clips, boats, sides, side_names: names } = await api("/api/clips");
+  const { boats, sides, side_names: names } = await api("/api/clips");
   boatSeats = boats;
   boatSides = sides;
   sideNames = names;
-  $("clip").replaceChildren(...clips.map((name) => new Option(name, name)));
   $("boat-class").replaceChildren(...Object.keys(boats).map((name) => new Option(name, name)));
   fillSeats();
   const job = await api("/api/job");
