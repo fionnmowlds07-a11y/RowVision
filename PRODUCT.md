@@ -6,7 +6,9 @@ RowVision analyses video of rowing. An athlete uploads launch footage, says whic
 
 ## Users
 
-College and junior rowers, and the coaches who work with them. They review footage after a session, often on a laptop or phone at the boathouse, and want to know what to change in their next outing. Many users are minors.
+College and junior rowers, and the coaches who work with them. They review footage after a session, often on a laptop or phone at the boathouse, and want to know what to change in their next outing.
+
+The first version is an invite-only preview for adults the owner knows personally. Accounts are for athletes only. Coaches and under-18s come later, and under-18s need parental consent, a safeguarding review and a legal review first.
 
 ## What makes it different
 
@@ -16,11 +18,13 @@ College and junior rowers, and the coaches who work with them. They review foota
 
 ## Core workflow
 
-1. Choose a clip, boat class, rowing side, number of boats and seat.
-2. Pick your boat if the video shows more than one.
-3. Read the accuracy rating and scores.
-4. Open a measure to check it against freeze frames, the target and the 3D model.
-5. Step through the footage frame by frame.
+1. Choose a clip, and a 60-second section if it is longer.
+2. Tap yourself on a clear frame, and give boat class, rowing side and seat.
+3. Leave it to run, and get an email when the result is ready.
+4. Read the accuracy rating, scores and what to work on next.
+5. Open a measure to check it against freeze frames, the target and the 3D model.
+6. Step through the footage frame by frame.
+7. Look back over past clips to see progress.
 
 ## Product rules
 
@@ -28,6 +32,8 @@ College and junior rowers, and the coaches who work with them. They review foota
 - When the rating is Poor, the overall score stays hidden until the viewer accepts a warning.
 - Output is coaching feedback, not medical advice.
 - Real footage shows identifiable athletes, many of them juniors, and stays out of the repository.
+- Video is deleted after 30 days, leaving the scores, unless the admin keeps a clip for training.
+- Older results are never hidden or changed. They are labelled when measured with an older version.
 
 ## Terminology
 
