@@ -425,9 +425,9 @@ export function labelView(centre, span, width, height) {
   return centreOn({ scale, x: 0, y: 0 }, { x: centre[0], y: centre[1] }, width, height);
 }
 
-export function labelCount({ labelled, target, available }) {
+export function labelCount({ usable, target, available }) {
   if (available === 0) return "No analysed clips yet. Analyse a clip first.";
-  return `${labelled} of ${target} frames labelled`;
+  return `${usable} of ${target} usable frames labelled`;
 }
 
 // Plain results once there is enough to say anything.

@@ -12,16 +12,18 @@ This was a structured search, not a formal systematic review. No study was score
 
 | Measure | General target | Reported values | Main sources |
 |---|---|---|---|
-| Forward trunk angle at catch | 20–35° | About 26–32° (thorax); 33–36° in one study | Cardoso 2024; Penichet-Tomas 2025 |
-| Trunk layback at finish | 15–30° | About 18–28° (thorax) | Cardoso 2024 |
-| Knee angle at catch | 45–60° | About 44–52°; 56–61° | Bell 2013; Penichet-Tomas 2025 |
-| Knee angle at finish | 165–180° | Mostly 160–164°; 167–169° | Our judgement, informed by Bell 2013 and Penichet-Tomas 2025 |
+| Forward trunk angle at catch | 26–31° | About 26–32° (thorax); 33–36° in one study | Cardoso 2024; Penichet-Tomas 2025 |
+| Trunk layback at finish | 20–25° | About 18–28° (thorax) | Cardoso 2024 |
+| Knee angle at catch | 50–55° | About 44–52°; 56–61° | Bell 2013; Penichet-Tomas 2025 |
+| Knee angle at finish | 175–180° | Mostly 160–164°; 167–169° | Our judgement, informed by Bell 2013 and Penichet-Tomas 2025 |
 | Drive share of the stroke | About 39–47%, rising with rate | 39.4% at 22 spm, 43.0% at 26 spm, 46.8% at 32 spm | Engstrom 2023 |
 | Legs lead the trunk off the catch | Legs first | Coaching principle, not a measured number | Rowing Canada and British Rowing technique models |
 
 The target ranges are RowVision's own judgement from these figures. No study states them as ideal values.
 
-The finish knee target is deliberately wider than the studies report. Those figures come from rowing machines, and legs are normally flat at the finish on the water, so a fully straight leg is not penalised. A coach should review this.
+Each angle target is 5° wide, so that scores separate good technique from very good technique. The studies report wider spreads between rowers, so each range is our choice of a point near the middle of the published values, not a finding. Rowers who differ from it by build or coaching style will lose points, and a coach should review all four.
+
+The finish knee target sits straighter than the studies report. Those figures come from rowing machines, and legs are normally flat at the finish on the water, so a fully straight leg is not penalised.
 
 The drive shares are worked out from Engstrom 2023, which gives the point in the cycle where the catch occurs (60.6%, 57.0% and 53.2%).
 
