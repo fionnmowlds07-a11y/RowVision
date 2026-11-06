@@ -1,5 +1,6 @@
 """Hand labels of where the rower's blade is, used to train and test the blade detector.
 
+Only rowers whose blade faces the camera are labelled, as those are the only blades measured.
 Labels come from real athletes, so they are kept in the private folder and never committed.
 """
 
@@ -7,6 +8,8 @@ import json
 import threading
 from pathlib import Path
 from typing import Any
+
+from rowvision.blades import blade_faces_camera
 
 from rowvision_preview.labels import _centre, _measurable, _spaced, _trunk_px, model_joints
 
@@ -76,7 +79,7 @@ class BladeStore:
         for path in self._results.glob("*.json"):
             result = json.loads(path.read_text())
             rower, settings = result.get("rower"), result.get("settings")
-            if not rower or not settings or "strokes" not in rower:
+            if not rower or not settings or "strokes" not in rower or "side" not in settings:
                 continue
             made = path.stat().st_mtime_ns
             if settings["clip"] not in newest or made > newest[settings["clip"]][0]:
@@ -84,6 +87,7 @@ class BladeStore:
         by_clip = [
             [_item(result, frame) for frame in _spaced(_moments(result), FRAMES_PER_CLIP)]
             for _, (_, result) in sorted(newest.items())
+            if blade_faces_camera(result["settings"]["side"], result.get("facing") or 0)
         ]
         longest = max((len(items) for items in by_clip), default=0)
         return [
@@ -121,18 +125,21 @@ class BladeStore:
     def undo(self) -> str | None:
         with self._lock:
             records = self._records()
-            if not records:
+            known = {item["id"] for item in self._sample()}
+            counted = [item_id for item_id in records if item_id in known]
+            if not counted:
                 return None
-            newest = list(records)[-1]
-            del records[newest]
+            del records[counted[-1]]
             self._write(records)
-            return newest
+            return counted[-1]
 
     def summary(self) -> dict[str, Any]:
         with self._lock:
             records = self._records()
-            available = len(self._sample())
-        states = [record["state"] for record in records.values()]
+            sample = self._sample()
+        available = len(sample)
+        # Labels for blades on the far side stay on disk but do not count.
+        states = [records[item["id"]]["state"] for item in sample if item["id"] in records]
         return {
             "labelled": len(states),
             "usable": sum(state in SEEN_STATES for state in states),
