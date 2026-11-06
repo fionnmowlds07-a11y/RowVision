@@ -508,3 +508,12 @@ export const MAX_CANVAS_WIDTH = 1920;
 export function canvasScaleFor(videoWidth) {
   return Math.min(2, MAX_CANVAS_WIDTH / videoWidth);
 }
+
+export function bladeCount({ usable, target, available }) {
+  if (available === 0) return "No analysed clips yet. Analyse a clip first.";
+  return `${usable} of ${target} blades placed`;
+}
+
+export function bladeSplit({ air, water, hidden }) {
+  return `${air} above water, ${water} in the water, ${hidden} can't see`;
+}
