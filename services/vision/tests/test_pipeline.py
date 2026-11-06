@@ -10,6 +10,7 @@ from rowvision.pipeline import (
     Scope,
     _boxes_for,
     analyse,
+    correction_views,
 )
 from rowvision.shots import ShotKind
 from rowvision.skeleton import FloatArray
@@ -276,3 +277,15 @@ def test_crew_scope_times_every_rower_without_extra_passes() -> None:
     timed = {rower.seat: rower.timing for rower in result.rowers}
     assert timed[4] is None
     assert all(timed[seat] is not None for seat in (1, 2, 3))
+
+
+def test_each_frame_gets_a_camera_angle_to_correct_by() -> None:
+    views = correction_views(np.array([10.0, np.nan, 80.0]), 20.0)
+    assert views.tolist() == [10.0, 20.0, 45.0]
+
+
+def test_an_analysis_keeps_the_view_for_every_frame() -> None:
+    result = run(FakeBackend(4), Request(boat_seats=4, seat=2))
+    assert result.frame_views is not None
+    assert len(result.frame_views) == result.frames
+    assert np.isfinite(result.frame_views).all()

@@ -5,6 +5,8 @@ import {
   FIT,
   uploadProblem,
   uploadText,
+  legsUnsure,
+  viewAt,
   overallGap,
   ratingNote,
   TARGET_WINDOW,
@@ -542,4 +544,29 @@ test("a file is checked before it is uploaded", () => {
 test("upload progress reads plainly, then says it is checking", () => {
   assert.equal(uploadText("a.mp4", 25, 100), "Adding a.mp4: 25%");
   assert.equal(uploadText("a.mp4", 100, 100), "Checking a.mp4...");
+});
+
+test("legs are doubted once the camera is well off side-on", () => {
+  assert.equal(legsUnsure(24.9), false);
+  assert.equal(legsUnsure(25), true);
+});
+
+test("the view comes from the frame, then the clip", () => {
+  assert.equal(viewAt({ views: [10, 40], view_deg: 20 }, 1), 40);
+  assert.equal(viewAt({ views: [null, 40], view_deg: 20 }, 0), 20);
+  assert.equal(viewAt({ view_deg: 20 }, 5), 20);
+  assert.equal(viewAt(null, 0), 0);
+});
+
+test("doubted legs are dashed and leave the arms alone", () => {
+  const seen = pose();
+  const drawn = (doubt) => limbSegments(seen, doubt).filter(({ sure }) => !sure).length;
+  assert.equal(drawn(false), 0);
+  assert.equal(drawn(true), 4);
+});
+
+test("a doubted knee is marked unsure, and the body angle is not", () => {
+  const marks = angleMarks(pose(), { trunk: 14, knee: 90, elbow: null }, true);
+  assert.equal(marks.find(({ kind }) => kind === "knee").sure, false);
+  assert.equal(marks.find(({ kind }) => kind === "trunk").sure, true);
 });

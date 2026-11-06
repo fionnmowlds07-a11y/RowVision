@@ -33,7 +33,7 @@ SCULLING_BOATS = {"1x", "2x", "4x"}
 SIDE_NAMES = {"stroke": "Stroke side", "bow": "Bow side", "scull": "Sculling"}
 """Rowing sides. Each gets its own reference model."""
 MAX_BOATS = 20
-RESULT_VERSION = 2
+RESULT_VERSION = 3
 """Raise this when the saved JSON changes shape, so older results are not reused."""
 
 

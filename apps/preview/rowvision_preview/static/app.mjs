@@ -14,12 +14,14 @@ import {
   formatTarget,
   formatValue,
   labelSpot,
+  legsUnsure,
   limbSegments,
   modelRequest,
   nearestMeasure,
   targetMarks,
   uploadProblem,
   uploadText,
+  viewAt,
   nextMarker,
   openingFrame,
   playStart,
@@ -263,15 +265,15 @@ function draw() {
   }
   const pose = result?.rower?.poses[frame];
   if ($("show-targets").checked) drawTargets(context, pose, frame, 1 / view.scale);
-  if ($("show-lines").checked) drawPose(context, pose, 1 / view.scale);
+  if ($("show-lines").checked) drawPose(context, pose, frame, 1 / view.scale);
   if ($("show-angles").checked) drawAngles(context, pose, frame, 1 / view.scale);
 }
 
 // `size` keeps lines and labels the same on screen at any zoom.
-function drawPose(target, pose, size) {
+function drawPose(target, pose, index, size) {
   target.lineWidth = 1.5 * size;
   target.lineCap = "round";
-  for (const { start, end, side, sure } of limbSegments(pose)) {
+  for (const { start, end, side, sure } of limbSegments(pose, legsUnsure(viewAt(result, index)))) {
     target.strokeStyle = COLOURS[side];
     target.setLineDash(sure ? [] : [3 * size, 3 * size]);
     target.beginPath();
@@ -291,7 +293,7 @@ function drawAngles(target, pose, index, size, only = null) {
   if (!pose) return;
   target.font = `${11 * size}px system-ui, sans-serif`;
   target.lineWidth = 1.5 * size;
-  const marks = angleMarks(pose, anglesAt(index));
+  const marks = angleMarks(pose, anglesAt(index), legsUnsure(viewAt(result, index)));
   for (const item of marks.filter(({ kind }) => !only || kind === only)) {
     const { start, end, anticlockwise } = arcBetween(item);
     const { x, y } = item.vertex;
@@ -315,8 +317,8 @@ function drawAngles(target, pose, index, size, only = null) {
 }
 
 function drawTargets(target, pose, index, size, only = null) {
-  const { rower, facing, view_deg: viewDeg } = result;
-  for (const item of targetMarks(pose, index, rower, facing, viewDeg)) {
+  const { rower, facing } = result;
+  for (const item of targetMarks(pose, index, rower, facing, viewAt(result, index))) {
     if (only && item.kind !== only) continue;
     const colour = TARGET_COLOURS[item.inside ? "inside" : "outside"];
     target.beginPath();
@@ -397,9 +399,11 @@ function updateLiveAngles() {
   }
   const angles = anglesAt(frame);
   const text = (name, value) => (value === null ? "not seen" : formatValue(name, value));
+  const doubt = angles.knee !== null && legsUnsure(viewAt(result, frame));
+  const kneeText = `${text("knee", angles.knee)}${doubt ? "?" : ""}`;
   const items = [
     ["trunk", "Body", text("lean", angles.trunk)],
-    ["knee", "Knee", text("knee", angles.knee)],
+    ["knee", "Knee", kneeText],
     ["elbow", "Elbow", text("elbow", angles.elbow)],
   ];
   $("live-angles").replaceChildren(...items.map(([kind, name, value]) => {
@@ -571,7 +575,7 @@ function drawFreeze(target, index, kind) {
     paint.imageSmoothingQuality = "high";
     paint.drawImage(picture, 0, 0, clip.width, clip.height);
     drawTargets(paint, pose, index, 0.5, kind);
-    drawPose(paint, pose, 0.5);
+    drawPose(paint, pose, index, 0.5);
     drawAngles(paint, pose, index, 0.5, kind);
   };
   picture.src = frameUrl(index);

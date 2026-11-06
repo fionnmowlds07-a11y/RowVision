@@ -172,3 +172,9 @@ def test_timing_names_the_seat_being_followed() -> None:
     assert timing["catch_ms"] == 66.7
     assert timing["finish_ms"] is None
     assert timing["strokes"] == 7
+
+
+def test_each_frame_carries_the_view_it_was_corrected_by() -> None:
+    views = np.array([0.0, 10.0, 20.0, 30.0])
+    analysis = Analysis(30.0, 4, facing=-1, view_deg=10.0, rowers=[rower()], frame_views=views)
+    assert analysis_json(analysis)["views"] == [0.0, 10.0, 20.0, 30.0]
