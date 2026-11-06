@@ -40,6 +40,8 @@ MIN_KNOWN_SHARE = 0.5
 VIEW_WINDOW_SECONDS = 3.0
 MIN_VIEW_FRAMES = 4
 UNCORRECTABLE_VIEW_DEG = 60.0
+MAX_FRAME_CORRECTION_DEG = 45.0
+"""Past this the stretch magnifies small errors, which made real clips less consistent."""
 FILM_CLOSER = (
     "The rowers are too small in this video to measure accurately, so no scores were given. "
     "Film closer, so that the boat fills most of the frame width."
@@ -130,6 +132,8 @@ class Analysis:
     preview: int = 0
     overlap_share: float = 0.0
     """Share of the chosen boat's frames dropped because another boat crossed it."""
+    frame_views: FloatArray | None = None
+    """The camera angle used to correct each frame."""
 
 
 def coarse_pass(
@@ -200,6 +204,14 @@ def _fine_pass(
     return points, scores
 
 
+def correction_views(views: FloatArray, clip_view: float) -> FloatArray:
+    """Return the camera angle to correct each frame by, as the camera can move during a clip.
+
+    Frames with no estimate use the figure for the whole clip.
+    """
+    return np.minimum(np.where(np.isfinite(views), views, clip_view), MAX_FRAME_CORRECTION_DEG)
+
+
 def _usable_view(shots: list[Shot], views: FloatArray) -> float:
     side = [shot for shot in shots if shot.kind in (ShotKind.SIDE_ON, ShotKind.OBLIQUE)]
     if not side:
@@ -235,6 +247,7 @@ def _measure(
     scores: FloatArray,
     facing: int,
     view: float,
+    frame_views: FloatArray,
     fps: float,
     shared: StrokeTimeline | None = None,
     *,
@@ -243,7 +256,7 @@ def _measure(
     agreement: float | None = None,
 ) -> RowerResult:
     timeline = shared if shared is not None else detect_strokes(reach_signal(points, facing), fps)
-    strokes = per_stroke(angle_series(points, facing, view), timeline)
+    strokes = per_stroke(angle_series(points, facing, frame_views), timeline)
     names = ("catch_lean_deg", "finish_lean_deg", "catch_knee_deg", "finish_knee_deg",
              "finish_elbow_deg", "drive_share", "legs_lead")  # fmt: skip
     summary: dict[str, float] = {}
@@ -366,6 +379,7 @@ def analyse(
     if not np.isfinite(view) or view > UNCORRECTABLE_VIEW_DEG:
         warnings.append("No side-on footage found, so side-view angles cannot be measured.")
         view = 0.0 if not np.isfinite(view) else UNCORRECTABLE_VIEW_DEG
+    frame_views = correction_views(views, view)
 
     targets: list[tuple[int | None, Track]] = []
     if request.scope is Scope.CREW:
@@ -416,6 +430,7 @@ def analyse(
                 scores,
                 assignment.facing,
                 view,
+                frame_views,
                 fps,
                 shared,
                 trunk_px=track.trunk(),
@@ -447,4 +462,5 @@ def analyse(
         results,
         warnings,
         overlap_share=overlap_share,
+        frame_views=frame_views,
     )
