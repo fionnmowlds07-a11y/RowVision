@@ -3,6 +3,8 @@ import { test } from "node:test";
 
 import {
   FIT,
+  bladeCount,
+  bladeSplit,
   canvasScaleFor,
   uploadProblem,
   uploadText,
@@ -577,4 +579,10 @@ test("the canvas stays a sensible size for any clip", () => {
   assert.equal(canvasScaleFor(960), 2);
   assert.equal(canvasScaleFor(2336) * 2336, 1920);
   assert.equal(canvasScaleFor(3840) * 3840, 1920);
+});
+
+test("blade labelling progress counts blades actually placed", () => {
+  assert.equal(bladeCount({ usable: 12, target: 200, available: 90 }), "12 of 200 blades placed");
+  assert.match(bladeCount({ usable: 0, target: 200, available: 0 }), /Analyse a clip first/);
+  assert.equal(bladeSplit({ air: 3, water: 2, hidden: 1 }), "3 above water, 2 in the water, 1 can't see");
 });
