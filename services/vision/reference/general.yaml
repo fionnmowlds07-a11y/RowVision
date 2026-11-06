@@ -1,5 +1,6 @@
 # General technique targets. See docs/research/README.md for evidence and limits.
 # Ranges are RowVision's judgement from the cited values, not figures stated by any study.
+# Each angle range is 5 degrees wide at most, so that a score separates good from very good.
 # Sources are PubMed IDs or links.
 
 version: 1
@@ -11,25 +12,25 @@ angle_conventions:
 
 targets:
   catch_lean_deg:
-    min: 20
-    max: 35
+    min: 26
+    max: 31
     sources: ["39275598", "40708773"]
     evidence: ergometer
   finish_lean_deg:
-    min: -30
-    max: -15
+    min: -25
+    max: -20
     sources: ["39275598"]
     evidence: ergometer
   catch_knee_deg:
-    min: 45
-    max: 60
+    min: 50
+    max: 55
     sources: ["24146710", "40708773"]
     evidence: ergometer
   finish_knee_deg:
-    min: 165
+    min: 175
     max: 180
     sources: ["24146710", "40708773"]
-    evidence: project judgement, wider than the rowing machine studies
+    evidence: project judgement, straighter than the rowing machine studies
     note: Legs are normally flat at the finish on the water, so a straight leg is not penalised.
   drive_share:
     by_rate_spm:
