@@ -1,0 +1,17 @@
+# Runs beside the Supabase CLI stack, which `npm run db:start` in apps/web starts.
+# Set SUPABASE_ANON_KEY in a git-ignored .env file. `npm run db:status` prints it.
+services:
+  web:
+    build: apps/web
+    ports:
+      - "127.0.0.1:3100:3100"
+    environment:
+      SUPABASE_URL: http://host.docker.internal:54421
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:?Set this in .env}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/api/health?deep=1').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
