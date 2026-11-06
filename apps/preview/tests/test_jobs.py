@@ -346,6 +346,10 @@ def test_changing_a_target_invalidates_saved_results(tmp_path: Path, monkeypatch
     target_file = targets / "general.yaml"
     target_file.write_text("min: 160")
     monkeypatch.setattr("rowvision.__file__", str(package / "__init__.py"))
+    code_version.cache_clear()
     before = code_version()
     target_file.write_text("min: 165")
-    assert code_version() != before
+    assert code_version() == before, "a running server keeps the version it started with"
+    code_version.cache_clear()
+    assert code_version() != before, "a restarted server sees the change"
+    code_version.cache_clear()
