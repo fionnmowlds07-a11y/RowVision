@@ -14,6 +14,7 @@ from rowvision.pose import RtmBackend
 from rowvision.reference_pose import Style, pose_at
 from rowvision.video import VideoReader
 
+from rowvision_preview.blades import BladeStore
 from rowvision_preview.clips import ClipLibrary
 from rowvision_preview.jobs import BOAT_SEATS, SIDE_NAMES, Runner, Settings, sides_for
 from rowvision_preview.labels import LabelStore
@@ -31,6 +32,8 @@ STATIC_FILES = {
     "/style.css": ("style.css", "text/css; charset=utf-8"),
     "/label": ("label.html", "text/html; charset=utf-8"),
     "/label.mjs": ("label.mjs", "text/javascript; charset=utf-8"),
+    "/blades": ("blades.html", "text/html; charset=utf-8"),
+    "/blades.mjs": ("blades.mjs", "text/javascript; charset=utf-8"),
 }
 MAX_BODY_BYTES = 10_000
 FRAME_CACHE = "private, max-age=3600"
@@ -45,11 +48,13 @@ class Handler(BaseHTTPRequestHandler):
         clips: ClipLibrary,
         runner: Runner,
         labels: LabelStore,
+        blades: BladeStore,
         allowed_hosts: set[str],
     ) -> None:
         self.clips = clips
         self.runner = runner
         self.labels = labels
+        self.blades = blades
         self.allowed_hosts = allowed_hosts
         super().__init__(*args)
 
@@ -134,6 +139,10 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"item": self.labels.next_item()})
         elif path == "/api/labels/summary":
             self._json(self.labels.summary())
+        elif path == "/api/blades/next":
+            self._json({"item": self.blades.next_item()})
+        elif path == "/api/blades/summary":
+            self._json(self.blades.summary())
         elif path == "/api/results":
             self._json({"results": self.runner.saved()})
         elif path.startswith("/api/results/"):
@@ -205,6 +214,13 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/labels/undo":
                 self._json({"undone": self.labels.undo()})
                 return
+            elif path == "/api/blades":
+                self.blades.save(str(body["id"]), body["blade"], str(body["state"]))
+                self._json(self.blades.summary())
+                return
+            elif path == "/api/blades/undo":
+                self._json({"undone": self.blades.undo()})
+                return
             else:
                 self._error(HTTPStatus.NOT_FOUND, "Not found.")
                 return
@@ -217,10 +233,17 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def make_server(
-    host: str, port: int, clips: ClipLibrary, runner: Runner, labels: LabelStore
+    host: str,
+    port: int,
+    clips: ClipLibrary,
+    runner: Runner,
+    labels: LabelStore,
+    blades: BladeStore,
 ) -> ThreadingHTTPServer:
     allowed: set[str] = set()
-    handler = partial(Handler, clips=clips, runner=runner, labels=labels, allowed_hosts=allowed)
+    handler = partial(
+        Handler, clips=clips, runner=runner, labels=labels, blades=blades, allowed_hosts=allowed
+    )
     server = ThreadingHTTPServer((host, port), handler)
     bound = server.server_address[1]
     allowed |= {f"127.0.0.1:{bound}", f"localhost:{bound}"}
@@ -241,7 +264,8 @@ def main() -> None:
         VideoReader, RtmBackend,
     )  # fmt: skip
     labels = LabelStore(args.private / "preview" / "results", args.private / "labels" / "labels.json")
-    server = make_server(args.host, args.port, clips, runner, labels)
+    blades = BladeStore(args.private / "preview" / "results", args.private / "labels" / "blades.json")
+    server = make_server(args.host, args.port, clips, runner, labels, blades)
     print(f"Serving on port {args.port}", flush=True)
     try:
         server.serve_forever()

@@ -11,6 +11,7 @@ import pytest
 from crew import crew_detections
 from fakes import FakeBackend, FakeSource, write_video
 
+from rowvision_preview.blades import BladeStore
 from rowvision_preview.clips import ClipLibrary
 from rowvision_preview.jobs import Runner
 from rowvision_preview.labels import LabelStore
@@ -67,7 +68,8 @@ def client(tmp_path: Path) -> Iterator[Client]:
         lambda: FakeBackend(points, scores),
     )
     labels = LabelStore(tmp_path / "results", tmp_path / "labels.json")
-    server = make_server("127.0.0.1", 0, clips, runner, labels)
+    blades = BladeStore(tmp_path / "results", tmp_path / "blades.json")
+    server = make_server("127.0.0.1", 0, clips, runner, labels, blades)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     yield Client(server.server_address[1])
@@ -297,3 +299,18 @@ def test_a_video_cannot_be_posted_by_a_plain_form(client: Client, video_bytes: b
 def test_an_upload_needs_a_name(client: Client, video_bytes: bytes) -> None:
     headers = {"Content-Type": "application/octet-stream"}
     assert client.call("POST", "/api/clips", video_bytes, headers).status == 400
+
+
+def test_the_blade_page_is_served(client: Client) -> None:
+    assert client.call("GET", "/blades").status == 200
+    assert client.call("GET", "/blades.mjs").status == 200
+
+
+def test_blade_labelling_starts_empty(client: Client) -> None:
+    assert client.call("GET", "/api/blades/next").json() == {"item": None}
+    assert client.call("GET", "/api/blades/summary").json()["labelled"] == 0
+
+
+def test_a_blade_label_for_an_unknown_frame_is_refused(client: Client) -> None:
+    reply = client.post("/api/blades", {"id": "nope", "blade": [1, 2], "state": "air"})
+    assert reply.status == 400

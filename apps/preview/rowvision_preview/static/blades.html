@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Label blades · RowVision</title>
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="/vendor/rubik.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand"><span class="brand-buoy" aria-hidden="true"></span>RowVision</span>
+    <a class="pill-link" href="/">Back to analysis</a>
+  </header>
+
+  <main class="label-page">
+    <section class="label-stage">
+      <div class="stage"><canvas id="canvas" class="tappable"></canvas></div>
+      <p id="frame-note" class="summary"></p>
+    </section>
+
+    <section class="panel label-panel" aria-label="Labelling blades">
+      <h1 id="prompt">Loading...</h1>
+      <p id="guide" class="muted-text">The arrow marks the rower and the ring marks their hands.
+        Follow their oar out and click the middle of the blade. For a sculler, use the blade nearest the camera. If their
+        blade is behind the boat or hidden, press Can't see it.</p>
+      <div class="toolbar">
+        <button id="air" type="button" class="primary" title="A" disabled>Above water</button>
+        <button id="water" type="button" class="primary" title="W" disabled>In the water</button>
+      </div>
+      <div class="toolbar">
+        <button id="hidden" type="button" title="S">Can't see it</button>
+        <button id="undo-frame" type="button" title="Z">Redo last frame</button>
+      </div>
+      <p class="progress-line"><strong id="count"></strong></p>
+      <progress id="bar" max="200" value="0"></progress>
+      <p id="split" class="muted-text"></p>
+      <p id="error" class="error" role="alert" hidden></p>
+    </section>
+  </main>
+  <script type="module" src="/blades.mjs"></script>
+</body>
+</html>
