@@ -34,7 +34,7 @@ reports/
 playwright-report/
 test-results/
 
-# Frames or overlays from real footage must stay local (public repo, identifiable athletes)
+# Frames or overlays from real footage must stay local (identifiable athletes)
 private/
 samples/
 
