@@ -4,6 +4,7 @@ The analysis takes minutes, so it runs in a thread that the page polls. Starting
 the old one. Results are saved as JSON, so a clip that has been analysed reopens at once.
 """
 
+import functools
 import hashlib
 import json
 import pickle
@@ -158,8 +159,13 @@ def load_detections(folder: Path, clip: str, source: Source) -> _SavedDetections
     return _SavedDetections(points, scores)
 
 
+@functools.cache
 def code_version() -> str:
-    """Hash the analysis code and targets, so older results are not shown as current."""
+    """Hash the analysis code and targets, so older results are not shown as current.
+
+    Read once, as a running server keeps the code it started with. Hashing the files again later
+    would stamp its results with the version of whatever has since been checked out.
+    """
     digest = hashlib.sha256(str(RESULT_VERSION).encode())
     package = Path(rowvision.__file__).parent
     targets = package.parent / "reference"
