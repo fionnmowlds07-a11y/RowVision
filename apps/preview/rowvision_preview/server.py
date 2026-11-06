@@ -173,7 +173,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(asdict(self.clips.info(name)))
             elif len(parts) == 3 and parts[1] == "frames" and parts[2].endswith(".jpg"):
                 index = int(parts[2].removesuffix(".jpg"))
-                jpeg = self.clips.frame_jpeg(name, index)
+                small = parse_qs(urlsplit(self.path).query).get("size") == ["small"]
+                jpeg = self.clips.frame_jpeg(name, index, small)
                 self._send(HTTPStatus.OK, jpeg, "image/jpeg", FRAME_CACHE)
             else:
                 self._error(HTTPStatus.NOT_FOUND, "Not found.")
