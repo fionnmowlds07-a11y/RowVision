@@ -16,6 +16,8 @@ import yaml
 TOLERANCE_DEG = 5.0
 ASSUMED_KEYPOINT_ERROR_PX = 1.5
 """Used until calibration replaces it. This is an assumption, not a measurement."""
+MIN_MEASURED_FRAMES = 50
+"""From here a measured error is better than the assumption, though not yet final."""
 MIN_CALIBRATION_FRAMES = 100
 CALIBRATION_FILE = Path(__file__).parent.parent / "reference" / "calibration.yaml"
 VIEW_ERROR_DEG = 3.0
@@ -31,15 +33,17 @@ OBLIQUE_VIEW_DEG = 25.0
 class Calibration:
     keypoint_error_px: float
     calibrated: bool
+    labelled_frames: int = 0
 
 
 def load_calibration(path: Path = CALIBRATION_FILE) -> Calibration:
-    """Return the measured keypoint error, or the assumption if too few frames have been labelled."""
+    """Return the measured keypoint error, or the assumption if too few frames are labelled."""
     data = yaml.safe_load(path.read_text())
     measured = data.get("keypoint_error_px")
-    if measured is None or data.get("labelled_frames", 0) < MIN_CALIBRATION_FRAMES:
+    frames = data.get("labelled_frames", 0)
+    if measured is None or frames < MIN_MEASURED_FRAMES:
         return Calibration(ASSUMED_KEYPOINT_ERROR_PX, False)
-    return Calibration(float(measured), True)
+    return Calibration(float(measured), frames >= MIN_CALIBRATION_FRAMES, frames)
 
 
 class Band(StrEnum):
@@ -68,6 +72,7 @@ class Rating:
     band: Band
     calibrated: bool
     warnings: list[str]
+    labelled_frames: int = 0
 
 
 def band_for(accuracy: float) -> Band:
@@ -131,4 +136,6 @@ def rate(evidence: Evidence, calibration: Calibration | None = None) -> Rating:
     if evidence.strokes >= MIN_STROKES_FOR_SPREAD:
         observed = evidence.stroke_spread_deg / 1.35
     accuracy = share_within_tolerance(max(modelled, observed))
-    return Rating(accuracy, band_for(accuracy), used.calibrated, _warnings(evidence))
+    return Rating(
+        accuracy, band_for(accuracy), used.calibrated, _warnings(evidence), used.labelled_frames
+    )

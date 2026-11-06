@@ -47,7 +47,18 @@ No study found validates pose estimation for on-water rowing, so RowVision has t
 
 The rating estimates the share of joint angles within 5° of the true value. It depends on how big the rower is in pixels, the camera angle, and how much the angle varies between strokes. Clip length, tracking coverage and crew rhythm do not change it. They appear as separate notes, because they say how much evidence there is, not how accurate an angle is.
 
-The keypoint error behind the rating is an assumption of 1.5 pixels until it is measured. Hand-labelled frames replace it through `services/vision/reference/calibration.yaml`, and the rating says "uncalibrated" until then. Tests on synthetic footage show the maths is right for a known error. They do not show what the error is on real footage.
+The rating uses a keypoint error measured against hand-labelled real footage, stored in `services/vision/reference/calibration.yaml`. It was first assumed to be 1.5 pixels. On 78 usable labelled frames, the value that matches real body angle accuracy is 2.0 pixels.
+
+| Measured on 78 labelled frames | Result |
+|---|---|
+| Body angle within 5° of the labeller | 50% overall, 54% on side-on shots, 44% on oblique shots |
+| Typical body angle gap | 5° |
+| Knee angle within 5° | 26%, with a typical gap of about 13° |
+| Typical joint gap, nearest side | About 2–3 pixels for shoulder, elbow, wrist and knee; 4.7 for hip; 7.9 for ankle |
+
+These results have limits. Hand labels on small, blurry rowers carry their own error, so the true accuracy is probably somewhat better than measured. The set is small, so the body angle figure could be about 10 points either way. Rowers in these clips had trunks of about 17–32 pixels, so nothing here shows how the app performs on sharper or closer footage. Within that range, accuracy did not clearly improve with rower size. The rating formula assumes it does, which is not yet proven.
+
+The app says the rating is based on labelled frames so far until 100 usable frames are reached.
 
 ## Review status
 

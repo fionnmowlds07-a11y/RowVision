@@ -1,6 +1,7 @@
 # Accuracy calibration, measured by comparing the pose model with hand-labelled frames.
-# Until `labelled_frames` reaches the minimum in reliability.py, ratings stay marked uncalibrated
-# and use the assumed keypoint error.
+# The error is the value that makes the rating match the body angle accuracy seen in the labels.
+# Fewer frames than the minimum in reliability.py use the assumed error, and the rating is only
+# called calibrated at the full count. Labels themselves stay in the private folder.
 
-keypoint_error_px: null
-labelled_frames: 0
+keypoint_error_px: 2.0
+labelled_frames: 78

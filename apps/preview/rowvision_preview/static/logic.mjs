@@ -392,3 +392,9 @@ export function timingText(gap, spread) {
   const size = Math.round(Math.abs(gap) / 10) * 10;
   return `About ${size} ms ${gap > 0 ? "late" : "early"}`;
 }
+
+export function ratingNote({ calibrated, labelled_frames: frames }) {
+  if (calibrated) return `Estimated accuracy, calibrated on ${frames} hand-labelled frames`;
+  if (frames) return `Estimated accuracy, based on ${frames} hand-labelled frames so far`;
+  return "Estimated accuracy, not yet checked against hand-labelled footage";
+}
