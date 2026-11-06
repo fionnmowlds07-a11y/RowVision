@@ -108,6 +108,13 @@ export function overallVisible(rating, revealed) {
   return rating.band !== "Poor" || revealed;
 }
 
+// Why a rower has no overall score.
+export function overallGap(strokes, phases, minStrokes) {
+  if (strokes < minStrokes) return `No overall score: it needs at least ${minStrokes} full strokes.`;
+  if (Object.keys(phases).length === 0) return "No overall score: nothing could be measured reliably.";
+  return "No overall score: it needs both the catch and the finish to be scored.";
+}
+
 const isShare = (name) => name === "drive_share" || name === "legs_lead";
 
 export function formatValue(name, value) {

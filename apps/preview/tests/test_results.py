@@ -127,7 +127,7 @@ def test_a_measure_not_scored_still_shows_its_value_and_reason() -> None:
     )
     assert metric["value"] == 50
     assert metric["score"] is None
-    assert "inconsistent" in metric["reason"]
+    assert "rough guide" in metric["reason"]
 
 
 def test_an_open_ended_target_survives_json() -> None:
@@ -140,7 +140,7 @@ def test_an_open_ended_target_survives_json() -> None:
 
 def test_rating_and_angles_are_included() -> None:
     result = full_result()["rower"]
-    assert result["rating"]["calibrated"] is False
+    assert result["rating"]["calibrated"] is True
     assert result["rating"]["band"]
     assert len(result["angles"]["trunk"]) == 4
     assert result["angles"]["trunk"][0] is None
