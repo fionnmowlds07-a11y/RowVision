@@ -26,15 +26,21 @@ def lean_from_vertical(lower: FloatArray, upper: FloatArray, facing: int) -> Flo
     return np.degrees(np.arctan2(dx, dy))
 
 
-def undo_foreshortening(points: FloatArray, origin: FloatArray, view_deg: float) -> FloatArray:
+def undo_foreshortening(
+    points: FloatArray, origin: FloatArray, view_deg: float | FloatArray
+) -> FloatArray:
     """Stretch points along the boat axis to recover a side-on view.
 
     A camera `view_deg` away from side-on compresses boat-axis distances by cos(view). Points
-    are rescaled about `origin`. Vertical distances are unaffected by camera yaw.
+    are rescaled about `origin`. Vertical distances are unaffected by camera yaw. `view_deg` is
+    one angle, or one per frame for points shaped (frames, joints, 2).
     """
-    if abs(view_deg) > MAX_CORRECTABLE_VIEW_DEG:
-        raise ValueError(f"view of {view_deg:.0f} degrees is too far from side-on to correct")
+    views = np.asarray(view_deg, dtype=float)
+    if np.any(np.abs(views) > MAX_CORRECTABLE_VIEW_DEG):
+        raise ValueError(f"view of {np.abs(views).max():.0f} degrees is too far from side-on to correct")
     corrected = np.array(points, dtype=float)
-    scale = 1 / np.cos(np.radians(view_deg))
+    scale = 1 / np.cos(np.radians(views))
+    if scale.ndim:
+        scale = scale[:, None]
     corrected[..., 0] = origin[..., 0] + (corrected[..., 0] - origin[..., 0]) * scale
     return corrected

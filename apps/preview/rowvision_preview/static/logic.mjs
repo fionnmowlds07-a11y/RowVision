@@ -5,13 +5,13 @@ export const LIMBS = [
   { from: 5, to: 7, side: "left" },
   { from: 7, to: 9, side: "left" },
   { from: 5, to: 11, side: "left" },
-  { from: 11, to: 13, side: "left" },
-  { from: 13, to: 15, side: "left" },
+  { from: 11, to: 13, side: "left", leg: true },
+  { from: 13, to: 15, side: "left", leg: true },
   { from: 6, to: 8, side: "right" },
   { from: 8, to: 10, side: "right" },
   { from: 6, to: 12, side: "right" },
-  { from: 12, to: 14, side: "right" },
-  { from: 14, to: 16, side: "right" },
+  { from: 12, to: 14, side: "right", leg: true },
+  { from: 14, to: 16, side: "right", leg: true },
   { from: 5, to: 6, side: "centre" },
   { from: 11, to: 12, side: "centre" },
 ];
@@ -38,13 +38,25 @@ export function nextMarker(frame, markers, direction) {
 
 // Each limb with both ends seen. Unsure limbs are kept and flagged, because seeing where the model
 // went wrong is the point of this page.
-export function limbSegments(pose) {
+// From this far off side-on, labelled frames showed the legs were often placed badly.
+export const UNSURE_LEGS_VIEW_DEG = 25;
+
+export function viewAt(result, frame) {
+  return result?.views?.[frame] ?? result?.view_deg ?? 0;
+}
+
+export function legsUnsure(viewDeg) {
+  return viewDeg >= UNSURE_LEGS_VIEW_DEG;
+}
+
+export function limbSegments(pose, unsureLegs = false) {
   if (!pose) return [];
-  return LIMBS.flatMap(({ from, to, side }) => {
+  return LIMBS.flatMap(({ from, to, side, leg }) => {
     const start = pose[from];
     const end = pose[to];
     if (!start || !end) return [];
-    return [{ start, end, side, sure: Math.min(start[2], end[2]) >= MIN_SCORE }];
+    const sure = Math.min(start[2], end[2]) >= MIN_SCORE && !(leg && unsureLegs);
+    return [{ start, end, side, sure }];
   });
 }
 
@@ -170,7 +182,7 @@ function mark(kind, vertex, a, b, value, label) {
 
 // The angles to draw on one frame. Labels use the measured value, which is corrected for camera
 // view, while the arcs follow the image, so the two can differ on oblique shots.
-export function angleMarks(pose, angles) {
+export function angleMarks(pose, angles, unsureLegs = false) {
   if (!pose) return [];
   const shoulder = middle(pose, 5, 6);
   const elbow = middle(pose, 7, 8);
@@ -181,7 +193,8 @@ export function angleMarks(pose, angles) {
   const above = hip && { x: hip.x, y: hip.y - 30 };
   return [
     ...mark("trunk", hip, above, shoulder, angles.trunk, formatValue("lean", angles.trunk)),
-    ...mark("knee", knee, hip, ankle, angles.knee, formatValue("knee", angles.knee)),
+    ...mark("knee", knee, hip, ankle, angles.knee, formatValue("knee", angles.knee))
+      .map((item) => ({ ...item, sure: item.sure && !unsureLegs })),
     ...mark("elbow", elbow, shoulder, wrist, angles.elbow, formatValue("elbow", angles.elbow)),
   ];
 }

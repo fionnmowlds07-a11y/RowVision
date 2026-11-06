@@ -113,10 +113,11 @@ def _stroke(stroke: StrokeMetrics) -> dict[str, Any]:
     }
 
 
-def _rower(rower: RowerResult, frames: int, facing: int, view_deg: float) -> dict[str, Any]:
+def _rower(
+    rower: RowerResult, frames: int, facing: int, view_deg: float | FloatArray
+) -> dict[str, Any]:
     catches, finishes = stroke_markers(rower.strokes, frames)
-    view = view_deg if np.isfinite(view_deg) else 0.0
-    angles = angle_series(rower.points, facing, view)
+    angles = angle_series(rower.points, facing, np.nan_to_num(view_deg))
     return {
         "seat": rower.seat,
         "rate_spm": _finite(rower.rate_spm),
@@ -136,8 +137,14 @@ def _rower(rower: RowerResult, frames: int, facing: int, view_deg: float) -> dic
 
 
 def analysis_json(analysis: Analysis) -> dict[str, Any]:
+    views = analysis.frame_views
     rower = (
-        _rower(analysis.rowers[0], analysis.frames, analysis.facing, analysis.view_deg)
+        _rower(
+            analysis.rowers[0],
+            analysis.frames,
+            analysis.facing,
+            analysis.view_deg if views is None else views,
+        )
         if analysis.rowers
         else None
     )
@@ -145,6 +152,7 @@ def analysis_json(analysis: Analysis) -> dict[str, Any]:
         "fps": analysis.fps,
         "frames": analysis.frames,
         "view_deg": _finite(analysis.view_deg),
+        "views": None if views is None else _series(views),
         "film_closer": FILM_CLOSER if FILM_CLOSER in analysis.warnings else None,
         "warnings": [warning for warning in analysis.warnings if warning != FILM_CLOSER],
         "shots": [

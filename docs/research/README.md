@@ -49,7 +49,7 @@ No study found validates pose estimation for on-water rowing, so RowVision has t
 
 ## How the accuracy rating works
 
-The rating estimates the share of joint angles within 5° of the true value. It depends on how big the rower is in pixels, the camera angle, and how much the angle varies between strokes. Clip length, tracking coverage and crew rhythm do not change it. They appear as separate notes, because they say how much evidence there is, not how accurate an angle is.
+The rating estimates the share of joint angles within 5° of the true value. It depends on how big the rower is in pixels, the camera angle, and how much the angle varies between strokes. Angles are corrected for the camera angle at each moment, as the camera can move during a clip. Clip length, tracking coverage and crew rhythm do not change it. They appear as separate notes, because they say how much evidence there is, not how accurate an angle is.
 
 The rating uses a keypoint error measured against hand-labelled real footage, stored in `services/vision/reference/calibration.yaml`. It was first assumed to be 1.5 pixels. On 108 usable labelled frames from 12 clips, the value that matches real body angle accuracy is 2.0 pixels.
 
@@ -60,6 +60,8 @@ The rating uses a keypoint error measured against hand-labelled real footage, st
 | Knee angle within 5° | 21%, with a typical gap of about 18° |
 
 These results have limits. Hand labels on small, blurry rowers carry their own error, so the true accuracy is probably somewhat better than measured. The set is small, so the body angle figure could be about 10 points either way. Rowers in these clips had trunks of about 17–32 pixels, so nothing here shows how the app performs on sharper or closer footage. Within that range, accuracy did not clearly improve with rower size. The rating formula assumes it does, which is not yet proven.
+
+Legs are less reliable when filmed from an angle. On 31 labelled catches, the knee matched the labeller closely from side-on (68° against 66°), but from 25° or more off side-on it read 118° against 74°, so a rower at full slide can look half way up it. That comes from where the pose model places the joints, so the camera correction cannot fix it. The app draws legs dashed and marks the knee as unsure on these frames.
 
 "Calibrated" means the rating now rests on 100 or more usable frames. It does not mean the figure is exact.
 
