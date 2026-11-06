@@ -15,12 +15,15 @@ import threading
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import cv2
 from rowvision.video import VideoReader
 
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi", ".webm"}
 JPEG_QUALITY = 85
+PLAYBACK_WIDTH = 1280
+"""Frames wider than this also get a small copy, as full size ones are too slow to play."""
 MAX_UPLOAD_BYTES = 4 * 1024**3
 CHUNK_BYTES = 1024 * 1024
 
@@ -62,6 +65,18 @@ class ClipInfo:
     height: int
 
 
+def _encode(frame: Any) -> bytes:
+    ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
+    if not ok:
+        raise ValueError("cannot encode frame")
+    return bytes(encoded.tobytes())
+
+
+def _shrunk(frame: Any) -> Any:
+    height = round(frame.shape[0] * PLAYBACK_WIDTH / frame.shape[1])
+    return cv2.resize(frame, (PLAYBACK_WIDTH, height), interpolation=cv2.INTER_AREA)
+
+
 class _DecodedClip:
     """Decodes a clip in the background. Requests wait until their frame is ready."""
 
@@ -71,6 +86,7 @@ class _DecodedClip:
         self.frames = self._reader.frames
         self.size = (0, 0)
         self._jpegs: list[bytes] = []
+        self._small: list[bytes] = []
         self._finished = False
         self._stopped = False
         self._ready = threading.Condition()
@@ -80,12 +96,14 @@ class _DecodedClip:
         try:
             for index in range(self.frames):
                 frame = self._reader(index)
-                ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
-                if not ok or self._stopped:
+                encoded = _encode(frame)
+                small = _encode(_shrunk(frame)) if frame.shape[1] > PLAYBACK_WIDTH else encoded
+                if self._stopped:
                     return
                 with self._ready:
                     self.size = (frame.shape[1], frame.shape[0])
-                    self._jpegs.append(encoded.tobytes())
+                    self._jpegs.append(encoded)
+                    self._small.append(small)
                     self._ready.notify_all()
         except ValueError:
             return  # The clip has fewer readable frames than it claims. Keep those it has.
@@ -97,14 +115,14 @@ class _DecodedClip:
     def stop(self) -> None:
         self._stopped = True
 
-    def jpeg(self, index: int) -> bytes:
+    def jpeg(self, index: int, small: bool = False) -> bytes:
         if not 0 <= index < self.frames:
             raise ValueError(f"no frame {index}")
         with self._ready:
             self._ready.wait_for(lambda: len(self._jpegs) > index or self._finished)
             if index >= len(self._jpegs):
                 raise ValueError(f"cannot read frame {index}")
-            return self._jpegs[index]
+            return (self._small if small else self._jpegs)[index]
 
 
 class ClipLibrary:
@@ -193,5 +211,5 @@ class ClipLibrary:
         clip.jpeg(0)
         return ClipInfo(clip.fps, clip.frames, *clip.size)
 
-    def frame_jpeg(self, name: str, index: int) -> bytes:
-        return self._open(name).jpeg(index)
+    def frame_jpeg(self, name: str, index: int, small: bool = False) -> bytes:
+        return self._open(name).jpeg(index, small)

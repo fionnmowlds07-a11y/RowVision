@@ -4,6 +4,7 @@ import {
   VIDEO_MIN,
   DROP_HINT,
   angleMarks,
+  canvasScaleFor,
   arcBetween,
   boatAt,
   boatLabel,
@@ -42,7 +43,6 @@ import { renderPanel } from "./panel.mjs";
 
 const POLL_MS = 500;
 const PREFETCH_FRAMES = 6;
-const SCALE = 2; // Canvas pixels per video pixel, so lines stay sharp when the page enlarges them.
 const COLOURS = { left: "#22d3ee", right: "#e879f9", centre: "#fde047" };
 const ANGLE_COLOUR = "#fde047";
 const TARGET_COLOURS = { inside: "74, 222, 128", outside: "251, 146, 60" };
@@ -73,6 +73,7 @@ let pollTimer = null;
 let stageName = null;
 let stageStart = 0;
 let view = FIT;
+let canvasScale = 1;
 let playback = null; // { start, startedAt, speed } while playing
 let frameLoading = false;
 let model = null;
@@ -91,8 +92,9 @@ async function api(path, body) {
   return data;
 }
 
-const frameUrl = (index) =>
-  `/api/clips/${encodeURIComponent(clip.name)}/frames/${index}.jpg`;
+const frameSize = () => (playback ? "?size=small" : "");
+const frameUrl = (index, size = "") =>
+  `/api/clips/${encodeURIComponent(clip.name)}/frames/${index}.jpg${size}`;
 
 function fillSeats() {
   const options = seatOptions(boatSeats[$("boat-class").value]);
@@ -230,8 +232,9 @@ async function openClip(name) {
   const details = await api(`/api/clips/${encodeURIComponent(name)}`);
   if (opening !== openingClip) return; // A later choice wins, however the requests finish.
   clip = { name, ...details };
-  canvas.width = clip.width * SCALE;
-  canvas.height = clip.height * SCALE;
+  canvasScale = canvasScaleFor(clip.width);
+  canvas.width = clip.width * canvasScale;
+  canvas.height = clip.height * canvasScale;
 }
 
 // Only the newest request draws, so holding an arrow key cannot leave an old frame under new lines.
@@ -250,12 +253,12 @@ function showFrame(index) {
     frameLoading = false;
     $("readout").textContent = `Frame ${index} could not be read.`;
   };
-  next.src = frameUrl(index);
+  next.src = frameUrl(index, frameSize());
 }
 
 function draw() {
   if (!image) return;
-  const scale = SCALE * view.scale;
+  const scale = canvasScale * view.scale;
   context.setTransform(scale, 0, 0, scale, -view.x * scale, -view.y * scale);
   context.imageSmoothingQuality = "high";
   context.drawImage(image, 0, 0, clip.width, clip.height);
@@ -361,7 +364,7 @@ function drawBoat(boat, index) {
 function prefetch(direction) {
   for (let step = 1; step <= PREFETCH_FRAMES; step += 1) {
     const index = frame + step * direction;
-    if (index >= 0 && index < clip.frames) new Image().src = frameUrl(index);
+    if (index >= 0 && index < clip.frames) new Image().src = frameUrl(index, frameSize());
   }
 }
 
@@ -459,8 +462,10 @@ function setPlayButton(playing) {
 }
 
 function pause() {
+  const wasPlaying = playback !== null;
   playback = null;
   setPlayButton(false);
+  if (wasPlaying) showFrame(frame); // Back to the full size frame for zooming and checking.
 }
 
 function play() {
