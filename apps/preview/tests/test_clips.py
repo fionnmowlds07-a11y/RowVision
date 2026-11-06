@@ -1,3 +1,4 @@
+import io
 from pathlib import Path
 
 import cv2
@@ -6,7 +7,7 @@ import pytest
 from fakes import write_video
 
 from rowvision_preview import clips
-from rowvision_preview.clips import ClipLibrary
+from rowvision_preview.clips import ClipLibrary, UploadError
 
 
 @pytest.fixture
@@ -68,3 +69,95 @@ def test_clip_claiming_too_many_frames_still_serves_those_it_has(
     assert library.frame_jpeg("b clip(1).avi", 4)
     with pytest.raises(ValueError):
         library.frame_jpeg("b clip(1).avi", 8)
+
+
+@pytest.fixture
+def uploads(tmp_path: Path) -> ClipLibrary:
+    (tmp_path / "videos").mkdir()
+    write_video(tmp_path / "videos" / "folder.avi")
+    return ClipLibrary(tmp_path / "videos", tmp_path / "uploads")
+
+
+def video(tmp_path: Path, frames: int) -> bytes:
+    path = tmp_path / f"made-{frames}.avi"
+    write_video(path, frames=frames)
+    return path.read_bytes()
+
+
+def add(library: ClipLibrary, name: str, data: bytes) -> str:
+    return library.add(name, io.BytesIO(data), len(data))
+
+
+def stored(tmp_path: Path) -> list[str]:
+    return sorted(item.name for item in (tmp_path / "uploads").iterdir())
+
+
+def test_added_videos_sit_beside_the_folder_clips(uploads: ClipLibrary, tmp_path: Path) -> None:
+    name = add(uploads, "new.avi", video(tmp_path, 4))
+    assert uploads.names() == ["folder.avi", "new.avi"]
+    assert uploads.path(name) == tmp_path / "uploads" / "new.avi"
+    assert uploads.info(name).frames == 4
+
+
+def test_the_same_video_twice_keeps_one_copy(uploads: ClipLibrary, tmp_path: Path) -> None:
+    data = video(tmp_path, 4)
+    assert add(uploads, "new.avi", data) == add(uploads, "new.avi", data)
+    assert stored(tmp_path) == ["new.avi"]
+
+
+def test_a_different_video_with_the_same_name_keeps_both(
+    uploads: ClipLibrary, tmp_path: Path
+) -> None:
+    first = add(uploads, "new.avi", video(tmp_path, 4))
+    second = add(uploads, "new.avi", video(tmp_path, 6))
+    assert first != second
+    assert uploads.info(first).frames == 4
+    assert uploads.info(second).frames == 6
+
+
+def test_a_video_matching_a_folder_clip_is_not_copied(uploads: ClipLibrary, tmp_path: Path) -> None:
+    data = (tmp_path / "videos" / "folder.avi").read_bytes()
+    assert add(uploads, "folder.avi", data) == "folder.avi"
+    assert stored(tmp_path) == []
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("../../escape.avi", "escape.avi"),
+        ("..\\..\\escape.avi", "escape.avi"),
+        ("/etc/odd name.AVI", "odd name.avi"),
+        ("we<ird>.avi", "we_ird_.avi"),
+        ("....avi", "clip.avi"),
+    ],
+)
+def test_upload_names_cannot_leave_the_folder(
+    uploads: ClipLibrary, tmp_path: Path, name: str, expected: str
+) -> None:
+    assert add(uploads, name, video(tmp_path, 4)) == expected
+    assert stored(tmp_path) == [expected]
+
+
+@pytest.mark.parametrize("name", ["virus.exe", "no-suffix", "clip.avi.txt"])
+def test_other_file_types_are_refused(uploads: ClipLibrary, name: str) -> None:
+    with pytest.raises(UploadError, match="not supported"):
+        add(uploads, name, b"data")
+
+
+def test_a_cut_off_upload_leaves_nothing_behind(uploads: ClipLibrary, tmp_path: Path) -> None:
+    with pytest.raises(UploadError, match="did not finish"):
+        uploads.add("new.avi", io.BytesIO(b"short"), 500)
+    assert stored(tmp_path) == []
+
+
+def test_an_oversized_upload_is_refused_before_reading(
+    uploads: ClipLibrary, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(clips, "MAX_UPLOAD_BYTES", 3)
+    with pytest.raises(UploadError, match="too big"):
+        uploads.add("new.avi", io.BytesIO(b"data"), 4)
+
+
+def test_a_library_without_uploads_refuses_them(library: ClipLibrary) -> None:
+    with pytest.raises(UploadError, match="cannot accept"):
+        library.add("new.avi", io.BytesIO(b"data"), 4)

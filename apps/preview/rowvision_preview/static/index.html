@@ -23,9 +23,12 @@
       <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></symbol>
       <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
       <symbol id="i-saved" viewBox="0 0 24 24"><path d="M6 4h12v17l-6-4-6 4z"/></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V5M7 10l5-5 5 5M4 19h16"/></symbol>
       <symbol id="i-cube" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"/></symbol>
     </defs>
   </svg>
+
+  <div class="drop-overlay" aria-hidden="true"><p>Drop to add this video</p></div>
 
   <header class="topbar">
     <span class="brand"><span class="brand-buoy" aria-hidden="true"></span>RowVision</span>
@@ -42,8 +45,20 @@
   </header>
 
   <main>
-    <form id="setup" class="setup">
-      <label class="wide">Clip <select id="clip" required></select></label>
+    <section id="drop-zone" class="drop-zone" aria-labelledby="drop-title">
+      <svg class="drop-icon" aria-hidden="true"><use href="#i-upload"/></svg>
+      <h1 id="drop-title">Drop a video here</h1>
+      <p id="drop-status" aria-live="polite"></p>
+      <progress id="upload-bar" max="1" hidden></progress>
+      <button id="choose-video" class="primary" type="button">Choose a file</button>
+      <input id="video-file" type="file" accept="video/*,.mp4,.mov,.m4v,.avi,.webm" hidden>
+    </section>
+
+    <form id="setup" class="setup" hidden>
+      <div class="chosen-clip">
+        <span>Clip</span>
+        <p><strong id="clip-name"></strong> <button id="change-video" class="link" type="button">Change video</button></p>
+      </div>
       <label>Boat <select id="boat-class" required></select></label>
       <label>Side <select id="side" required></select></label>
       <label>Boats in the video <input id="boats" type="number" min="1" max="20" value="1" required></label>
@@ -51,11 +66,6 @@
       <button type="submit" class="primary">Analyse</button>
     </form>
     <p id="form-error" class="error" role="alert" hidden></p>
-
-    <section id="welcome" class="welcome" hidden>
-      <h1>No clips yet</h1>
-      <p>Add videos to your clips folder, then reload this page.</p>
-    </section>
 
     <section id="clip-preview" class="clip-preview" aria-label="Clip preview" hidden>
       <div class="stage">
