@@ -161,3 +161,20 @@ def test_an_oversized_upload_is_refused_before_reading(
 def test_a_library_without_uploads_refuses_them(library: ClipLibrary) -> None:
     with pytest.raises(UploadError, match="cannot accept"):
         library.add("new.avi", io.BytesIO(b"data"), 4)
+
+
+def size_of(jpeg: bytes) -> tuple[int, int]:
+    image = cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_GRAYSCALE)
+    return image.shape[1], image.shape[0]
+
+
+def test_wide_clips_get_a_small_copy_for_playback(tmp_path: Path) -> None:
+    write_video(tmp_path / "wide.avi", frames=2, size=(2000, 1000))
+    library = ClipLibrary(tmp_path)
+    assert size_of(library.frame_jpeg("wide.avi", 1)) == (2000, 1000)
+    assert size_of(library.frame_jpeg("wide.avi", 1, small=True)) == (1280, 640)
+
+
+def test_narrow_clips_play_at_full_size(library: ClipLibrary) -> None:
+    full = library.frame_jpeg("a.AVI", 1)
+    assert library.frame_jpeg("a.AVI", 1, small=True) == full
