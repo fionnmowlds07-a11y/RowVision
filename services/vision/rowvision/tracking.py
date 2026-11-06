@@ -19,6 +19,10 @@ MAX_SIZE_RATIO = 1.6
 NEIGHBOUR_DISTANCE_TRUNKS = 8.0
 MAX_STITCH_SECONDS = 3.0
 STITCH_DISTANCE_TRUNKS = 2.0
+ZOOM_MIN_RATIO = 1.25
+"""A change in everyone's size this big between detections means the camera zoomed."""
+ZOOM_MIN_PEOPLE = 3
+ZOOM_FIT_TRUNKS = 0.6
 TORSO = [sk.LEFT_SHOULDER, sk.RIGHT_SHOULDER, sk.LEFT_HIP, sk.RIGHT_HIP]
 SHOULDERS = [sk.LEFT_SHOULDER, sk.RIGHT_SHOULDER]
 
@@ -122,6 +126,36 @@ def _local_motion(predicted: FloatArray, sizes: FloatArray, found: FloatArray) -
     return shifts
 
 
+def _zoom(
+    previous: FloatArray, sizes: FloatArray, found: FloatArray, found_sizes: FloatArray
+) -> tuple[FloatArray, FloatArray] | None:
+    """Return where tracks should now be and their new sizes if the camera has just zoomed.
+
+    A zoom moves each rower by a different amount, far too much for matching by distance, and the
+    person who lands nearest is often someone else. Everyone keeps their place relative to one
+    another, so the zoom is the scale and shift that lands the most tracks on detections.
+    """
+    if min(len(previous), len(found)) < ZOOM_MIN_PEOPLE:
+        return None
+    scale = float(np.median(found_sizes) / np.median(sizes))
+    if max(scale, 1 / scale) < ZOOM_MIN_RATIO:
+        return None
+    scaled = previous * scale
+    tolerance = ZOOM_FIT_TRUNKS * float(np.median(found_sizes))
+    best: tuple[int, float] | None = None
+    moved = scaled
+    for shift in (found[None, :, :] - scaled[:, None, :]).reshape(-1, 2):
+        gaps = np.linalg.norm((scaled + shift)[:, None, :] - found[None, :, :], axis=-1).min(axis=1)
+        close = gaps <= tolerance
+        fit = (int(close.sum()), -float(gaps[close].sum()))
+        if best is None or fit > best:
+            best = fit
+            moved = scaled + shift
+    if best is None or best[0] < max(ZOOM_MIN_PEOPLE, min(len(previous), len(found)) // 2):
+        return None
+    return moved, sizes * scale
+
+
 def _stitch(tracks: list[Track], fps: float) -> list[Track]:
     """Join track pieces where one person continues after a gap, such as behind another rower."""
     max_gap = round(MAX_STITCH_SECONDS * fps)
@@ -179,7 +213,11 @@ def track_people(
         active = [i for i, seen in enumerate(last_frame) if frame - seen <= max_missed]
         previous = np.array([last_seen[i] for i in active]).reshape(-1, 2)
         sizes = np.array([last_size[i] for i in active])
-        predicted = previous + _local_motion(previous, sizes, centres)
+        zoomed = _zoom(previous, sizes, centres, found_sizes)
+        if zoomed is not None:
+            predicted, sizes = zoomed
+        else:
+            predicted = previous + _local_motion(previous, sizes, centres)
         for slot, index in enumerate(active):
             last_seen[index] = predicted[slot]
 
