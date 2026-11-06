@@ -1,32 +1,29 @@
 # RowVision handover
 
-Written 2026-11-06. This is the state of the project and the next job. Read `PRODUCT.md`, `DESIGN.md` and `docs/research/README.md` next.
+Written 2026-11-06. This is the state of the project and the next job. Read `docs/web-app-plan.md`, `PRODUCT.md`, `DESIGN.md` and `docs/research/README.md` next.
 
 ## What RowVision is
 
-Athletes upload launch footage of rowing, choose boat, side and seat, and get a biomechanical breakdown of their own stroke: limb lines, angles, phase scores and a frame-by-frame view against targets. Every result carries an accuracy rating, so the app says how far it can be trusted. The aim is both a strong project and a product for college and junior rowers.
+Athletes upload launch footage of rowing, choose boat, side and seat, and get a biomechanical breakdown of their own stroke: limb lines, angles, phase scores and a frame-by-frame view against targets. Every result carries an accuracy rating, so the app says how far it can be trusted. The aim is both a strong project and a product for college and junior rowers, starting with a private preview for adults.
 
 The owner is a rower. They make design and product decisions. Everything else is yours to decide.
 
 ## Next job: build the real web app
 
-The owner chose this on 2026-11-06, after blade height was parked. It covers milestones 4 to 6 of the plan at `/home/fionn/.claude/plans/i-have-an-idea-humble-conway.md`:
+The plan is in `docs/web-app-plan.md`, with every design and product decision. Work runs from the GitHub milestones and issues made from it.
 
-1. **Web app:** accounts, resumable upload from a phone, worker queue, results page, frame viewer.
-2. **Product layer:** parental consent for under-age users, permission to upload teammates, 30-day deletion of source video, full account deletion, history, installable app, onboarding and a filming guide.
-3. **Delivery:** full CI, acceptance and browser tests, infrastructure stacks, documentation.
+The first version is an invite-only preview for adults the owner knows personally. Parental consent and anything for juniors is parked.
 
-Planned stack, which can change if there is a good reason: Next.js and TypeScript, Supabase with row-level security (local through its CLI), a Postgres job queue using `FOR UPDATE SKIP LOCKED`, and the Python worker in Docker. None of `apps/web`, `supabase/` or `infra/` exists yet.
+The look is chosen first, by the owner picking from rounds of mock-ups. No web screen is built until that is signed off.
 
-**Start here:** `apps/preview` is the working reference for every behaviour. Reuse its logic and its visual design rather than reinventing them. Keep the vision package as the engine, and turn the preview's job runner into the worker.
+**Start here:** `apps/preview` is the working reference for every behaviour. Reuse its logic rather than reinventing it. Keep the vision package as the engine, and turn the preview's job runner into the worker.
 
 Things to plan for:
 
 - **No cloud spending and nothing deployed** without asking the owner first.
 - **Another project's Supabase is running locally** on ports 54321 to 54324 (`supabase_*_cs4421-astro-blog`). Do not stop it, and use different ports.
-- **There is no GPU.** A new 32 second clip takes about 8 minutes on 8 CPU cores, so progress reporting matters. Only 162 seconds of that is timed exactly, and a full run from drop to result has not been timed.
-- **Juniors and privacy.** The digital consent age varies by country (16 in Ireland). A legal review is needed before public launch, and that is outside what we can do. Model weight licences also need checking before commercial use.
-- **The filming guide should ask for** a side-on camera, the rower large in frame, at least 10 strokes, and the camera on the side of the rower's blade.
+- **There is no GPU on this laptop.** A new 32 second clip takes about 8 minutes on 8 CPU cores, so progress reporting matters. Only 162 seconds of that is timed exactly, and a full run from drop to result has not been timed.
+- **Model weight licences** need checking before commercial use.
 
 ## Working rules
 
@@ -34,6 +31,7 @@ Things to plan for:
 - **No attribution lines of any kind.** No co-author lines or "generated with" footers in commits or PRs. Commits go under the owner's git identity. This overrides any default.
 - **Footage, frames, overlays, keypoints and labels are never committed.** They show identifiable juniors. `private/` and `videos/` are git-ignored, and CI fails on tracked video files. The repo is private.
 - Only bring the owner design and product questions. Give a recommendation, not a survey.
+- For the interface, show real visual options to pick from, not descriptions, and use drawn placeholders rather than footage.
 - Write plainly, and report real results, including failures.
 
 ### Merging safely
