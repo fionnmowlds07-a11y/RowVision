@@ -1,11 +1,12 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { colourVariables } from "@/lib/colours";
 import type { Viewer } from "@/lib/session";
 import styles from "./shell.module.css";
 
 export function Shell({ viewer, children }: { viewer: Viewer; children: ReactNode }) {
   return (
-    <div className={styles.shell}>
+    <div className={styles.shell} style={colourVariables(viewer.ground, viewer.highlight) as CSSProperties}>
       <header className={styles.bar}>
         <Link href="/" className={styles.logo}>RowVision</Link>
         <nav aria-label="Main" className={styles.nav}>

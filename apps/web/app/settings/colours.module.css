@@ -1,0 +1,61 @@
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.preset {
+  appearance: none;
+  border: 2px solid var(--quiet);
+  border-radius: var(--radius-button);
+  min-height: 44px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 500 14px var(--font-text);
+  cursor: pointer;
+}
+
+.preset[aria-pressed="true"] {
+  border-color: var(--link);
+}
+
+.preset span {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+}
+
+.pick {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 500;
+}
+
+.pick input {
+  width: 64px;
+  height: 40px;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--radius-field);
+  background: var(--quiet);
+  cursor: pointer;
+}
+
+.sample {
+  border-radius: var(--radius-field);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+}
+
+.sample span {
+  border-radius: var(--radius-field);
+  padding: 2px 12px;
+  font: 800 24px var(--font-display);
+}
