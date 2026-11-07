@@ -143,3 +143,72 @@ jobs:
         run: npx supabase start --workdir ../.. -x studio,imgproxy,mailpit,postgres-meta
       - name: Security tests
         run: npx supabase test db --workdir ../..
+
+  full-stack:
+    name: Acceptance and browser tests
+    runs-on: ubuntu-latest
+    needs: [web, database, worker]
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      RETENTION_SECRET: ci-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            services/vision/pyproject.toml
+            services/worker/pyproject.toml
+      - name: Install
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          npm ci
+          pip install -e ../../services/vision -e ../../services/worker
+      - name: Start the database
+        run: npx supabase start --workdir ../.. -x studio,imgproxy,postgres-meta
+      - name: Read the local keys
+        run: |
+          npx supabase status --workdir ../.. -o json > /tmp/supabase.json
+          echo "SUPABASE_ANON_KEY=$(jq -r .ANON_KEY /tmp/supabase.json)" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_KEY=$(jq -r .SERVICE_ROLE_KEY /tmp/supabase.json)" >> "$GITHUB_ENV"
+      - name: Build and start the web app
+        run: |
+          npm run build
+          cp -r .next/static .next/standalone/.next/
+          cp -r public .next/standalone/
+          PORT=3100 HOSTNAME=127.0.0.1 SUPABASE_URL=http://127.0.0.1:54421 node .next/standalone/server.js &
+      - name: Start the worker with the fake engine
+        run: python -m rowvision_worker.main > /tmp/worker.log 2>&1 &
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54422/postgres
+          SUPABASE_URL: http://127.0.0.1:54421
+          ROWVISION_ENGINE: fake
+      - name: Wait until healthy
+        run: |
+          for i in $(seq 1 30); do
+            curl -fsS 'http://127.0.0.1:3100/api/health?deep=1' && exit 0
+            sleep 2
+          done
+          exit 1
+      - name: Acceptance tests
+        run: npm run test:acceptance
+      - name: Browser tests
+        run: npm run test:browser
+      - name: Keep the reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-report
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+            /tmp/worker.log
+          retention-days: 7
