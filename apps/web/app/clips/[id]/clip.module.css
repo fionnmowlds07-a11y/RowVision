@@ -44,3 +44,427 @@
   border-radius: 50%;
   box-shadow: 0 0 0 2px var(--stage);
 }
+
+.strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tile,
+.tileMain {
+  border-radius: var(--radius-field);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tile {
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.tileMain {
+  background: var(--highlight);
+  color: var(--on-highlight);
+}
+
+.tile > span,
+.tileMain > span {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tile strong,
+.tileMain strong {
+  font: 800 48px/1.05 var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.tileMain p {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.tile small {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.wideTile {
+  display: none;
+}
+
+.notes {
+  margin: 0;
+  padding: 10px 12px 10px 30px;
+  border-radius: var(--radius-field);
+  background: var(--caution-bg);
+  color: var(--caution);
+  font-size: 14px;
+}
+
+.warn {
+  border: 1px solid var(--link);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.videoColumn {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.videoHolder {
+  display: none;
+}
+
+.openVideo {
+  width: 100%;
+}
+
+.gone {
+  margin: 0;
+  color: var(--on-ground-soft);
+}
+
+.advice {
+  margin: 0;
+  padding: 0 0 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.measures {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.measures > li + li {
+  border-top: 1px solid var(--quiet);
+}
+
+.measure {
+  appearance: none;
+  width: 100%;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 10px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.measure small {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.line {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.miniLane {
+  position: relative;
+  display: block;
+  height: 10px;
+  margin-top: 6px;
+  border-radius: 5px;
+  background: var(--quiet);
+  overflow: hidden;
+}
+
+.band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--link);
+  opacity: 0.5;
+}
+
+.value {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  margin-left: -3px;
+  border-radius: 3px;
+  background: var(--ink);
+}
+
+.evidence {
+  padding-bottom: 10px;
+  font-size: 14px;
+}
+
+.freezes {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.freezes button {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: 500 13px var(--font-text);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.freezes canvas {
+  width: 160px;
+  height: 120px;
+  border-radius: var(--radius-field);
+  background: var(--stage);
+}
+
+.viewer,
+.viewerFull {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--on-stage);
+  min-width: 0;
+}
+
+.viewerFull {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  padding: 12px;
+  background: var(--stage);
+  overflow: auto;
+}
+
+.viewerBar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.viewerFull .viewerBar {
+  display: flex;
+}
+
+.viewerBar p {
+  margin: 0;
+  font-weight: 700;
+}
+
+.time {
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+.stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-panel);
+  background: var(--stage);
+  touch-action: none;
+  cursor: grab;
+  flex: none;
+}
+
+.picture {
+  position: relative;
+  transform-origin: 0 0;
+  line-height: 0;
+}
+
+.picture video,
+.picture canvas {
+  width: 100%;
+  display: block;
+}
+
+.picture canvas {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  pointer-events: none;
+}
+
+.lane {
+  position: relative;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--panel);
+  flex: none;
+}
+
+.lane i {
+  position: absolute;
+  top: 3px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+}
+
+.catchMark {
+  border-radius: 50%;
+  background: var(--link);
+}
+
+.finishMark {
+  background: var(--ink);
+}
+
+.lane .cursor {
+  top: 0;
+  width: 3px;
+  height: 18px;
+  margin-left: -1px;
+  background: var(--highlight);
+}
+
+.scrub {
+  width: 100%;
+  margin: 0;
+  min-height: 28px;
+  accent-color: var(--highlight);
+}
+
+.liveTiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.liveTiles div {
+  background: var(--panel);
+  border-radius: var(--radius-field);
+  padding: 6px 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.liveTiles span {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.liveTiles strong {
+  font: 800 32px/1.1 var(--font-display);
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.wide {
+  display: none;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.speed,
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  font-size: 14px;
+  accent-color: var(--highlight);
+}
+
+.speed select {
+  min-height: 36px;
+  border: 0;
+  border-radius: var(--radius-field);
+  background: var(--quiet);
+  color: var(--ink);
+  padding: 0 8px;
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.small {
+  margin: 0;
+  font-size: 13px;
+  color: var(--on-ground-soft);
+}
+
+@media (min-width: 900px) {
+  .strip {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .wideTile {
+    display: flex;
+  }
+
+  .body {
+    display: grid;
+    grid-template-columns: minmax(0, 62fr) minmax(0, 38fr);
+    align-items: start;
+  }
+
+  .openVideo,
+  .hint {
+    display: none;
+  }
+
+  .videoHolder {
+    display: block;
+  }
+
+  .wide {
+    display: inline-flex;
+  }
+
+  .viewer .viewerBar {
+    display: flex;
+  }
+
+  .viewer .close {
+    display: none;
+  }
+}
