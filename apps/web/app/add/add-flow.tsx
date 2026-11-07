@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import type { Upload } from "tus-js-client";
 import {
   clockTime, lastSectionStart, looksCompressed, needsSection, refuseFile, refuseLength, sectionEnd,
@@ -27,6 +27,7 @@ export function AddFlow({ userId, setup: saved, connection }: Props) {
   const [facts, setFacts] = useState<VideoFacts | null>(null);
   const [cannotShow, setCannotShow] = useState(false);
   const [share, setShare] = useState(0);
+  const [dragging, setDragging] = useState(false);
   const [uploaded, setUploaded] = useState(false);
   const [uploadFailed, setUploadFailed] = useState(false);
   const [sectionStart, setSectionStart] = useState(0);
@@ -54,9 +55,12 @@ export function AddFlow({ userId, setup: saved, connection }: Props) {
     });
   }, [submitted, uploaded, clipId, file, connection, router]);
 
-  async function choose(event: ChangeEvent<HTMLInputElement>) {
+  function choose(event: ChangeEvent<HTMLInputElement>) {
     const picked = event.target.files?.[0];
-    if (!picked) return;
+    if (picked) void take(picked);
+  }
+
+  async function take(picked: File) {
     const problem = refuseFile(picked);
     setRefusal(problem);
     if (problem) return;
@@ -78,6 +82,31 @@ export function AddFlow({ userId, setup: saved, connection }: Props) {
       onError: () => setUploadFailed(true),
     });
   }
+
+  // A video dropped anywhere on the page counts, and a browser would otherwise open it and lose the form.
+  const dropped = useEffectEvent((event: DragEvent) => {
+    event.preventDefault();
+    setDragging(false);
+    const picked = event.dataTransfer?.files[0];
+    if (picked && !file) void take(picked);
+  });
+  const over = useEffectEvent((event: DragEvent) => {
+    event.preventDefault();
+    if (!file) setDragging(true);
+  });
+  useEffect(() => {
+    const onDrop = (event: DragEvent) => dropped(event);
+    const onOver = (event: DragEvent) => over(event);
+    const onLeave = (event: DragEvent) => { if (!event.relatedTarget) setDragging(false); };
+    window.addEventListener("drop", onDrop);
+    window.addEventListener("dragover", onOver);
+    window.addEventListener("dragleave", onLeave);
+    return () => {
+      window.removeEventListener("drop", onDrop);
+      window.removeEventListener("dragover", onOver);
+      window.removeEventListener("dragleave", onLeave);
+    };
+  }, []);
 
   function reset() {
     upload.current?.abort();
@@ -138,7 +167,8 @@ export function AddFlow({ userId, setup: saved, connection }: Props) {
 
   if (!file) {
     return (
-      <section className={`card stack ${styles.pick}`}>
+      <section className={`card stack ${styles.pick} ${dragging ? styles.dragging : ""}`}>
+        <p className={styles.dropHint}>{dragging ? "Drop it anywhere" : "Drag a video here, or choose one"}</p>
         <p className="soft">Use the original video, side-on, with you large in the frame.</p>
         <label className="button primary">
           Choose a video
