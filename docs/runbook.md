@@ -10,6 +10,8 @@ npm run dev               # Web app on port 3100
 docker compose up worker  # Set ROWVISION_ENGINE=fake to skip the models
 ```
 
+To preview the finished build instead, run `docker compose up -d --no-deps web`, after stopping `npm run dev`. Rebuild with `docker compose build web`.
+
 Local email arrives at http://127.0.0.1:54424. Sign in as `admin@example.com` or `athlete@example.com`.
 
 ## Tests
