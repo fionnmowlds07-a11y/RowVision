@@ -41,7 +41,7 @@ Catch, drive, finish, recovery, stroke side (port), bow side (starboard), sculli
 
 ## Platform
 
-Web. Used on laptops and phones.
+A desktop app for Windows and Linux comes first. Android may follow. The website is kept as the owner's preview.
 
 ## Accessibility
 

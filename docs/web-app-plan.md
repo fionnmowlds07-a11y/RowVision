@@ -1,3 +1,5 @@
+> **7 November 2026:** the Windows and Linux app now comes first. See `docs/desktop-plan.md`. This website stays as the owner's preview.
+
 # RowVision web app: staged plan
 
 Approved by the owner on 2026-11-06. Work runs from the GitHub milestones and issues made from this plan.
