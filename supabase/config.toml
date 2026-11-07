@@ -265,6 +265,10 @@ content_path = "./supabase/templates/sign-in-code.html"
 subject = "Your RowVision code"
 content_path = "./supabase/templates/sign-in-code.html"
 
+[auth.hook.before_user_created]
+enabled = true
+uri = "pg-functions://postgres/public/hook_approved_email"
+
 [auth.sms]
 # Allow/disallow the phone provider. When false, users can't sign up or sign in with SMS.
 # To block new signups only, set enable_signup = false under [auth] instead.
