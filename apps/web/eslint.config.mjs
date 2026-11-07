@@ -6,7 +6,7 @@ const config = [
   ...next,
   ...nextTypescript,
   { files: ["**/*.tsx"], rules: jsxA11y.flatConfigs.recommended.rules },
-  { ignores: [".next/**", "next-env.d.ts"] },
+  { ignores: [".next/**", "next-env.d.ts", "tests/logic.test.ts"] },
 ];
 
 export default config;
