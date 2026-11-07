@@ -2,13 +2,22 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
+import type { Summary } from "@/lib/result";
 import { requireViewer } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { isWaiting, publicLink, type JobState } from "@/lib/waiting";
+import { Results } from "./results";
 import { Status } from "./status";
 import { TapAgain } from "./tap-again";
 
+const LINK_SECONDS = 3600;
+
 export const metadata: Metadata = { title: "Your clip" };
+
+async function signed(supabase: Awaited<ReturnType<typeof createClient>>, bucket: string, path: string) {
+  const { data } = await supabase.storage.from(bucket).createSignedUrl(path, LINK_SECONDS);
+  return data ? publicLink(data.signedUrl, process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLIC_URL) : null;
+}
 
 const DATE = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short" });
 
@@ -18,7 +27,7 @@ export default async function Clip({ params }: { params: Promise<{ id: string }>
   const supabase = await createClient();
   const { data: clip } = await supabase
     .from("clips")
-    .select("id, boat_class, seat, side, note, filmed_at, created_at, duration_seconds, working_path")
+    .select("id, boat_class, seat, side, note, filmed_at, created_at, duration_seconds, working_path, video_deleted_at")
     .eq("id", id)
     .maybeSingle();
   if (!clip) notFound();
@@ -26,7 +35,7 @@ export default async function Clip({ params }: { params: Promise<{ id: string }>
   const [{ data: job }, { data: result }] = await Promise.all([
     supabase.from("jobs").select("state, stage, progress, error, pause").eq("clip_id", id)
       .order("created_at", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("results").select("accuracy, band, overall").eq("clip_id", id)
+    supabase.from("results").select("summary, frames_path, code_version").eq("clip_id", id)
       .order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
   const state = (job?.state ?? "failed") as JobState;
@@ -53,12 +62,13 @@ export default async function Clip({ params }: { params: Promise<{ id: string }>
 
   let tap = null;
   if (state === "needs_tap" && clip.working_path) {
-    const { data: signed } = await supabase.storage.from("working").createSignedUrl(clip.working_path, 3600);
-    if (signed) {
-      const link = publicLink(signed.signedUrl, process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLIC_URL);
-      tap = <TapAgain clip={id} link={link} seconds={Number(job?.pause?.seconds ?? 0)} />;
-    }
+    const link = await signed(supabase, "working", clip.working_path);
+    if (link) tap = <TapAgain clip={id} link={link} seconds={Number(job?.pause?.seconds ?? 0)} />;
   }
+
+  const summary = (result?.summary ?? null) as Summary | null;
+  const videoLink = state === "done" && clip.working_path && !clip.video_deleted_at ? await signed(supabase, "working", clip.working_path) : null;
+  const framesLink = state === "done" && result?.frames_path && !clip.video_deleted_at ? await signed(supabase, "frames", result.frames_path) : null;
 
   return (
     <Shell viewer={viewer}>
@@ -79,11 +89,21 @@ export default async function Clip({ params }: { params: Promise<{ id: string }>
           <Link className="button primary" href="/add">Add a video</Link>
         </section>
       ) : null}
-      {state === "done" && result ? (
+      {state === "done" && summary && !summary.rower ? (
         <section className="card stack">
-          <h2 style={{ fontSize: 24 }}>Accuracy {Math.round(result.accuracy ?? 0)}% {result.band}</h2>
-          <p className="soft">Overall {result.overall === null ? "not given" : Math.round(result.overall)}</p>
+          <h2 style={{ fontSize: 24 }}>No scores for this clip</h2>
+          <p className="soft">{summary.film_closer ?? summary.warnings[0] ?? "We couldn't find your rower in this clip."}</p>
+          <Link className="button primary" href="/guide">How to film a good clip</Link>
         </section>
+      ) : null}
+      {state === "done" && summary?.rower ? (
+        <Results
+          summary={summary}
+          rower={summary.rower}
+          videoLink={videoLink}
+          framesLink={framesLink}
+          oldVersion={false}
+        />
       ) : null}
     </Shell>
   );
