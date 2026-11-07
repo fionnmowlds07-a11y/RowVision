@@ -12,7 +12,7 @@ from rowvision_worker.media import Facts
 
 JOB = Job(
     id="j", clip_id="c", user_id="u", email="a@example.com", attempts=1, source_path="u/c/source",
-    working_path=None, section_start=0, setup=Setup("8+", "bow", 3, Tap(1, 0.5, 0.5)),
+    working_path=None, section_start=0, section_length=60, setup=Setup("8+", "bow", 3, Tap(1, 0.5, 0.5)),
     fps=None, frames=None, width=None, height=None,
 )  # fmt: skip
 FACTS = Fraction(30)
@@ -76,7 +76,7 @@ class Engine:
 
 @pytest.fixture(autouse=True)
 def no_ffmpeg(monkeypatch: pytest.MonkeyPatch) -> None:
-    def make(source: Path, target: Path, start: float) -> Facts:
+    def make(source: Path, target: Path, start: float, length: float) -> Facts:
         target.write_bytes(b"copy")
         return Facts(100, 50, FACTS, 90, 3.0, None)
 

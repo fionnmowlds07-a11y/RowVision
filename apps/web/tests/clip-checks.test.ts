@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
-  MAX_UPLOAD_BYTES, clockTime, lastSectionStart, looksCompressed, needsSection, refuseFile,
-  refuseLength, sectionEnd, submitError, tapPoint,
+  MAX_UPLOAD_BYTES, clockTime, looksCompressed, refuseFile,
+  refuseLength, firstTrim, trimEnd, trimStart, submitError, tapPoint,
 } from "@/lib/clip-checks";
 
 const facts = (width: number, height: number) => ({ duration: 30, width, height });
@@ -40,18 +40,35 @@ describe("compressed copies", () => {
   });
 });
 
-describe("sections", () => {
-  test("only clips over 60 seconds need a section", () => {
-    expect(needsSection(60)).toBe(false);
-    expect(needsSection(61)).toBe(true);
+describe("trimming", () => {
+  test("starts with as much as can be analysed", () => {
+    expect(firstTrim(30)).toEqual({ start: 0, end: 30 });
+    expect(firstTrim(200)).toEqual({ start: 0, end: 60 });
   });
-  test("a section cannot run past the end", () => {
-    expect(lastSectionStart(100)).toBe(40);
-    expect(sectionEnd(40, 100)).toBe(100);
-    expect(sectionEnd(10, 30)).toBe(30);
+
+  test("moving the start pushes the end to stay at 60 seconds or less", () => {
+    expect(trimStart(50, { start: 0, end: 60 }, 200)).toEqual({ start: 50, end: 60 });
+    expect(trimStart(100, { start: 0, end: 60 }, 200)).toEqual({ start: 100, end: 105 });
   });
+
+  test("moving the end pulls the start to stay at 60 seconds or less", () => {
+    expect(trimEnd(150, { start: 10, end: 60 }, 200)).toEqual({ start: 90, end: 150 });
+    expect(trimEnd(30, { start: 10, end: 60 }, 200)).toEqual({ start: 10, end: 30 });
+  });
+
+  test("a trim is never shorter than 5 seconds", () => {
+    expect(trimEnd(12, { start: 10, end: 60 }, 200)).toEqual({ start: 7, end: 12 });
+    expect(trimStart(58, { start: 10, end: 60 }, 200)).toEqual({ start: 58, end: 63 });
+  });
+
   test("times read as minutes and seconds", () => {
     expect(clockTime(75.9)).toBe("1:15");
+  });
+
+  test("a trim stays inside the clip", () => {
+    expect(trimStart(29, { start: 0, end: 30 }, 30)).toEqual({ start: 25, end: 30 });
+    expect(trimEnd(1, { start: 0, end: 30 }, 30)).toEqual({ start: 0, end: 5 });
+    expect(trimEnd(99, { start: 0, end: 20 }, 30)).toEqual({ start: 0, end: 30 });
   });
 });
 

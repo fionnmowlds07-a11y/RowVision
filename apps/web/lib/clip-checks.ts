@@ -22,16 +22,25 @@ export function looksCompressed(name: string, facts: VideoFacts): boolean {
   return /-WA\d+/i.test(name) || Math.min(facts.width, facts.height) < SMALL_SIDE;
 }
 
-export function needsSection(duration: number): boolean {
-  return duration > SECTION_SECONDS;
+export type Trim = { start: number; end: number };
+
+/** Start with as much of the clip as we can analyse. */
+export function firstTrim(duration: number): Trim {
+  return { start: 0, end: Math.min(SECTION_SECONDS, duration) };
 }
 
-export function lastSectionStart(duration: number): number {
-  return Math.max(0, duration - SECTION_SECONDS);
+/** Move the start, pushing the end along so the trim stays between 5 and 60 seconds. */
+export function trimStart(start: number, trim: Trim, duration: number): Trim {
+  const moved = Math.min(Math.max(start, 0), Math.max(duration - MIN_SECONDS, 0));
+  const end = Math.min(Math.max(trim.end, moved + MIN_SECONDS), moved + SECTION_SECONDS, duration);
+  return { start: moved, end };
 }
 
-export function sectionEnd(start: number, duration: number): number {
-  return Math.min(start + SECTION_SECONDS, duration);
+/** Move the end, pushing the start along so the trim stays between 5 and 60 seconds. */
+export function trimEnd(end: number, trim: Trim, duration: number): Trim {
+  const moved = Math.max(Math.min(end, duration), Math.min(MIN_SECONDS, duration));
+  const start = Math.max(Math.min(trim.start, moved - MIN_SECONDS), moved - SECTION_SECONDS, 0);
+  return { start, end: moved };
 }
 
 export function clockTime(seconds: number): string {
@@ -47,6 +56,7 @@ export function tapPoint(clientX: number, clientY: number, rect: { left: number;
 
 export function submitError(message: string): string {
   if (message.includes("queue_full")) return "You already have 2 clips waiting. Add another once one has finished.";
+  if (message.includes("bad_section")) return "Trim the clip to 60 seconds or less.";
   if (message.includes("bad_seat") || message.includes("bad_side")) return "Check your boat, side and seat.";
   return "We couldn't send your clip for analysis. Check your connection and try again.";
 }

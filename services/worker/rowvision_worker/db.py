@@ -8,7 +8,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from rowvision_worker.engine import Setup, Tap
-from rowvision_worker.media import Facts
+from rowvision_worker.media import SECTION_SECONDS, Facts
 
 LEASE_SECONDS = 60
 MAX_ATTEMPTS = 2
@@ -24,6 +24,7 @@ class Job:
     source_path: str | None
     working_path: str | None
     section_start: float
+    section_length: float
     setup: Setup
     fps: float | None
     frames: int | None
@@ -55,6 +56,7 @@ def parse_job(row: dict[str, Any]) -> Job:
         source_path=row["source_path"],
         working_path=row["working_path"],
         section_start=float(row["section_start_seconds"]),
+        section_length=float(row.get("section_length_seconds") or SECTION_SECONDS),
         setup=Setup(
             row["boat_class"],
             row["side"],
@@ -95,8 +97,8 @@ class Database:
             return None
         row = self._one(
             """select j.id, j.clip_id, j.user_id, j.attempts, u.email, c.source_path, c.working_path,
-                      c.section_start_seconds, c.boat_class, c.side, c.seat, c.tap, c.fps, c.frames,
-                      c.width, c.height
+                      c.section_start_seconds, c.section_length_seconds, c.boat_class, c.side, c.seat,
+                      c.tap, c.fps, c.frames, c.width, c.height
                from public.jobs j
                join public.clips c on c.id = j.clip_id
                join auth.users u on u.id = j.user_id

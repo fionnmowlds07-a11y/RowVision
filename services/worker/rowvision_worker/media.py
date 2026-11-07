@@ -69,10 +69,10 @@ def probe(path: Path) -> Facts:
     return parse_probe(json.loads(output))
 
 
-def copy_command(source: Path, target: Path, start: float, fps: Fraction) -> list[str]:
+def copy_command(source: Path, target: Path, start: float, length: float, fps: Fraction) -> list[str]:
     return [
         "ffmpeg", "-y", "-v", "error",
-        "-ss", f"{start:.3f}", "-i", str(source), "-t", str(SECTION_SECONDS), "-an",
+        "-ss", f"{start:.3f}", "-i", str(source), "-t", f"{length:.3f}", "-an",
         "-vf", f"settb=expr={fps.denominator}/{fps.numerator},setpts=N",
         "-fps_mode", "passthrough",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", str(QUALITY_CRF),
@@ -82,10 +82,12 @@ def copy_command(source: Path, target: Path, start: float, fps: Fraction) -> lis
     ]  # fmt: skip
 
 
-def make_working_copy(source: Path, target: Path, start: float) -> Facts:
+def make_working_copy(
+    source: Path, target: Path, start: float, length: float = SECTION_SECONDS
+) -> Facts:
     """Cut the section and normalise it. Returns the facts of the copy, with the source's date."""
     original = probe(source)
-    subprocess.check_call(copy_command(source, target, start, original.fps))
+    subprocess.check_call(copy_command(source, target, start, length, original.fps))
     copy = probe(target)
     return Facts(
         width=copy.width,
