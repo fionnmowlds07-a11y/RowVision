@@ -7,7 +7,10 @@ services:
       - "127.0.0.1:3100:3100"
     environment:
       SUPABASE_URL: http://host.docker.internal:54421
+      SUPABASE_PUBLIC_URL: http://127.0.0.1:54421
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:?Set this in .env}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:?Set this in .env}
+      RETENTION_SECRET: ${RETENTION_SECRET:-local-only}
     extra_hosts:
       - host.docker.internal:host-gateway
     healthcheck:
