@@ -7,6 +7,9 @@ import time
 
 import numpy as np
 from rowvision.pose import RtmBackend
+from rowvision.reference import load_targets
+from rowvision.reliability import load_calibration
+from rowvision.version import code_version
 
 from rowvision_worker import desktop
 from rowvision_worker.engine import make_engine
@@ -14,6 +17,8 @@ from rowvision_worker.engine import make_engine
 
 def main() -> None:
     make_engine("fake", "cpu")
+    load_targets()
+    load_calibration()
     started = time.time()
     backend = RtmBackend()
     loaded = time.time()
@@ -22,6 +27,7 @@ def main() -> None:
     backend.estimate(frame, np.array([[100, 100, 400, 600]], dtype=np.float32))
     print(json.dumps({
         "system": platform.platform(),
+        "version": code_version(),
         "load_seconds": round(loaded - started, 2),
         "run_seconds": round(time.time() - loaded, 2),
     }))
