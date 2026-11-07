@@ -55,7 +55,7 @@ def parse_job(data: dict[str, Any]) -> DesktopJob:
             boat_class=data["boat_class"],
             side=data["side"],
             seat=int(data["seat"]),
-            tap=Tap(float(tap["seconds"]), float(tap["x"]), float(tap["y"])) if tap else None,
+            tap=Tap(float(tap["t"]), float(tap["x"]), float(tap["y"])) if tap else None,
         ),
         engine=data.get("engine", "real"),
         device=data.get("device", "cpu"),
@@ -166,7 +166,12 @@ def main(argv: list[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, stream=sys.stderr)
     lower_priority()
-    job = parse_job(json.loads(arguments.job.read_text()))
+    try:
+        job = parse_job(json.loads(arguments.job.read_text()))
+    except (OSError, ValueError, KeyError, TypeError):
+        log.exception("could not read the job")
+        send_line({"event": "failed", "message": FAILED_MESSAGE})
+        return FAILED
     stop = threading.Event()
     threading.Thread(target=watch_input, args=(sys.stdin, stop), daemon=True).start()
     return run(job, make_engine(job.engine, job.device), send_line, stop.is_set)

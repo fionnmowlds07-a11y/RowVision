@@ -55,7 +55,7 @@ class Noisy:
 
 
 def test_a_job_keeps_its_tap_and_section() -> None:
-    tap = {"seconds": 1.5, "x": 0.25, "y": 0.75}
+    tap = {"t": 1.5, "x": 0.25, "y": 0.75}  # The same shape the add page saves
     job = job_in(Path("clip"), start=12, tap=tap)
     assert job.start == 12
     assert job.setup.tap == Tap(1.5, 0.25, 0.75)
@@ -147,6 +147,14 @@ def test_cancel_or_a_closed_stdin_stops_the_job(text: str) -> None:
     stop = threading.Event()
     desktop.watch_input(io.StringIO(text), stop)
     assert stop.is_set()
+
+
+@pytest.mark.parametrize("text", ["not json", "{}", '{"folder": "c", "boat_class": "2-", "side": "bow"}'])
+def test_a_bad_job_file_fails_cleanly(text: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    path = tmp_path / "job.json"
+    path.write_text(text)
+    assert desktop.main([str(path)]) == desktop.FAILED
+    assert json.loads(capsys.readouterr().out)["event"] == "failed"
 
 
 def test_every_line_sent_is_json(capsys: pytest.CaptureFixture[str]) -> None:
