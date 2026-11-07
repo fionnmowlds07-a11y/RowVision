@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useEffectEvent, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import type { Upload } from "tus-js-client";
 import {
-  clockTime, lastSectionStart, looksCompressed, needsSection, refuseFile, refuseLength, sectionEnd,
+  clockTime, firstTrim, looksCompressed, refuseFile, refuseLength, trimEnd, trimStart,
   submitError, tapPoint, type VideoFacts,
 } from "@/lib/clip-checks";
 import { BOAT_NAMES, BOAT_SEATS, SIDE_NAMES, fitSetup, seatsFor, sidesFor, type Setup } from "@/lib/setup";
@@ -30,7 +30,7 @@ export function AddFlow({ userId, setup: saved, connection }: Props) {
   const [dragging, setDragging] = useState(false);
   const [uploaded, setUploaded] = useState(false);
   const [uploadFailed, setUploadFailed] = useState(false);
-  const [sectionStart, setSectionStart] = useState(0);
+  const [trim, setTrim] = useState({ start: 0, end: 0 });
   const [frameTime, setFrameTime] = useState(0);
   const [tap, setTap] = useState<Tap | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -111,7 +111,7 @@ export function AddFlow({ userId, setup: saved, connection }: Props) {
   function reset() {
     upload.current?.abort();
     setFile(null); setObjectUrl(null); setClipId(null); setFacts(null); setCannotShow(false); setShare(0);
-    setUploaded(false); setUploadFailed(false); setTap(null); setSectionStart(0); setFrameTime(0); setRefusal(null);
+    setUploaded(false); setUploadFailed(false); setTap(null); setTrim({ start: 0, end: 0 }); setFrameTime(0); setRefusal(null);
   }
 
   function loaded() {
@@ -129,6 +129,7 @@ export function AddFlow({ userId, setup: saved, connection }: Props) {
       return;
     }
     setFacts(next);
+    setTrim(firstTrim(next.duration));
     element.currentTime = Math.min(1, next.duration / 2);
     setFrameTime(element.currentTime);
   }
@@ -139,15 +140,24 @@ export function AddFlow({ userId, setup: saved, connection }: Props) {
     setTap(null);
   }
 
-  function moveSection(start: number) {
-    setSectionStart(start);
-    seek(start);
+  function moveStart(start: number) {
+    if (!facts) return;
+    const next = trimStart(start, trim, facts.duration);
+    setTrim(next);
+    seek(next.start);
+  }
+
+  function moveEnd(end: number) {
+    if (!facts) return;
+    const next = trimEnd(end, trim, facts.duration);
+    setTrim(next);
+    seek(next.end);
   }
 
   function tapFrame(event: MouseEvent<HTMLButtonElement>) {
     const box = event.currentTarget.getBoundingClientRect();
     const point = event.detail === 0 ? { x: 0.5, y: 0.5 } : tapPoint(event.clientX, event.clientY, box);
-    setTap({ t: frameTime - sectionStart, ...point });
+    setTap({ t: frameTime - trim.start, ...point });
   }
 
   async function submit() {
@@ -155,7 +165,7 @@ export function AddFlow({ userId, setup: saved, connection }: Props) {
     setError(null);
     const { error: failed } = await browserClient(connection).rpc("submit_clip", {
       clip: clipId, boat: setup.boat, rowing_side: setup.side, seat_number: setup.seat,
-      section_start: sectionStart, tap_point: tap, clip_note: note,
+      section_start: trim.start, section_length: facts ? trim.end - trim.start : null, tap_point: tap, clip_note: note,
       filmed: new Date(file.lastModified).toISOString(), uploaded,
     });
     if (failed) {
@@ -180,8 +190,6 @@ export function AddFlow({ userId, setup: saved, connection }: Props) {
     );
   }
 
-  const long = facts ? needsSection(facts.duration) : false;
-  const end = facts ? sectionEnd(sectionStart, facts.duration) : 0;
 
   return (
     <div className={styles.flow}>
@@ -204,17 +212,25 @@ export function AddFlow({ userId, setup: saved, connection }: Props) {
       </div>
 
       <section className={`card stack ${styles.controls}`} aria-label="Choose your frame">
-        {long && facts ? (
-          <label className="field">
-            Your 60 seconds start at {clockTime(sectionStart)}
-            <input type="range" className={styles.range} min={0} max={lastSectionStart(facts.duration)} step={1} value={sectionStart} onChange={(e) => moveSection(Number(e.target.value))} />
-          </label>
-        ) : null}
         {facts ? (
           <>
+            <div className={styles.trim} role="group" aria-label="Trim your clip">
+              <div className={styles.row}>
+                <strong>Trim your clip</strong>
+                <span className="soft" aria-live="polite">{Math.round(trim.end - trim.start)} of up to 60 seconds</span>
+              </div>
+              <label className="field">
+                Start {clockTime(trim.start)}
+                <input type="range" className={styles.range} min={0} max={facts.duration} step={0.5} value={trim.start} onChange={(e) => moveStart(Number(e.target.value))} />
+              </label>
+              <label className="field">
+                End {clockTime(trim.end)}
+                <input type="range" className={styles.range} min={0} max={facts.duration} step={0.5} value={trim.end} onChange={(e) => moveEnd(Number(e.target.value))} />
+              </label>
+            </div>
             <label className="field">
               Drag to a clear frame, then tap yourself
-              <input type="range" className={styles.range} min={sectionStart} max={end} step={0.1} value={frameTime} onChange={(e) => seek(Number(e.target.value))} />
+              <input type="range" className={styles.range} min={trim.start} max={trim.end} step={0.1} value={frameTime} onChange={(e) => seek(Number(e.target.value))} />
             </label>
             <div className={styles.row}>
               <span className="soft" aria-live="polite">{tap ? "Got you. Tap again to change it." : "Not tapped yet"}</span>

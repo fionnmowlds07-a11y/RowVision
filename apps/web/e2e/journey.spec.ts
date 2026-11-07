@@ -103,3 +103,14 @@ test("a dropped file is checked like a chosen one", async ({ page }) => {
   await page.dispatchEvent("body", "drop", { dataTransfer: transfer });
   await expect(page.getByText("That file isn't a video")).toBeVisible();
 });
+
+test("a clip can be trimmed before analysing", async ({ page }) => {
+  await signIn(page, "second@example.com");
+  await page.goto("/add");
+  await page.locator("input[type=file]").setInputFiles(makeClip("trim.mp4", 12));
+  await expect(page.getByText("12 of up to 60 seconds")).toBeVisible();
+  await page.getByLabel(/^End/).fill("7");
+  await expect(page.getByText("7 of up to 60 seconds")).toBeVisible();
+  await page.getByLabel(/^Start/).fill("6");
+  await expect(page.getByText("5 of up to 60 seconds")).toBeVisible();
+});
