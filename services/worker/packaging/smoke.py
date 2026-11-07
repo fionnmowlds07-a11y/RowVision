@@ -6,6 +6,7 @@ import time
 
 import numpy as np
 from rowvision.pose import RtmBackend
+
 from rowvision_worker.engine import make_engine
 
 
