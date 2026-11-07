@@ -39,7 +39,8 @@ The first version is a private preview for adults the owner knows personally. It
 | Look | Chosen in two mock-up rounds and recorded in `DESIGN.md`: option B, black and green. |
 | Custom colours | Athletes can change the ground and highlight colours, starting from the club greens (#116). |
 | Bad results | "Something wrong?" on each result: a short form saved with the clip and listed for the admin. |
-| Hosting | Decided when the owner is ready for testers. Hosted and self-hosted Supabase use the same code. |
+| Hosting | No monthly cost: Vercel free, Supabase free for accounts and scores, Cloudflare R2 for videos, Gmail for email, and the home PC as worker. Decided 7 November 2026. See `docs/deployment.md`. |
+| Video after the change | Once the free hosting issues are built, video is kept 7 days, not 30. Athletes save up to 4 frames with limb lines, kept with the scores. If none are picked, a catch and a finish frame are saved. |
 
 **Defaults taken, owner told:** setup remembers last boat, side and seat, and is filled in during upload. Uploads resume after a drop. Reruns with a changed setup reuse the kept section. Waiting shows queue position and rough time left, with cancel. A failed analysis retries once. Home is the clip list. No sharing or export. Athletes can delete any clip, and account deletion removes everything. Each video shows days left. Whole-crew analysis stays off. Hosted services use EU regions.
 
