@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Shell } from "@/components/shell";
 import { requireViewer } from "@/lib/session";
-import { saveName, signOut } from "./actions";
+import { deleteAccount, saveName, signOut } from "./actions";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -20,6 +20,15 @@ export default async function Settings() {
       </form>
       <form action={signOut}>
         <button className="button quiet">Sign out</button>
+      </form>
+      <form action={deleteAccount} className="card stack" style={{ maxWidth: 480 }}>
+        <h2 style={{ fontSize: 19 }}>Delete your account</h2>
+        <p className="soft">This removes your clips, results and account for good. It can&apos;t be undone.</p>
+        <label className="field">
+          Type delete to confirm
+          <input name="confirm" autoComplete="off" required />
+        </label>
+        <button className="button quiet">Delete everything</button>
       </form>
     </Shell>
   );

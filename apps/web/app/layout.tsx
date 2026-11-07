@@ -8,6 +8,8 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "RowVision",
   description: "See your stroke, measured from launch footage.",
+  appleWebApp: { capable: true, title: "RowVision", statusBarStyle: "black" },
+  icons: { apple: "/icons/icon-192.png" },
 };
 
 export const viewport: Viewport = {
