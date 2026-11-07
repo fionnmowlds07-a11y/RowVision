@@ -49,7 +49,7 @@ select throws_ok($$ update public.jobs set state = 'done' $$, '42501', null, 'an
 select throws_ok($$ update public.clips set working_path = 'x' $$, '42501', null, 'an athlete cannot set the working copy');
 select throws_ok($$ insert into public.results (clip_id, user_id, code_version, summary) values ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-00000000000a', 'v', '{}') $$, '42501', null, 'an athlete cannot write a result');
 select throws_ok($$ insert into public.approved_emails (email) values ('x@example.com') $$, '42501', null, 'an athlete cannot approve an email');
-select throws_ok($$ insert into public.clips (user_id, boat_class, side, seat) values ('00000000-0000-0000-0000-00000000000b', '8+', 'bow', 1) $$, '42501', null, 'an athlete cannot add a clip for someone else');
+select throws_ok($$ insert into public.clips (user_id, boat_class, side, seat) values ('00000000-0000-0000-0000-00000000000a', '8+', 'bow', 1) $$, '42501', null, 'clips can only be added through submit_clip');
 select throws_ok($$ insert into public.feedback (clip_id, user_id, kind) values ('00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-00000000000a', 'other') $$, '42501', null, 'an athlete cannot report on another clip');
 select throws_ok($$ insert into storage.objects (bucket_id, name) values ('uploads', '00000000-0000-0000-0000-00000000000b/x.mp4') $$, '42501', null, 'an athlete cannot upload into another folder');
 
