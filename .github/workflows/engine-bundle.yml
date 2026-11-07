@@ -1,0 +1,45 @@
+name: Engine bundle
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - services/vision/**
+      - services/worker/**
+      - .github/workflows/engine-bundle.yml
+
+jobs:
+  bundle:
+    name: Bundle on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest Linux we support, as a bundle only runs on systems as new as the one it was built on.
+        os: [ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the engine
+        run: |
+          pip install ./services/vision ./services/worker pyinstaller
+          # rtmlib brings a desktop build of OpenCV, which needs a display library we do not use.
+          pip uninstall -y opencv-contrib-python opencv-python opencv-python-headless
+          pip install "opencv-python-headless>=4.10,<5"
+      - name: Bundle it
+        run: |
+          pyinstaller --noconfirm --onedir --name rowvision-engine --exclude-module psycopg \
+            --collect-all rtmlib --collect-all onnxruntime --collect-all cv2 \
+            --collect-submodules rowvision --collect-submodules rowvision_worker \
+            services/worker/packaging/smoke.py
+          du -sh dist/rowvision-engine
+      - name: Run it from outside the repo, with no Python on the path
+        run: |
+          engine="$PWD/dist/rowvision-engine/rowvision-engine"
+          cd "$RUNNER_TEMP"
+          PATH="$(dirname "$engine"):/usr/bin:/bin" "$engine"
