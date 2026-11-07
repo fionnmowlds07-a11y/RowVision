@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(12);
+select plan(14);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-00000000000a', 'a@example.com'),
@@ -22,6 +22,8 @@ select throws_ok($$ select public.submit_clip(gen_random_uuid(), '4-', 'bow', 5,
 select throws_ok($$ select public.submit_clip(gen_random_uuid(), '1x', 'bow', 1, 0, null, null, null, true) $$, 'P0001', 'bad_side', 'a scull cannot be bow side');
 select throws_ok($$ select public.submit_clip(gen_random_uuid(), '8+', 'scull', 1, 0, null, null, null, true) $$, 'P0001', 'bad_side', 'an eight cannot be sculled');
 
+select throws_ok($$ select public.submit_clip(gen_random_uuid(), '4-', 'bow', 1, 0, null, null, now(), true, 61) $$, 'P0001', 'bad_section', 'A trim cannot run over 60 seconds');
+select throws_ok($$ select public.submit_clip(gen_random_uuid(), '4-', 'bow', 1, 0, null, null, now(), true, 0) $$, 'P0001', 'bad_section', 'A trim cannot be empty');
 select public.submit_clip('00000000-0000-0000-0000-0000000000a2', '1x', 'scull', 1, 0, null, null, null, true);
 select throws_ok($$ select public.submit_clip(gen_random_uuid(), '1x', 'scull', 1, 0, null, null, null, true) $$, 'P0001', 'queue_full', 'a third waiting clip is refused');
 

@@ -147,3 +147,10 @@
     grid-column: auto;
   }
 }
+
+.trim {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--quiet);
+}

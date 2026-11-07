@@ -23,7 +23,7 @@ def job_in(folder: Path, **changes: Any) -> desktop.DesktopJob:
 def copies(monkeypatch: pytest.MonkeyPatch) -> list[Path]:
     made: list[Path] = []
 
-    def make(source: Path, target: Path, start: float) -> Facts:
+    def make(source: Path, target: Path, start: float, length: float) -> Facts:
         target.write_bytes(b"video")
         made.append(target)
         return FACTS
@@ -56,8 +56,10 @@ class Noisy:
 
 def test_a_job_keeps_its_tap_and_section() -> None:
     tap = {"t": 1.5, "x": 0.25, "y": 0.75}  # The same shape the add page saves
-    job = job_in(Path("clip"), start=12, tap=tap)
+    job = job_in(Path("clip"), start=12, length=20, tap=tap)
     assert job.start == 12
+    assert job.length == 20
+    assert job_in(Path("clip")).length == 60
     assert job.setup.tap == Tap(1.5, 0.25, 0.75)
     assert job_in(Path("clip")).setup.tap is None
 
@@ -119,7 +121,7 @@ def test_a_failure_gives_a_plain_message(tmp_path: Path, copies: list[Path]) -> 
 
 
 def test_a_file_that_is_not_a_video_fails_cleanly(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    def refuse(source: Path, target: Path, start: float) -> Facts:
+    def refuse(source: Path, target: Path, start: float, length: float) -> Facts:
         raise ValueError("no video stream")
 
     monkeypatch.setattr(media, "make_working_copy", refuse)
