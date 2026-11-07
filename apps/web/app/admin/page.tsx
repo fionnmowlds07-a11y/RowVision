@@ -7,6 +7,7 @@ import { removeEmail } from "./actions";
 import { AddEmailForm } from "./add-form";
 
 const TIME = new Intl.DateTimeFormat("en-GB", { dateStyle: "short", timeStyle: "short" });
+const REPORTS: Record<string, string> = { wrong_rower: "Wrong rower", angle_off: "Angle looks off", other: "Something else" };
 const ONLINE_MS = 2 * 60 * 1000;
 
 function isOnline(lastSeen: string): boolean {
@@ -23,9 +24,12 @@ export default async function Admin() {
     .select("email, note")
     .order("added_at", { ascending: false });
 
-  const [{ data: workers }, { data: jobs }] = await Promise.all([
+  const [{ data: workers }, { data: jobs }, { data: clips }, { data: reports }, { data: views }] = await Promise.all([
     supabase.from("worker_status").select("worker_id, device, last_seen").order("last_seen", { ascending: false }),
     supabase.from("jobs").select("id, clip_id, state, stage, error, created_at").order("created_at", { ascending: false }).limit(30),
+    supabase.from("clips").select("id, boat_class, seat, created_at").order("created_at", { ascending: false }).limit(30),
+    supabase.from("feedback").select("id, clip_id, kind, message").is("resolved_at", null).order("created_at", { ascending: false }).limit(30),
+    supabase.from("admin_access_log").select("id, clip_id, action, created_at").order("created_at", { ascending: false }).limit(15),
   ]);
   const waiting = (jobs ?? []).filter(({ state }) => ["uploading", "queued", "running", "needs_tap"].includes(state));
   const failed = (jobs ?? []).filter(({ state }) => state === "failed");
@@ -55,6 +59,27 @@ export default async function Admin() {
         {failed.length === 0 ? <p className="soft">None.</p> : null}
         {failed.map(({ id, clip_id, error }) => (
           <p key={id} style={{ margin: 0 }}><Link href={`/clips/${clip_id}`}>Open clip</Link> {error}</p>
+        ))}
+      </section>
+      <section className="card stack" aria-labelledby="reports-title">
+        <h2 id="reports-title" style={{ fontSize: 19 }}>Problems reported</h2>
+        {(reports ?? []).length === 0 ? <p className="soft">None.</p> : null}
+        {(reports ?? []).map(({ id, clip_id, kind, message }) => (
+          <p key={id} style={{ margin: 0 }}><Link href={`/clips/${clip_id}`}>{REPORTS[kind] ?? kind}</Link> {message}</p>
+        ))}
+      </section>
+      <section className="card stack" aria-labelledby="clips-title">
+        <h2 id="clips-title" style={{ fontSize: 19 }}>All clips</h2>
+        <p className="soft">Each clip you open from someone else is logged.</p>
+        {(clips ?? []).map(({ id, boat_class, seat, created_at }) => (
+          <p key={id} style={{ margin: 0 }}><Link href={`/clips/${id}`}>{TIME.format(new Date(created_at))}</Link> {boat_class} seat {seat}</p>
+        ))}
+      </section>
+      <section className="card stack" aria-labelledby="log-title">
+        <h2 id="log-title" style={{ fontSize: 19 }}>Your access log</h2>
+        {(views ?? []).length === 0 ? <p className="soft">Nothing logged.</p> : null}
+        {(views ?? []).map(({ id, action, created_at }) => (
+          <p key={id} style={{ margin: 0 }}>{TIME.format(new Date(created_at))} {action}</p>
         ))}
       </section>
       <AddEmailForm />

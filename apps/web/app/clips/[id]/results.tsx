@@ -11,9 +11,16 @@ import styles from "./clip.module.css";
 
 const MIN_STROKES = 3;
 
-type Props = { summary: Summary; rower: Rower; videoLink: string | null; framesLink: string | null; oldVersion: boolean };
+type Props = {
+  summary: Summary;
+  rower: Rower;
+  videoLink: string | null;
+  framesLink: string | null;
+  oldVersion: boolean;
+  daysLeft: number | null;
+};
 
-export function Results({ summary, rower, videoLink, framesLink, oldVersion }: Props) {
+export function Results({ summary, rower, videoLink, framesLink, oldVersion, daysLeft }: Props) {
   const [data, setData] = useState<FrameData | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [asking, setAsking] = useState(false);
@@ -93,7 +100,7 @@ export function Results({ summary, rower, videoLink, framesLink, oldVersion }: P
         </div>
       ) : null}
 
-      {oldVersion ? <p className={styles.caution}>Measured with an older version of RowVision.</p> : null}
+      {oldVersion ? <p className={styles.caution}>Measured with an older version of RowVision. You can measure it again below while the video exists.</p> : null}
       {[...summary.warnings, ...rating.warnings].length ? (
         <ul className={styles.notes}>{[...summary.warnings, ...rating.warnings].map((text) => <li key={text}>{text}</li>)}</ul>
       ) : null}
@@ -172,7 +179,10 @@ export function Results({ summary, rower, videoLink, framesLink, oldVersion }: P
           ) : null}
         </div>
       </div>
-      <p className={styles.small}>Coaching feedback, not medical advice.</p>
+      <p className={styles.small}>
+        {daysLeft !== null ? `Video deleted in ${daysLeft} ${daysLeft === 1 ? "day" : "days"}, leaving your scores. ` : ""}
+        Coaching feedback, not medical advice.
+      </p>
     </>
   );
 }
