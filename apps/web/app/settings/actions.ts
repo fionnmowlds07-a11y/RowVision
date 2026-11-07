@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireViewer } from "@/lib/session";
+import { adminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export async function saveName(form: FormData) {
@@ -14,6 +15,32 @@ export async function saveName(form: FormData) {
 }
 
 export async function signOut() {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  redirect("/sign-in");
+}
+
+/** Removes every file and row. Rows go with the user, and files must go first. */
+export async function deleteAccount(form: FormData) {
+  const viewer = await requireViewer();
+  if (String(form.get("confirm")).trim().toLowerCase() !== "delete") return;
+  const admin = adminClient();
+  const { data: clips } = await admin
+    .from("clips")
+    .select("source_path, working_path, results(frames_path), training_clips(path)")
+    .eq("user_id", viewer.id);
+  const paths = (values: (string | null | undefined)[]) => values.filter((value): value is string => Boolean(value));
+  const all = clips ?? [];
+  const groups: [string, string[]][] = [
+    ["uploads", paths(all.map((clip) => clip.source_path))],
+    ["working", paths(all.map((clip) => clip.working_path))],
+    ["frames", paths(all.flatMap((clip) => clip.results.map((result) => result.frames_path)))],
+    ["training", paths(all.flatMap((clip) => [clip.training_clips].flat().map((kept) => kept?.path)))],
+  ];
+  for (const [bucket, names] of groups) {
+    if (names.length) await admin.storage.from(bucket).remove(names);
+  }
+  await admin.auth.admin.deleteUser(viewer.id);
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/sign-in");

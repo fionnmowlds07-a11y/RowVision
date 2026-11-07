@@ -5,10 +5,13 @@ import { Shell } from "@/components/shell";
 import type { Summary } from "@/lib/result";
 import { requireViewer } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
+import { isOlder } from "@/lib/history";
+import { daysLeft } from "@/lib/retention";
 import { isWaiting, publicLink, type JobState } from "@/lib/waiting";
 import { Results } from "./results";
 import { Status } from "./status";
 import { TapAgain } from "./tap-again";
+import { Tools } from "./tools";
 
 const LINK_SECONDS = 3600;
 
@@ -27,15 +30,19 @@ export default async function Clip({ params }: { params: Promise<{ id: string }>
   const supabase = await createClient();
   const { data: clip } = await supabase
     .from("clips")
-    .select("id, boat_class, seat, side, note, filmed_at, created_at, duration_seconds, working_path, video_deleted_at")
+    .select("id, user_id, boat_class, seat, side, note, filmed_at, created_at, duration_seconds, working_path, video_deleted_at, video_expires_at")
     .eq("id", id)
     .maybeSingle();
   if (!clip) notFound();
+  const own = clip.user_id === viewer.id;
+  if (viewer.isAdmin && !own) {
+    await supabase.from("admin_access_log").insert({ admin_id: viewer.id, clip_id: id, action: "opened clip" });
+  }
 
   const [{ data: job }, { data: result }] = await Promise.all([
     supabase.from("jobs").select("state, stage, progress, error, pause").eq("clip_id", id)
       .order("created_at", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("results").select("summary, frames_path, code_version").eq("clip_id", id)
+    supabase.from("results").select("id, summary, frames_path, code_version").eq("clip_id", id)
       .order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
   const state = (job?.state ?? "failed") as JobState;
@@ -67,6 +74,11 @@ export default async function Clip({ params }: { params: Promise<{ id: string }>
   }
 
   const summary = (result?.summary ?? null) as Summary | null;
+  const { data: version } = await supabase.rpc("current_version");
+  const { data: kept } = viewer.isAdmin
+    ? await supabase.from("training_clips").select("clip_id").eq("clip_id", id).maybeSingle()
+    : { data: null };
+  const left = clip.video_deleted_at ? null : daysLeft(clip.video_expires_at, new Date().getTime());
   const videoLink = state === "done" && clip.working_path && !clip.video_deleted_at ? await signed(supabase, "working", clip.working_path) : null;
   const framesLink = state === "done" && result?.frames_path && !clip.video_deleted_at ? await signed(supabase, "frames", result.frames_path) : null;
 
@@ -102,7 +114,20 @@ export default async function Clip({ params }: { params: Promise<{ id: string }>
           rower={summary.rower}
           videoLink={videoLink}
           framesLink={framesLink}
-          oldVersion={false}
+          oldVersion={result ? isOlder(result, version ?? null) : false}
+          daysLeft={left}
+        />
+      ) : null}
+      {!isWaiting(state) && state !== "needs_tap" ? (
+        <Tools
+          clip={id}
+          result={result?.id ?? null}
+          note={clip.note}
+          setup={{ boat: clip.boat_class, side: clip.side, seat: clip.seat }}
+          canRerun={Boolean(clip.working_path) && !clip.video_deleted_at}
+          own={own}
+          admin={viewer.isAdmin}
+          kept={Boolean(kept)}
         />
       ) : null}
     </Shell>

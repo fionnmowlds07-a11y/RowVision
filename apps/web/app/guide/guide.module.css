@@ -1,0 +1,60 @@
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.logo {
+  font: 800 22px var(--font-display);
+  letter-spacing: -0.02em;
+  color: var(--on-ground);
+  text-decoration: none;
+}
+
+.title {
+  font-size: 44px;
+}
+
+.lead {
+  margin: 0;
+  color: var(--on-ground-soft);
+}
+
+.plan {
+  width: 100%;
+  font-size: 11px;
+  fill: var(--on-ground-soft);
+}
+
+.boat {
+  fill: var(--highlight);
+}
+
+.launch {
+  fill: var(--quiet);
+}
+
+.sight {
+  fill: none;
+  stroke: var(--link);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.steps h2 {
+  font-size: 19px;
+  margin-bottom: 6px;
+}
