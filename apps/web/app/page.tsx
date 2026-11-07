@@ -1,12 +1,12 @@
-import { createClient } from "@/lib/supabase/server";
+import { Shell } from "@/components/shell";
+import { requireViewer } from "@/lib/session";
 
 export default async function Home() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
+  const viewer = await requireViewer();
   return (
-    <main style={{ padding: 24 }}>
+    <Shell viewer={viewer}>
       <h1 style={{ fontSize: 32 }}>Your clips</h1>
-      <p style={{ color: "var(--on-ground-soft)" }}>Signed in as {String(data?.claims.email ?? "")}.</p>
-    </main>
+      <p style={{ margin: 0, color: "var(--on-ground-soft)" }}>Your clips will appear here.</p>
+    </Shell>
   );
 }
