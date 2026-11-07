@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { evidenceFrames, formatTarget, formatValue, laneMarks, overallGap, overallVisible, ratingNote, sourceLink, timingText } from "@/lib/logic";
+import { evidenceFrames, formatTarget, formatValue, laneMarks, measureKind, overallGap, overallVisible, ratingNote, sourceLink, timingText } from "@/lib/logic";
 import type { FrameData, Metric, Rower, Summary } from "@/lib/result";
 import { workOnNext } from "@/lib/work-on-next";
 import { Evidence } from "./evidence";
 import { makeScene } from "./draw";
+import { ModelDialog } from "./model-dialog";
 import { Viewer, type Jump } from "./viewer";
 import styles from "./clip.module.css";
 
 const MIN_STROKES = 3;
 
 type Props = {
+  side: string;
   summary: Summary;
   rower: Rower;
   videoLink: string | null;
@@ -20,13 +22,14 @@ type Props = {
   daysLeft: number | null;
 };
 
-export function Results({ summary, rower, videoLink, framesLink, oldVersion, daysLeft }: Props) {
+export function Results({ side, summary, rower, videoLink, framesLink, oldVersion, daysLeft }: Props) {
   const [data, setData] = useState<FrameData | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [asking, setAsking] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const [fullScreen, setFullScreen] = useState(false);
   const [jump, setJump] = useState<Jump | null>(null);
+  const [model, setModel] = useState<string | null>(null);
 
   useEffect(() => {
     if (!framesLink) return;
@@ -154,6 +157,9 @@ export function Results({ summary, rower, videoLink, framesLink, oldVersion, day
                   {open === metric.name ? (
                     <div className={styles.evidence}>
                       {videoLink ? <Evidence link={videoLink} fps={summary.fps} metric={metric} rower={rower} scene={scene} onPick={show} /> : null}
+                      {measureKind(metric.name) && metric.name !== "finish_elbow_deg" ? (
+                        <button type="button" className="button quiet" onClick={() => setModel(metric.name)}>See it on the 3D model</button>
+                      ) : null}
                       {metric.target?.sources.length ? (
                         <p className="soft">
                           Sources:{" "}
@@ -179,6 +185,7 @@ export function Results({ summary, rower, videoLink, framesLink, oldVersion, day
           ) : null}
         </div>
       </div>
+      {model ? <ModelDialog name={model} side={side} metrics={card.metrics} onClose={() => setModel(null)} /> : null}
       <p className={styles.small}>
         {daysLeft !== null ? `Video deleted in ${daysLeft} ${daysLeft === 1 ? "day" : "days"}, leaving your scores. ` : ""}
         Coaching feedback, not medical advice.
