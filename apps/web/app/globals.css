@@ -50,3 +50,86 @@ h3 {
     animation: none !important;
   }
 }
+
+.card {
+  background: var(--panel);
+  color: var(--ink);
+  border-radius: var(--radius-panel);
+  padding: 16px 18px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.soft {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.field input,
+.field select {
+  min-height: 50px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-field);
+  background: var(--quiet);
+  color: var(--ink);
+  padding: 0 16px;
+  font: 500 16px var(--font-text);
+}
+
+.field input::placeholder {
+  color: var(--ink-soft);
+}
+
+.button {
+  appearance: none;
+  border: 0;
+  border-radius: var(--radius-button);
+  min-height: 52px;
+  padding: 0 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 16px var(--font-text);
+  text-decoration: none;
+  cursor: pointer;
+  transition: filter 150ms ease-out;
+}
+
+.button:hover {
+  filter: brightness(1.08);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.button.primary {
+  background: var(--highlight);
+  color: var(--on-highlight);
+}
+
+.button.quiet {
+  background: var(--quiet);
+  color: var(--ink);
+  min-height: 44px;
+  font-weight: 500;
+  font-size: 14px;
+}
