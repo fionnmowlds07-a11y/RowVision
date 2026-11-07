@@ -296,6 +296,13 @@ const middleOf = (target: { low: number; high: number }) => (target.low + target
 
 // What the 3D model should show for a measure: the target pose, the athlete's pose if it can be
 // trusted, and the range to shade. An unreliable angle falls back to the target and says so.
+// The model poses the whole body, so it needs both the lean and the knee for that moment.
+export function modelFits(name: string, metrics: { name: string }[]) {
+  if (!measureKind(name) || name === "finish_elbow_deg") return false;
+  const phase = name.startsWith("finish") ? "finish" : "catch";
+  return [`${phase}_lean_deg`, `${phase}_knee_deg`].every((needed) => metrics.some((item) => item.name === needed));
+}
+
 export function modelRequest(name: string, metrics: ModelMetric[]) {
   const phase = name.startsWith("finish") ? "finish" : "catch";
   const lean = metrics.find((item) => item.name === `${phase}_lean_deg`)!;

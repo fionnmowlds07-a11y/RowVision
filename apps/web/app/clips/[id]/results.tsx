@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { evidenceFrames, formatTarget, formatValue, laneMarks, measureKind, overallGap, overallVisible, ratingNote, sourceLink, timingText } from "@/lib/logic";
+import { evidenceFrames, formatTarget, formatValue, laneMarks, modelFits, overallGap, overallVisible, ratingNote, sourceLink, timingText } from "@/lib/logic";
 import type { FrameData, Metric, Rower, Summary } from "@/lib/result";
 import { workOnNext } from "@/lib/work-on-next";
 import { Evidence } from "./evidence";
@@ -44,7 +44,7 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
   );
   const advice = workOnNext(rower);
   const { card, rating } = rower;
-  const firstModel = card.metrics.find((metric) => measureKind(metric.name) && metric.name !== "finish_elbow_deg");
+  const firstModel = card.metrics.find((metric) => modelFits(metric.name, card.metrics));
   const visible = overallVisible(rating, revealed);
   // On Poor, the rating's warnings are already the filming advice.
   const notes = advice.kind === "filming" ? summary.warnings : [...summary.warnings, ...rating.warnings];
@@ -158,7 +158,7 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
                   {open === metric.name ? (
                     <div className={styles.evidence}>
                       {videoLink ? <Evidence link={videoLink} fps={summary.fps} metric={metric} rower={rower} scene={scene} onPick={show} /> : null}
-                      {measureKind(metric.name) && metric.name !== "finish_elbow_deg" ? (
+                      {modelFits(metric.name, card.metrics) ? (
                         <button type="button" className="button quiet" onClick={() => setModel(metric.name)}>See it on the 3D model</button>
                       ) : null}
                       {metric.target?.sources.length ? (
