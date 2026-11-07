@@ -20,10 +20,10 @@ class PoseBackend(Protocol):
 class RtmBackend:
     """YOLOX detection and RTMPose estimation through ONNX Runtime."""
 
-    def __init__(self, mode: str = "balanced") -> None:
+    def __init__(self, mode: str = "balanced", device: str = "cpu") -> None:
         from rtmlib import Body  # type: ignore[import-untyped]
 
-        self._model = Body(mode=mode, backend="onnxruntime", device="cpu")
+        self._model = Body(mode=mode, backend="onnxruntime", device=device)
 
     def detect(self, frame: Any) -> FloatArray:
         return np.asarray(self._model.det_model(frame), dtype=float).reshape(-1, 4)
