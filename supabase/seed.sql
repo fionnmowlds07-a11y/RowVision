@@ -1,7 +1,8 @@
 -- Local development only. Hosted accounts are approved on the admin page.
 insert into public.approved_emails (email, note) values
   ('admin@example.com', 'Local admin'),
-  ('athlete@example.com', 'Local athlete');
+  ('athlete@example.com', 'Local athlete'),
+  ('second@example.com', 'Second local athlete');
 
 -- The local admin is promoted as soon as that account signs in for the first time.
 create or replace function public.seed_local_admin() returns trigger

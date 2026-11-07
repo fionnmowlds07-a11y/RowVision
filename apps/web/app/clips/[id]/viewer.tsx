@@ -271,16 +271,16 @@ export function Viewer({ link, fps, frames, rower, scene, jump, fullScreen, onCl
 
       <div className={styles.controls}>
         <button type="button" className="button primary" onClick={togglePlay}>{playing ? "Pause" : "Play"}</button>
-        <button type="button" className="button quiet" onClick={() => goTo(frame - 1)} aria-label="Back one frame">Back 1</button>
-        <button type="button" className="button quiet" onClick={() => goTo(frame + 1)} aria-label="Forward one frame">Forward 1</button>
+        <button type="button" className="button quiet" onClick={() => goTo(frame - 1)}>Back 1</button>
+        <button type="button" className="button quiet" onClick={() => goTo(frame + 1)}>Forward 1</button>
         <button type="button" className="button quiet" onClick={() => jumpTo(rower.catches, -1)}>Last catch</button>
         <button type="button" className="button quiet" onClick={() => jumpTo(rower.catches, 1)}>Next catch</button>
         <button type="button" className="button quiet" onClick={() => jumpTo(rower.finishes, 1)}>Next finish</button>
         <span className={styles.wide}>
           <button type="button" className="button quiet" onClick={() => goTo(frame - 10)}>Back 10</button>
           <button type="button" className="button quiet" onClick={() => goTo(frame + 10)}>Forward 10</button>
-          <button type="button" className="button quiet" onClick={() => zoom(1 / ZOOM_STEP)} aria-label="Zoom out">Zoom out</button>
-          <button type="button" className="button quiet" onClick={() => zoom(ZOOM_STEP)} aria-label="Zoom in">Zoom in</button>
+          <button type="button" className="button quiet" onClick={() => zoom(1 / ZOOM_STEP)} >Zoom out</button>
+          <button type="button" className="button quiet" onClick={() => zoom(ZOOM_STEP)} >Zoom in</button>
           <button type="button" className="button quiet" onClick={() => setView(FIT)}>Fit</button>
         </span>
         <button type="button" className="button quiet" onClick={zoomToRower} disabled={!scene}>Zoom to rower</button>
