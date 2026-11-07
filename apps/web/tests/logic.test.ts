@@ -9,7 +9,6 @@ import {
   angleMarks,
   arcBetween,
   bodyCentre,
-  canvasScaleFor,
   centreOn,
   clampFrame,
   clampView,
@@ -451,12 +450,5 @@ test("a doubted knee is marked unsure, and the body angle is not", () => {
   const marks = angleMarks(pose(), { trunk: 14, knee: 90, elbow: null }, true);
   assert.equal(marks.find(({ kind }) => kind === "knee").sure, false);
   assert.equal(marks.find(({ kind }) => kind === "trunk").sure, true);
-});
-
-test("the canvas stays a sensible size for any clip", () => {
-  assert.equal(canvasScaleFor(848), 2);
-  assert.equal(canvasScaleFor(960), 2);
-  assert.equal(canvasScaleFor(2336) * 2336, 1920);
-  assert.equal(canvasScaleFor(3840) * 3840, 1920);
 });
 

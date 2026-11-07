@@ -386,7 +386,7 @@ export async function showModel(host, request, style, showYours) {
       window.removeEventListener("resize", resize);
       controls.dispose();
       renderer.dispose();
-      host.replaceChildren();
+      renderer.domElement.remove();
     },
   };
 }

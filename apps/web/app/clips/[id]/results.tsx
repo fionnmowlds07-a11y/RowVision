@@ -44,6 +44,7 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
   );
   const advice = workOnNext(rower);
   const { card, rating } = rower;
+  const firstModel = card.metrics.find((metric) => measureKind(metric.name) && metric.name !== "finish_elbow_deg");
   const visible = overallVisible(rating, revealed);
   // On Poor, the rating's warnings are already the filming advice.
   const notes = advice.kind === "filming" ? summary.warnings : [...summary.warnings, ...rating.warnings];
@@ -174,6 +175,7 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
                 </li>
               ))}
             </ul>
+            {firstModel ? <button type="button" className="button quiet" onClick={() => setModel(firstModel.name)}>See the 3D model</button> : null}
           </section>
           {rower.timing ? (
             <section className="card stack">
