@@ -8,21 +8,28 @@ Athletes upload launch footage of rowing, choose boat, side and seat, and get a 
 
 The owner is a rower. They make design and product decisions. Everything else is yours to decide.
 
-## Next job: build the real web app
+## Where things stand
 
-The plan is in `docs/web-app-plan.md`, with every design and product decision. Work runs from the GitHub milestones and issues made from it.
+The web app is built and runs locally, from `docs/web-app-plan.md` and the GitHub milestones. Nothing is deployed and nothing has been spent.
 
-The first version is an invite-only preview for adults the owner knows personally. Parental consent and anything for juniors is parked.
+The first version is an invite-only preview for adults the owner knows personally. Parental consent and anything for juniors is parked in the "Before juniors" milestone.
 
-The look is chosen first, by the owner picking from rounds of mock-ups. No web screen is built until that is signed off.
+**The next job is issue #134: results are not stable.** The owner's best clip was saved as 76% Good, but a fresh run gives about 40% Poor. Every web upload runs fresh. Fix this before inviting testers, or the first impression will be Poor on everything.
 
-**Start here:** `apps/preview` is the working reference for every behaviour. Reuse its logic rather than reinventing it. Keep the vision package as the engine, and turn the preview's job runner into the worker.
+Still open, and needing the owner:
+
+- #51 and #59: run the frame stepping test page and check picked files on a real iPhone and Android phone.
+- #83 and #98: try the phone viewer and installing the app on a real phone.
+- #71: benchmark the GPU, which needs access to the home PC.
+- #75: time the models in a browser on a phone and laptop.
+- #104: set up the home worker. It needs one visit, and the PC's operating system.
+- Approve hosting and spending. See `docs/deployment.md`.
 
 Things to plan for:
 
 - **No cloud spending and nothing deployed** without asking the owner first.
-- **Another project's Supabase is running locally** on ports 54321 to 54324 (`supabase_*_cs4421-astro-blog`). Do not stop it, and use different ports.
-- **There is no GPU on this laptop.** A new 32 second clip takes about 8 minutes on 8 CPU cores, so progress reporting matters. Only 162 seconds of that is timed exactly, and a full run from drop to result has not been timed.
+- **Another project's Supabase is running locally** on ports 54321 to 54324 (`supabase_*_cs4421-astro-blog`). Do not stop it. This project uses 544xx.
+- **There is no GPU on this laptop.** Analysis takes about 15 seconds per second of video on 8 CPU cores.
 - **Model weight licences** need checking before commercial use.
 
 ## Working rules
@@ -51,6 +58,11 @@ If a check stays "pending" although the job finished, rerun that job with `gh ru
 
 ### Other lessons
 
+- A stopped tool call can still finish. After one, check what actually happened before carrying on.
+- `boat_at` and `track_at` return the nearest, however far away, so check the distance yourself.
+- Playwright's text matching ignores case and matches parts of words, so "Kept" also finds "not kept".
+- Saved detections go stale silently. Compare fresh runs before trusting a cached result.
+
 - Stop when a rebase conflicts. Do not run later commands in the same shell call. Appended tests often share a closing `});`, so run the tests before continuing the rebase.
 - Do parallel work in a separate `git worktree`. `gh pr merge --delete-branch` may remove it, so `git worktree prune` afterwards.
 - `code_version()` hashes `rowvision/*.py` and `reference/*.yaml`. Any change there hides saved results until clips are rerun.
@@ -62,7 +74,8 @@ If a check stays "pending" although the job finished, rerun that job with `gh ru
 
 | Task | Command |
 |---|---|
-| Owner's app, port 8766 | `PREVIEW_PORT=8766 apps/preview/start.sh` |
+| Web app, database, worker | See `docs/runbook.md` |
+| Labelling tool, port 8766 | `PREVIEW_PORT=8766 apps/preview/start.sh` |
 | Vision tests | `pytest` in `services/vision`, inside the `rowvision-vision:dev` image |
 | Preview tests | `pytest` in `apps/preview`, same image, with the whole repo mounted |
 | Page tests | `node --test apps/preview/tests/logic.test.mjs` |
@@ -71,13 +84,19 @@ If a check stays "pending" although the job finished, rerun that job with `gh ru
 
 Host Python is too new, so Python runs in Docker. Mount the repo when testing, for example `-e PYTHONPATH=/repo/services/vision:/repo/apps/preview -v "$PWD/services:/repo/services:ro" -v "$PWD/apps:/repo/apps:ro"`. Use port 8767 for test servers, and only restart 8766 when `/api/job` is not `running`. The app does not come back by itself after a computer restart. Browser checks use Playwright from `/home/fionn/Kidscope/Kidscope/node_modules` through `createRequire`.
 
-Current suites on `main`: 255 vision, 162 preview and 71 page tests, all passing.
+Current suites on `main`, all passing: 272 vision, 145 preview, 71 page, 44 worker, 162 web unit, 74 database, 16 browser and 6 acceptance scenarios.
 
 ## What exists
 
 **`services/vision/rowvision`** is the analysis engine. A coarse pass finds boats, seats and shots, then a fine pass measures the chosen rower. It uses YOLOX and RTMPose through ONNX Runtime. Key files: `pipeline.py`, `tracking.py`, `boats.py`, `seats.py`, `metrics.py`, `scoring.py`, `reliability.py`, `timing.py`, `reference_pose.py`, `blades.py`.
 
-**`apps/preview`** is a local web page on Python's `http.server` with static ES modules. It has drag-and-drop upload, a boat picker, the frame viewer with limb lines, angles and target wedges, the score panel, a 3D reference rower for stroke side, bow side and sculling, saved results, and labelling pages for joints and blades.
+**`apps/web`** is the Next.js app. `lib/logic.ts` is ported from the preview, with its tests. `app/clips/[id]` holds the results page, viewer, freeze frames and 3D model.
+
+**`services/worker`** is the worker. `engine.py` turns a setup into a request, and pauses when a tap misses. `media.py` makes the working copy. `worker.py` runs a job and keeps nothing afterwards.
+
+**`supabase`** holds the schema, row-level security, the queue functions and their tests.
+
+**`apps/preview`** is the older local page, kept as the labelling tool. Its saved results are hidden until clips are rerun, as moving code into the engine changed `code_version()`.
 
 **Data in `private/`:** `uploads/`, `preview/results/`, `detections/`, `labels/labels.json` (136 joint labels), `labels/blades.json` (294 blade labels), `models/blades-v1.onnx`, `train/` (1.1 GB, training scripts and packages), `seats.json`.
 
@@ -94,7 +113,7 @@ Current suites on `main`: 255 vision, 162 preview and 71 page tests, all passing
 - **Sides:** separate stroke side, bow side and sculling models, sharing body angle targets until evidence differs.
 - **Catch timing:** judged against the rower being followed. Stroke side follows stroke, bow side follows the seat behind stroke, scullers follow stroke, and the stroke seat has no figure. It is an unscored trend.
 - **Blades only count on the camera's side of the boat** (`blade_faces_camera`). The app does not yet tell a rower when theirs is on the far side.
-- **Upload replaces the clip dropdown.** The folder clips open from Saved results.
+- **The web app's decisions** are in `docs/web-app-plan.md`, and its look is in `DESIGN.md`.
 
 ## Parked: blade height
 
@@ -109,7 +128,8 @@ To resume: film close footage from the blade's side, label about 200 near-side r
 ## Known problems
 
 - **Issue #7 is still open:** one clip reports 10 rowers in an eight.
-- **Most sample clips rate Poor,** which is honest about the footage. Seats and sides for those clips are guesses in `private/analyse_all.py`. Some hidden scores are still high (95 and 98). The owner's 8 at 3 seat is the best real test: 76% Good, overall 87.
+- **Fresh results differ from saved ones (#134).** The owner's 8 at 3 seat was saved as 76% Good, overall 87, from detections made before a frame reading fix. Fresh, it gives about 40% Poor. Catch timing is also several frames off on many clips.
+- **Most sample clips rate Poor,** and all 14 are WhatsApp copies at 848x478. Seats and sides for those clips are guesses in `private/analyse_all.py`.
 - **Legs filmed from an angle are placed badly.** Catch knee read 118° against a true 74° on 16 frames from 25° or more off side-on. These are drawn dashed with a "?".
 - **The rating formula assumes bigger rowers measure better.** The labels do not clearly show this for body angle.
 - **Zoom handling needs at least 5 people,** and has only been proven on one real zoom.

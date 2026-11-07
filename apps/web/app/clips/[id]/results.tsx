@@ -45,6 +45,8 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
   const advice = workOnNext(rower);
   const { card, rating } = rower;
   const visible = overallVisible(rating, revealed);
+  // On Poor, the rating's warnings are already the filming advice.
+  const notes = advice.kind === "filming" ? summary.warnings : [...summary.warnings, ...rating.warnings];
 
   function show(frame: number) {
     setJump((old) => ({ frame, nonce: (old?.nonce ?? 0) + 1 }));
@@ -104,9 +106,7 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
       ) : null}
 
       {oldVersion ? <p className={styles.caution}>Measured with an older version of RowVision. You can measure it again below while the video exists.</p> : null}
-      {[...summary.warnings, ...rating.warnings].length ? (
-        <ul className={styles.notes}>{[...summary.warnings, ...rating.warnings].map((text) => <li key={text}>{text}</li>)}</ul>
-      ) : null}
+      {notes.length ? <ul className={styles.notes}>{notes.map((text) => <li key={text}>{text}</li>)}</ul> : null}
 
       <div className={styles.body}>
         {videoLink ? (
