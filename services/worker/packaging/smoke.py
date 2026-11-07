@@ -2,11 +2,13 @@
 
 import json
 import platform
+import sys
 import time
 
 import numpy as np
 from rowvision.pose import RtmBackend
 
+from rowvision_worker import desktop
 from rowvision_worker.engine import make_engine
 
 
@@ -26,4 +28,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        sys.exit(desktop.main())
     main()
