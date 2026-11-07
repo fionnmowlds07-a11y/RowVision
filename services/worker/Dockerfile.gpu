@@ -1,0 +1,13 @@
+# For an NVIDIA machine. Not yet run on real hardware: see the benchmark in the GPU issue.
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3.12 python3-pip ffmpeg libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY services/vision ./vision
+COPY services/worker ./worker
+RUN pip install --break-system-packages --no-cache-dir -e ./vision ./worker \
+    && pip uninstall --break-system-packages -y onnxruntime \
+    && pip install --break-system-packages --no-cache-dir onnxruntime-gpu
+ENV ROWVISION_DEVICE=cuda
+CMD ["python3", "-m", "rowvision_worker.main"]

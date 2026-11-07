@@ -1,9 +1,10 @@
-"""Turn an analysis into plain JSON for the page."""
+"""Turn an analysis into plain JSON for the preview and the worker."""
 
 from dataclasses import asdict
 from typing import Any
 
 import numpy as np
+
 from rowvision.metrics import StrokeMetrics, angle_series
 from rowvision.pipeline import FILM_CLOSER, Analysis, BoatChoice, RowerResult
 from rowvision.reference import Target

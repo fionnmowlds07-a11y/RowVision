@@ -4,7 +4,6 @@ The analysis takes minutes, so it runs in a thread that the page polls. Starting
 the old one. Results are saved as JSON, so a clip that has been analysed reopens at once.
 """
 
-import functools
 import hashlib
 import json
 import pickle
@@ -18,14 +17,14 @@ from pathlib import Path
 from typing import Any, Protocol
 
 import numpy as np
-import rowvision
 from rowvision.boats import boat_at
 from rowvision.pipeline import COARSE_STEP, Request, Scouting, analyse, scout
 from rowvision.pose import PoseBackend
+from rowvision.report import analysis_json, boat_choices_json, result_summary
 from rowvision.skeleton import FloatArray
+from rowvision.version import code_version
 
 from rowvision_preview.clips import ClipLibrary
-from rowvision_preview.results import analysis_json, boat_choices_json, result_summary
 
 BOAT_SEATS = {"1x": 1, "2x": 2, "2-": 2, "4x": 4, "4-": 4, "4+": 4, "8+": 8}
 """Rowing seats in each boat class. A cox has no seat number."""
@@ -33,8 +32,6 @@ SCULLING_BOATS = {"1x", "2x", "4x"}
 SIDE_NAMES = {"stroke": "Stroke side", "bow": "Bow side", "scull": "Sculling"}
 """Rowing sides. Each gets its own reference model."""
 MAX_BOATS = 20
-RESULT_VERSION = 3
-"""Raise this when the saved JSON changes shape, so older results are not reused."""
 
 
 def sides_for(boat_class: str) -> list[str]:
@@ -157,21 +154,6 @@ def load_detections(folder: Path, clip: str, source: Source) -> _SavedDetections
     if fps != source.fps or frames != source.frames or len(points) != expected:
         return None
     return _SavedDetections(points, scores)
-
-
-@functools.cache
-def code_version() -> str:
-    """Hash the analysis code and targets, so older results are not shown as current.
-
-    Read once, as a running server keeps the code it started with. Hashing the files again later
-    would stamp its results with the version of whatever has since been checked out.
-    """
-    digest = hashlib.sha256(str(RESULT_VERSION).encode())
-    package = Path(rowvision.__file__).parent
-    targets = package.parent / "reference"
-    for path in [*sorted(package.glob("*.py")), *sorted(targets.glob("*.yaml"))]:
-        digest.update(path.read_bytes())
-    return digest.hexdigest()
 
 
 class Runner:
