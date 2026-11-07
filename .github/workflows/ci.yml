@@ -14,7 +14,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Fail if video, image frames or keypoint data are tracked
         run: |
-          found=$(git ls-files | grep -Ei '\.(mp4|mov|m4v|avi|webm|npz)$' || true)
+          found=$(git ls-files \
+            | grep -Ei '\.(mp4|mov|m4v|avi|webm|mkv|hevc|npz|pkl|jpe?g|png|webp|heic|bmp|tiff?)$' \
+            | grep -v '^apps/web/public/icons/' || true)
           if [ -n "$found" ]; then
             echo "Real footage must not be committed:"
             echo "$found"
