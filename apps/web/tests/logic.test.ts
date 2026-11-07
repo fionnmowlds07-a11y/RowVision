@@ -9,7 +9,6 @@ import {
   angleMarks,
   arcBetween,
   bodyCentre,
-  canvasScaleFor,
   centreOn,
   clampFrame,
   clampView,
@@ -23,6 +22,7 @@ import {
   limbSegments,
   measureKind,
   median,
+  modelFits,
   modelRequest,
   nearestMeasure,
   nextMarker,
@@ -453,10 +453,12 @@ test("a doubted knee is marked unsure, and the body angle is not", () => {
   assert.equal(marks.find(({ kind }) => kind === "trunk").sure, true);
 });
 
-test("the canvas stays a sensible size for any clip", () => {
-  assert.equal(canvasScaleFor(848), 2);
-  assert.equal(canvasScaleFor(960), 2);
-  assert.equal(canvasScaleFor(2336) * 2336, 1920);
-  assert.equal(canvasScaleFor(3840) * 3840, 1920);
+test("the 3D model is only offered when the whole pose can be built", () => {
+  const lean = { name: "catch_lean_deg" };
+  const knee = { name: "catch_knee_deg" };
+  assert.equal(modelFits("catch_lean_deg", [lean]), false);
+  assert.equal(modelFits("catch_lean_deg", [lean, knee]), true);
+  assert.equal(modelFits("finish_lean_deg", [lean, knee]), false);
+  assert.equal(modelFits("finish_elbow_deg", [lean, knee]), false);
+  assert.equal(modelFits("legs_first", [lean, knee]), false);
 });
-

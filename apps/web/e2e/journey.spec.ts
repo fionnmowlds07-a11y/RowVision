@@ -33,6 +33,10 @@ test("a clip goes from upload to result, and frames can be stepped", async ({ pa
   await expect(page.getByRole("heading", { name: "Work on next" })).toBeVisible({ timeout: 45_000 });
   await noSeriousProblems(page);
 
+  await page.getByRole("button", { name: "See the 3D model" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByRole("button", { name: "Close" }).click();
+
   const open = page.getByRole("button", { name: "Open video" });
   if (await open.isVisible()) await open.click();
   const readout = page.getByLabel("Frame viewer").locator("p").first();
