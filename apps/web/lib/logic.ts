@@ -407,11 +407,3 @@ export function ratingNote({ calibrated, labelled_frames: frames }: Pick<Rating,
   if (frames) return `Estimated accuracy, based on ${frames} hand-labelled frames so far`;
   return "Estimated accuracy, not yet checked against hand-labelled footage";
 }
-
-export const MAX_CANVAS_WIDTH = 1920;
-
-// Canvas pixels per video pixel. Small clips get extra so lines stay sharp when enlarged, and large
-// ones get fewer, as repainting a very large canvas on every frame makes playback stutter.
-export function canvasScaleFor(videoWidth: number) {
-  return Math.min(2, MAX_CANVAS_WIDTH / videoWidth);
-}
