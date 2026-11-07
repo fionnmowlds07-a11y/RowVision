@@ -91,3 +91,15 @@ test("colours can be changed and reset", async ({ page }) => {
   }).toBe("rgb(223, 241, 230)");
   await page.getByRole("button", { name: "Reset to the club greens" }).click();
 });
+
+test("a dropped file is checked like a chosen one", async ({ page }) => {
+  await signIn(page, "second@example.com");
+  await page.goto("/add");
+  const transfer = await page.evaluateHandle(() => {
+    const data = new DataTransfer();
+    data.items.add(new File(["not a video"], "notes.txt", { type: "text/plain" }));
+    return data;
+  });
+  await page.dispatchEvent("body", "drop", { dataTransfer: transfer });
+  await expect(page.getByText("That file isn't a video")).toBeVisible();
+});
