@@ -36,6 +36,7 @@ jobs:
           pyinstaller --noconfirm --onedir --name rowvision-engine --exclude-module psycopg \
             --collect-all rtmlib --collect-all onnxruntime --collect-all cv2 \
             --collect-submodules rowvision --collect-submodules rowvision_worker \
+            --add-data "services/vision/reference:reference" --add-data "services/vision/rowvision/*.py:rowvision" \
             services/worker/packaging/smoke.py
           du -sh dist/rowvision-engine
       - name: Run it from outside the repo, with no Python on the path
@@ -43,3 +44,14 @@ jobs:
           engine="$PWD/dist/rowvision-engine/rowvision-engine"
           cd "$RUNNER_TEMP"
           PATH="$(dirname "$engine"):/usr/bin:/bin" "$engine"
+      - name: Run a job through the bundled command
+        run: |
+          engine="$PWD/dist/rowvision-engine/rowvision-engine"
+          folder="$RUNNER_TEMP/clip"
+          mkdir -p "$folder"
+          echo video > "$folder/working.mp4"
+          python -c "import json, sys; f = sys.argv[1]; json.dump(dict(fps=30, frames=240, width=1280, height=720), open(f + '/video.json', 'w')); json.dump(dict(folder=f, boat_class='2-', side='bow', seat=2, engine='fake'), open(f + '/job.json', 'w'))" "$folder"
+          sleep 30 | "$engine" "$folder/job.json" | tee "$RUNNER_TEMP/events.txt"
+          grep -q '"event": "done"' "$RUNNER_TEMP/events.txt"
+          test -s "$folder/summary.json"
+          test -s "$folder/frames.json"
