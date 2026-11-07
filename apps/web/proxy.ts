@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { cookieOptions } from "@/lib/supabase/cookie";
 import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PATHS = ["/sign-in", "/guide", "/api/health", "/api/retention", "/manifest.webmanifest"];
@@ -6,6 +7,7 @@ const PUBLIC_PATHS = ["/sign-in", "/guide", "/api/health", "/api/retention", "/m
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
   const supabase = createServerClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!, {
+    cookieOptions,
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll: (items) => {
