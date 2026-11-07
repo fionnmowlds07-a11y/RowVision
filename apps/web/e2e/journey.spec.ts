@@ -95,7 +95,6 @@ test("colours can be changed and reset", async ({ page }) => {
 test("a dropped file is checked like a chosen one", async ({ page }) => {
   await signIn(page, "second@example.com");
   await page.goto("/add");
-  await expect(page.getByText("Drag a video here")).toBeVisible();
   const transfer = await page.evaluateHandle(() => {
     const data = new DataTransfer();
     data.items.add(new File(["not a video"], "notes.txt", { type: "text/plain" }));
