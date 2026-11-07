@@ -14,7 +14,9 @@
     "test": "vitest run",
     "db:start": "supabase start --workdir ../..",
     "db:stop": "supabase stop --workdir ../..",
-    "db:status": "supabase status --workdir ../.."
+    "db:status": "supabase status --workdir ../..",
+    "test:browser": "playwright test",
+    "test:acceptance": "cucumber-js features --import features/steps/steps.mjs --format summary"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
@@ -28,6 +30,9 @@
     "tus-js-client": "^4.3.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@cucumber/cucumber": "^13.3.0",
+    "@playwright/test": "^1.65.0",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
