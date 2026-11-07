@@ -7,18 +7,18 @@ describe("waiting", () => {
     expect(isWaiting("needs_tap")).toBe(false);
     expect(isWaiting("done")).toBe(false);
   });
-  test("a 32 second clip is about 8 minutes", () => {
-    expect(minutesLeft(1, 32, 0)).toBe(8);
+  test("a 32 second clip is about 12 minutes", () => {
+    expect(minutesLeft(1, 32, 0)).toBe(12);
   });
   test("clips ahead add to the wait", () => {
-    expect(minutesLeft(3, 32, 0)).toBe(28);
+    expect(minutesLeft(3, 32, 0)).toBe(36);
   });
   test("progress shortens the wait, but never to nothing", () => {
-    expect(minutesLeft(null, 32, 0.5)).toBe(4);
+    expect(minutesLeft(null, 32, 0.5)).toBe(6);
     expect(minutesLeft(null, 32, 1)).toBe(1);
   });
   test("unknown length uses a typical clip", () => {
-    expect(minutesLeft(null, null, null)).toBe(12);
+    expect(minutesLeft(null, null, null)).toBe(16);
   });
   test("the words read naturally", () => {
     expect(waitText(1)).toBe("About a minute");

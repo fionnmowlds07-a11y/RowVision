@@ -14,7 +14,7 @@ The web app is built and runs locally, from `docs/web-app-plan.md` and the GitHu
 
 The first version is an invite-only preview for adults the owner knows personally. Parental consent and anything for juniors is parked in the "Before juniors" milestone.
 
-**The next job is issue #134: results are not stable.** The owner's best clip was saved as 76% Good, but a fresh run gives about 40% Poor. Every web upload runs fresh. Fix this before inviting testers, or the first impression will be Poor on everything.
+**The next job is issue #134: results are not stable.** The same clip gives 75% Good when the rower is chosen by a tap, and about 40% Poor by seat number, with catch lean moving 7°. The engine itself is repeatable. Resolve this before inviting testers, as the scores can't be trusted yet.
 
 Still open, and needing the owner:
 
@@ -29,7 +29,7 @@ Things to plan for:
 
 - **No cloud spending and nothing deployed** without asking the owner first.
 - **Another project's Supabase is running locally** on ports 54321 to 54324 (`supabase_*_cs4421-astro-blog`). Do not stop it. This project uses 544xx.
-- **There is no GPU on this laptop.** Analysis takes about 15 seconds per second of video on 8 CPU cores.
+- **There is no GPU on this laptop.** A 32-second full-size clip took 11 minutes 5 seconds on 8 CPU cores, from claim to result.
 - **Model weight licences** need checking before commercial use.
 
 ## Working rules
@@ -84,7 +84,7 @@ If a check stays "pending" although the job finished, rerun that job with `gh ru
 
 Host Python is too new, so Python runs in Docker. Mount the repo when testing, for example `-e PYTHONPATH=/repo/services/vision:/repo/apps/preview -v "$PWD/services:/repo/services:ro" -v "$PWD/apps:/repo/apps:ro"`. Use port 8767 for test servers, and only restart 8766 when `/api/job` is not `running`. The app does not come back by itself after a computer restart. Browser checks use Playwright from `/home/fionn/Kidscope/Kidscope/node_modules` through `createRequire`.
 
-Current suites on `main`, all passing: 272 vision, 145 preview, 71 page, 44 worker, 162 web unit, 74 database, 16 browser and 6 acceptance scenarios.
+Current suites on `main`, all passing: 272 vision, 145 preview, 71 page, 43 worker, 162 web unit, 74 database, 16 browser and 6 acceptance scenarios.
 
 ## What exists
 
@@ -128,7 +128,7 @@ To resume: film close footage from the blade's side, label about 200 near-side r
 ## Known problems
 
 - **Issue #7 is still open:** one clip reports 10 rowers in an eight.
-- **Fresh results differ from saved ones (#134).** The owner's 8 at 3 seat was saved as 76% Good, overall 87, from detections made before a frame reading fix. Fresh, it gives about 40% Poor. Catch timing is also several frames off on many clips.
+- **Fresh results differ from saved ones (#134).** The owner's 8 at 3 seat was saved as 76% Good, overall 87, from detections made before a frame reading fix. Fresh, it gives about 40% Poor by seat number and 75% Good by tap. Catch timing is also several frames off on many clips.
 - **Most sample clips rate Poor,** and all 14 are WhatsApp copies at 848x478. Seats and sides for those clips are guesses in `private/analyse_all.py`.
 - **Legs filmed from an angle are placed badly.** Catch knee read 118° against a true 74° on 16 frames from 25° or more off side-on. These are drawn dashed with a "?".
 - **The rating formula assumes bigger rowers measure better.** The labels do not clearly show this for body angle.
