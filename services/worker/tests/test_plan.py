@@ -1,9 +1,11 @@
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import FunctionType
 from typing import Any
 
 import numpy as np
 from rowvision.pipeline import COARSE_STEP, BoatChoice
+from rowvision.tracking import Track
 
 from rowvision_worker.engine import Setup, Tap, Video, pause_for, plan_request
 
@@ -103,3 +105,8 @@ def test_a_pause_gives_the_frame_and_boats() -> None:
     pause = pause_for(FakeScouting([crew()]), VIDEO).pause
     assert pause["seconds"] == 2.0
     assert pause["boats"][0]["people"] == 2
+
+
+def test_the_fake_track_matches_the_real_one() -> None:
+    assert isinstance(vars(Track)["trunk"], FunctionType)
+    assert isinstance(vars(Track)["centre"], FunctionType)
