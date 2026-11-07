@@ -22,6 +22,7 @@ import {
   limbSegments,
   measureKind,
   median,
+  modelFits,
   modelRequest,
   nearestMeasure,
   nextMarker,
@@ -452,3 +453,12 @@ test("a doubted knee is marked unsure, and the body angle is not", () => {
   assert.equal(marks.find(({ kind }) => kind === "trunk").sure, true);
 });
 
+test("the 3D model is only offered when the whole pose can be built", () => {
+  const lean = { name: "catch_lean_deg" };
+  const knee = { name: "catch_knee_deg" };
+  assert.equal(modelFits("catch_lean_deg", [lean]), false);
+  assert.equal(modelFits("catch_lean_deg", [lean, knee]), true);
+  assert.equal(modelFits("finish_lean_deg", [lean, knee]), false);
+  assert.equal(modelFits("finish_elbow_deg", [lean, knee]), false);
+  assert.equal(modelFits("legs_first", [lean, knee]), false);
+});

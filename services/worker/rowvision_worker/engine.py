@@ -201,7 +201,15 @@ def fake_report(video: Video) -> dict[str, Any]:
                         "value": 23.0,
                         "target": {"low": 26.0, "high": 31.0, "sources": [], "evidence": "ergometer"},
                         "score": 70.0,
-                    }
+                    },
+                    {
+                        **metric,
+                        "name": "catch_knee_deg",
+                        "label": "Knee angle at the catch",
+                        "value": 60.0,
+                        "target": {"low": 50.0, "high": 55.0, "sources": [], "evidence": "ergometer"},
+                        "score": None,
+                    },
                 ],
             },
             "rating": {
