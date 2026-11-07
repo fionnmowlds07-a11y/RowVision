@@ -1,5 +1,5 @@
 # Runs beside the Supabase CLI stack, which `npm run db:start` in apps/web starts.
-# Set SUPABASE_ANON_KEY in a git-ignored .env file. `npm run db:status` prints it.
+# Set SUPABASE_ANON_KEY and SUPABASE_SERVICE_KEY in a git-ignored .env file. `npm run db:status` prints them.
 services:
   web:
     build: apps/web
@@ -15,3 +15,24 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
+
+  worker:
+    build:
+      context: .
+      dockerfile: services/worker/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:54422/postgres
+      SUPABASE_URL: http://host.docker.internal:54421
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:?Set this in .env}
+      SMTP_HOST: host.docker.internal
+      SMTP_PORT: "54425"
+      ROWVISION_ENGINE: ${ROWVISION_ENGINE:-real}
+      HOME: /home/worker
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - models:/home/worker/.cache
+    restart: unless-stopped
+
+volumes:
+  models:
