@@ -110,6 +110,7 @@ export default async function Clip({ params }: { params: Promise<{ id: string }>
       ) : null}
       {state === "done" && summary?.rower ? (
         <Results
+          side={clip.side}
           summary={summary}
           rower={summary.rower}
           videoLink={videoLink}

@@ -485,3 +485,24 @@
 .tools form {
   margin-top: 12px;
 }
+
+.model {
+  width: min(760px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  border: 0;
+  border-radius: var(--radius-panel);
+  padding: 16px;
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.model::backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.modelView {
+  height: min(420px, 50dvh);
+  margin: 10px 0;
+  border-radius: var(--radius-field);
+  overflow: hidden;
+}
