@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(33);
+select plan(34);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-00000000000a', 'a@example.com'),
@@ -83,6 +83,7 @@ select is(public.hook_approved_email('{"user":{"email":"A@Example.com"}}'), '{}'
 select is(public.hook_approved_email('{"user":{"email":"stranger@example.com"}}') -> 'error' ->> 'message', 'not_approved', 'an unapproved email is turned away');
 delete from public.approved_emails where email = 'a@example.com';
 select isnt((select banned_until from auth.users where email = 'a@example.com'), null, 'removing an email stops that account');
+select ok(isfinite((select banned_until from auth.users where email = 'a@example.com')), 'the ban date is one that Auth can read');
 insert into public.approved_emails (email) values ('a@example.com');
 select is((select banned_until from auth.users where email = 'a@example.com'), null, 'approving it again restores the account');
 
