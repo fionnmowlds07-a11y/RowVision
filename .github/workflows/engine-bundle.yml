@@ -36,6 +36,7 @@ jobs:
           pyinstaller --noconfirm --onedir --name rowvision-engine --exclude-module psycopg \
             --collect-all rtmlib --collect-all onnxruntime --collect-all cv2 \
             --collect-submodules rowvision --collect-submodules rowvision_worker \
+            --add-data "services/vision/reference:reference" --add-data "services/vision/rowvision/*.py:rowvision" \
             services/worker/packaging/smoke.py
           du -sh dist/rowvision-engine
       - name: Run it from outside the repo, with no Python on the path
