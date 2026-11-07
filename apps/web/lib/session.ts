@@ -1,7 +1,14 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-export type Viewer = { id: string; email: string; isAdmin: boolean; displayName: string | null };
+export type Viewer = {
+  id: string;
+  email: string;
+  isAdmin: boolean;
+  displayName: string | null;
+  ground: string | null;
+  highlight: string | null;
+};
 
 /** Return the signed-in athlete. Sends anyone else to sign-in. */
 export async function requireViewer(): Promise<Viewer> {
@@ -11,7 +18,7 @@ export async function requireViewer(): Promise<Viewer> {
   if (!id) redirect("/sign-in");
   const { data: profile } = await supabase
     .from("profiles")
-    .select("is_admin, display_name")
+    .select("is_admin, display_name, ground_colour, highlight_colour")
     .eq("id", id)
     .single();
   return {
@@ -19,6 +26,8 @@ export async function requireViewer(): Promise<Viewer> {
     email: String(data.claims.email ?? ""),
     isAdmin: profile?.is_admin ?? false,
     displayName: profile?.display_name ?? null,
+    ground: profile?.ground_colour ?? null,
+    highlight: profile?.highlight_colour ?? null,
   };
 }
 

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { isColour } from "@/lib/colours";
 import { requireViewer } from "@/lib/session";
 import { adminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -44,4 +45,12 @@ export async function deleteAccount(form: FormData) {
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/sign-in");
+}
+
+export async function saveColours(ground: string | null, highlight: string | null) {
+  const viewer = await requireViewer();
+  if ((ground && !isColour(ground)) || (highlight && !isColour(highlight))) return;
+  const supabase = await createClient();
+  await supabase.from("profiles").update({ ground_colour: ground, highlight_colour: highlight }).eq("id", viewer.id);
+  revalidatePath("/", "layout");
 }
