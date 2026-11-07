@@ -1,5 +1,5 @@
-const ANALYSIS_SECONDS_PER_SECOND = 15;
-const TYPICAL_CLIP_MINUTES = 10;
+const ANALYSIS_SECONDS_PER_SECOND = 21;
+const TYPICAL_CLIP_MINUTES = 12;
 
 export type JobState = "uploading" | "queued" | "running" | "needs_tap" | "done" | "failed" | "cancelled";
 
