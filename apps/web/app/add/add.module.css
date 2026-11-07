@@ -1,5 +1,28 @@
 .pick {
   max-width: 480px;
+  border: 2px dashed var(--quiet);
+  transition: border-color 120ms ease-out;
+}
+
+.dragging {
+  border-color: var(--highlight);
+}
+
+.dropHint {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+/* There is nothing to drag from on a phone. */
+@media (hover: none) {
+  .pick {
+    border-color: transparent;
+  }
+
+  .dropHint {
+    display: none;
+  }
 }
 
 .hiddenInput {
