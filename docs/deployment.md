@@ -4,15 +4,19 @@
 
 ## What needs hosting
 
-| Part | Recommended | Rough cost | Why |
+The owner chose a setup with no monthly cost on 7 November 2026. **The video storage part is not built yet**, so the steps below still describe Supabase storage until the issues for it are finished.
+
+| Part | Chosen | Cost | Notes |
 |---|---|---|---|
-| Database, sign-in, storage | Supabase Pro, EU region | About $25 a month | The free plan caps files at 50 MB, and clips reach about 150 MB. It also pauses after a week idle |
-| Web app | Vercel Hobby, or a small server | Free | Vercel's free plan is for non-commercial use only. Check that its functions can run in the EU |
-| Email | Resend free tier | Free | 3,000 emails a month and 100 a day. Supabase's built-in email only reaches your own team |
-| Domain | Any | About €10 to €15 a year | Needed to send email |
+| Web app | Vercel free, on a `.vercel.app` address | Free | Understood to be for non-commercial use only. Check Vercel's terms before charging anyone |
+| Database, sign-in, queue | Supabase free, EU region | Free | Pauses after a week idle. Whether the worker's connection prevents that is untested |
+| Videos | Cloudflare R2, EU location | Free up to 10 GB | Supabase's free plan caps files at 50 MB. Going over 10 GB is billed, so the app must stop uploads before that |
+| Email | A separate Gmail account with an app password | Free | About 500 recipients a day. No domain needed |
 | Worker | The home PC | Electricity | See `docs/home-worker.md` |
 
-Hosted and self-hosted Supabase use the same code, so this can change later without a rebuild.
+Videos are kept for 7 days. Up to 4 saved frames stay with the scores.
+
+Supabase Pro, at about $25 a month, remains the simple upgrade. Hosted and self-hosted Supabase use the same code.
 
 ## Steps
 
@@ -20,7 +24,7 @@ Hosted and self-hosted Supabase use the same code, so this can change later with
 2. Link it, then apply the migrations: `npx supabase link`, then `npx supabase db push`.
 3. Set the Auth site URL, and the email template from `supabase/templates/sign-in-code.html`.
 4. Turn on the hook `hook_approved_email` under Auth Hooks, for before a user is created.
-5. Set up the email sender as custom SMTP, with a verified domain.
+5. Set up the email sender as custom SMTP, using the Gmail account and its app password.
 6. Add your own email to `approved_emails`, sign in once, then set `is_admin` to true on your profile.
 7. Deploy `apps/web` with these settings. Keep the service key and secret on the server only.
 

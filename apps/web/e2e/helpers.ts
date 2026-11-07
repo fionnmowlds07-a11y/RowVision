@@ -17,7 +17,7 @@ export function makeClip(name: string, seconds: number, size = "1920x1080"): str
 
 async function code(email: string): Promise<string> {
   for (let attempt = 0; attempt < 30; attempt += 1) {
-    const search = await (await fetch(`${MAIL}/api/v1/search?query=to:${email}`)).json();
+    const search = await (await fetch(`${MAIL}/api/v1/search?query=${encodeURIComponent(`to:${email} subject:"Your RowVision code"`)}`)).json();
     if (search.messages?.[0]) {
       const message = await (await fetch(`${MAIL}/api/v1/message/${search.messages[0].ID}`)).json();
       return (message.Text || message.HTML).match(/\b\d{6}\b/)[0];
