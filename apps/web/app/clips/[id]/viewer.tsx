@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import {
-  FIT, bodyCentre, canvasScaleFor, centreOn, clampFrame, clampView, clipTime, nextMarker, viewPoint, zoomAt,
+  FIT, bodyCentre, centreOn, clampFrame, clampView, clipTime, nextMarker, viewPoint, zoomAt,
   type Point, type View,
 } from "@/lib/logic";
 import type { Rower } from "@/lib/result";
@@ -40,13 +40,13 @@ export function Viewer({ link, fps, frames, rower, scene, jump, fullScreen, onCl
   const [view, setView] = useState<View>(FIT);
   const [layers, setLayers] = useState({ limbs: true, angles: true, targets: true });
   const [follow, setFollow] = useState(false);
-  const [shownWidth, setShownWidth] = useState(0);
+  const [shown, setShown] = useState({ width: 0, height: 0 });
 
-  // Lines are drawn in video pixels, so their thickness must follow how large the video is shown.
+  // The overlay is painted at the stage's real size, so it stays sharp however far the video is zoomed.
   useEffect(() => {
     const element = stage.current;
     if (!element) return;
-    const observer = new ResizeObserver(() => setShownWidth(element.clientWidth));
+    const observer = new ResizeObserver(() => setShown({ width: element.clientWidth, height: element.clientHeight }));
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
@@ -85,19 +85,29 @@ export function Viewer({ link, fps, frames, rower, scene, jump, fullScreen, onCl
     if (jump) goTo(jump.frame);
   }, [jump, goTo]);
 
+  const shownView = follow && scene ? followView(view, scene, frame, size) : view;
+
   useEffect(() => {
-    const paint = canvas.current?.getContext("2d");
-    if (!paint || !canvas.current || !size.width || !scene) return;
-    const scale = canvasScaleFor(size.width);
-    paint.setTransform(scale, 0, 0, scale, 0, 0);
-    paint.clearRect(0, 0, size.width, size.height);
-    const line = (size.width / Math.max(shownWidth, 1)) / view.scale;
+    const element = canvas.current;
+    const paint = element?.getContext("2d");
+    if (!paint || !element || !size.width || !shown.width) return;
+    const ratio = window.devicePixelRatio || 1;
+    const width = Math.round(shown.width * ratio);
+    const height = Math.round(shown.height * ratio);
+    if (element.width !== width || element.height !== height) {
+      element.width = width;
+      element.height = height;
+    }
+    paint.setTransform(1, 0, 0, 1, 0, 0);
+    paint.clearRect(0, 0, width, height);
+    if (!scene) return;
+    const scale = (width / size.width) * shownView.scale;
+    paint.setTransform(scale, 0, 0, scale, -shownView.x * scale, -shownView.y * scale);
+    const line = size.width / (shown.width * shownView.scale);
     if (layers.targets) drawTargets(paint, scene, frame, line);
     if (layers.limbs) drawPose(paint, scene, frame, line);
     if (layers.angles) drawAngles(paint, scene, frame, line);
-  }, [frame, layers, scene, shownWidth, size, view.scale]);
-
-  const shownView = follow && scene ? followView(view, scene, frame, size) : view;
+  }, [frame, layers, scene, shown, shownView.scale, shownView.x, shownView.y, size]);
 
   const zoom = useCallback((factor: number, point?: Point) => {
     setView((current) => {
@@ -232,18 +242,13 @@ export function Viewer({ link, fps, frames, rower, scene, jump, fullScreen, onCl
             onLoadedMetadata={(event) => {
               const { videoWidth: width, videoHeight: height } = event.currentTarget;
               setSize({ width, height });
-              if (canvas.current) {
-                const scale = canvasScaleFor(width);
-                canvas.current.width = width * scale;
-                canvas.current.height = height * scale;
-              }
               goTo(rower.catches[0] ?? 0);
             }}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
           />
-          <canvas ref={canvas} aria-hidden="true" />
         </div>
+        <canvas ref={canvas} className={styles.overlay} aria-hidden="true" />
       </div>
 
       <div className={styles.lane} aria-hidden="true">
