@@ -39,6 +39,7 @@ class DesktopJob:
     source: Path | None
     """The video to cut. None when the folder already has a working copy, as on a rerun."""
     start: float
+    length: float
     setup: Setup
     engine: str
     device: str
@@ -51,6 +52,7 @@ def parse_job(data: dict[str, Any]) -> DesktopJob:
         folder=Path(data["folder"]),
         source=Path(source) if source else None,
         start=float(data.get("start", 0)),
+        length=float(data.get("length", media.SECTION_SECONDS)),
         setup=Setup(
             boat_class=data["boat_class"],
             side=data["side"],
@@ -80,7 +82,7 @@ def prepare(job: DesktopJob, send: Send) -> Video:
         raise FileNotFoundError("This clip has no video left to analyse")
     send({"event": "stage", "stage": "Preparing your video", "progress": None})
     part = job.folder / "working.part.mp4"
-    made = media.make_working_copy(job.source, part, job.start)
+    made = media.make_working_copy(job.source, part, job.start, job.length)
     part.replace(copy)
     saved = {
         "fps": float(made.fps),

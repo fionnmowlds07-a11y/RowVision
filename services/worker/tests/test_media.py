@@ -60,6 +60,12 @@ def test_the_section_is_cut(tmp_path: Path) -> None:
     assert 58 <= facts.frames <= 62
 
 
+def test_a_trimmed_section_stops_where_the_athlete_chose(tmp_path: Path) -> None:
+    source = clip(tmp_path / "source.mp4", seconds=4)
+    facts = media.make_working_copy(source, tmp_path / "copy.mp4", 1, 2)
+    assert 58 <= facts.frames <= 62
+
+
 def test_a_section_stops_at_sixty_seconds(tmp_path: Path) -> None:
     source = clip(tmp_path / "source.mp4", seconds=62)
     facts = media.make_working_copy(source, tmp_path / "copy.mp4", 0)

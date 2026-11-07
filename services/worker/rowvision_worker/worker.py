@@ -59,7 +59,7 @@ def prepare(job: Job, queue: Queue, files: Files, folder: Path, status: Status) 
     status.report("Preparing your video", None)
     source = folder / "source"
     files.download("uploads", job.source_path, source)
-    facts = media.make_working_copy(source, copy, job.section_start)
+    facts = media.make_working_copy(source, copy, job.section_start, job.section_length)
     path = f"{job.user_id}/{job.clip_id}/working.mp4"
     files.upload("working", path, copy, "video/mp4")
     queue.save_copy(job, path, facts)
