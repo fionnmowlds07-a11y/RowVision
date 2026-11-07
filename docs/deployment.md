@@ -1,5 +1,7 @@
 # Deployment guide
 
+**Parked on 7 November 2026, as the desktop app comes first. See `docs/desktop-plan.md`.**
+
 **Nothing is deployed.** This is what it takes, for the owner to decide. Prices were checked on 6 November 2026, and need checking again.
 
 ## What needs hosting

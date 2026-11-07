@@ -8,6 +8,10 @@ Athletes upload launch footage of rowing, choose boat, side and seat, and get a 
 
 The owner is a rower. They make design and product decisions. Everything else is yours to decide.
 
+## Latest direction (7 November 2026)
+
+The Windows and Linux desktop app now comes first, with analysis on the user's own computer. Read `docs/desktop-plan.md`. The website stays as the owner's preview: serve it with `docker compose up -d --no-deps web`, not the dev server. #134 still comes first for the scores, and runs at night when the laptop is free. Hosting, the home PC and phone checks are parked.
+
 ## Where things stand
 
 The web app is built and runs locally, from `docs/web-app-plan.md` and the GitHub milestones. Nothing is deployed and nothing has been spent.
