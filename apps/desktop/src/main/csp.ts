@@ -5,7 +5,8 @@ export const CSP = [
   "style-src 'self'",
   "img-src 'self' data: blob:",
   "font-src 'self'",
-  "media-src rowvision:",
+  // blob: is only the video the user has just picked, read by the page itself.
+  "media-src rowvision: blob:",
   "connect-src rowvision:",
   "object-src 'none'",
   "base-uri 'none'",

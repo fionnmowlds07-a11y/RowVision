@@ -1,14 +1,15 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
-import { CATCHES, FRAMES, frameOf, makeClip } from "./fixture";
+import { CATCHES, FPS, FRAMES, OLD_CODEC, frameOf, makeClip, makeVideo } from "./fixture";
 
 const appDir = path.resolve(__dirname, "../..");
 const electronPath = createRequire(__filename)("electron") as unknown as string;
 
 let data: string;
+let sources: string;
 let app: ElectronApplication;
 let page: Page;
 const problems: string[] = [];
@@ -16,6 +17,13 @@ const problems: string[] = [];
 test.beforeAll(async () => {
   data = mkdtempSync(path.join(tmpdir(), "rowvision-app-"));
   makeClip(path.join(data, "clips"));
+  // Videos to add, kept outside the library as a user's would be.
+  sources = path.join(data, "videos");
+  mkdirSync(sources);
+  makeVideo(path.join(sources, "row.mp4"), { frames: 6 * FPS });
+  makeVideo(path.join(sources, "old camera.avi"), { frames: 6 * FPS, codec: OLD_CODEC });
+  makeVideo(path.join(sources, "short.mp4"));
+  writeFileSync(path.join(sources, "notes.txt"), "not a video");
   app = await electron.launch({
     executablePath: electronPath,
     // CI machines have no graphics card, so the 3D model needs Chromium's software graphics.
@@ -67,7 +75,7 @@ test("the page has no Node access and only the narrow bridge", async () => {
     bridge: Object.keys(window.rowvision).sort(),
     origin: location.origin,
   }));
-  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["getClip", "getColours", "listClips", "setColours"], origin: "app://rowvision" });
+  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["addClip", "getClip", "getColours", "getSetup", "listClips", "pathForFile", "setColours"], origin: "app://rowvision" });
   const prefs = await app.evaluate(({ BrowserWindow }) => {
     // Not in Electron's types, but it reports the settings the page really runs with.
     const contents = BrowserWindow.getAllWindows()[0].webContents as unknown as { getLastWebPreferences(): Electron.WebPreferences | null };
@@ -137,6 +145,89 @@ test("colours are saved on this computer", async () => {
   await page.reload();
   const ground = await page.locator("main").evaluate((element) => getComputedStyle(element.parentElement!).getPropertyValue("--ground").trim());
   expect(ground).toBe("#0a3d27");
+});
+
+function readJson(file: string) {
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+async function openAdd() {
+  await page.getByRole("link", { name: "Clips" }).click();
+  await page.getByRole("link", { name: "Add a video" }).click();
+  await expect(page.getByRole("heading", { name: "Add a video" })).toBeVisible();
+}
+
+async function addedClip() {
+  await expect(page).toHaveURL(/#\/clip\/[a-z0-9-]+$/);
+  await expect(page.getByRole("heading", { name: "Not analysed yet" })).toBeVisible();
+  const id = /#\/clip\/([a-z0-9-]+)$/.exec(page.url())![1];
+  return readJson(path.join(data, "clips", id, "clip.json"));
+}
+
+test("a video is picked, trimmed, tapped and added without copying it", async () => {
+  await openAdd();
+  const video = path.join(sources, "row.mp4");
+  await page.locator("input[type=file]").setInputFiles(video);
+  await expect(page.getByRole("group", { name: "Trim your clip" })).toBeVisible();
+  await expect(page.getByText("6 of up to 60 seconds")).toBeVisible();
+  // The test video is small, like a copy sent over WhatsApp.
+  await expect(page.getByText("compressed copy")).toBeVisible();
+  const [boat, side, seat] = [0, 1, 2].map((n) => page.getByRole("region", { name: "Your boat" }).locator("select").nth(n));
+  await boat.selectOption("2-");
+  await side.selectOption("bow");
+  await seat.selectOption("2");
+  await page.getByLabel("Note, if you like").fill("Saturday steady state");
+  await page.getByRole("button", { name: "Tap yourself on this frame" }).click({ position: { x: 40, y: 30 } });
+  await expect(page.getByText("Got you")).toBeVisible();
+  await page.getByRole("button", { name: "Add to your clips" }).click();
+
+  const clip = await addedClip();
+  expect(clip).toMatchObject({ source: video, boat_class: "2-", side: "bow", seat: 2, note: "Saturday steady state", section_start: 0, section_length: 6 });
+  expect(clip.tap.x).toBeGreaterThan(0);
+  expect(clip.tap.x).toBeLessThan(0.5);
+  expect(clip.tap.y).toBeLessThan(0.5);
+  expect(readJson(path.join(data, "settings.json")).setup).toEqual({ boat: "2-", side: "bow", seat: 2 });
+  // The last boat is offered next time.
+  await openAdd();
+  await page.locator("input[type=file]").setInputFiles(video);
+  await expect(page.getByRole("region", { name: "Your boat" }).locator("select").first()).toHaveValue("2-");
+});
+
+test("a video the page cannot play can still be added", async () => {
+  await openAdd();
+  const video = path.join(sources, "old camera.avi");
+  await page.locator("input[type=file]").setInputFiles(video);
+  await expect(page.getByText("can't be shown here, but it can still be analysed")).toBeVisible();
+  await expect(page.getByRole("group", { name: "Trim your clip" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Add to your clips" }).click();
+  const clip = await addedClip();
+  expect(clip).toMatchObject({ source: video, section_start: 0, section_length: null, tap: null });
+});
+
+test("files that are not videos, or too short, are refused", async () => {
+  await openAdd();
+  await page.locator("input[type=file]").setInputFiles(path.join(sources, "notes.txt"));
+  await expect(page.getByRole("alert")).toHaveText(/isn't a video/);
+  await page.locator("input[type=file]").setInputFiles(path.join(sources, "short.mp4"));
+  await expect(page.getByRole("alert")).toHaveText(/too short/);
+  await expect(page.getByRole("button", { name: "Add to your clips" })).toHaveCount(0);
+});
+
+test("a dropped video is taken by the page, not opened", async () => {
+  await openAdd();
+  // A file made inside the page has no place on disk, so it is refused rather than read.
+  await page.evaluate(() => {
+    const drop = new DataTransfer();
+    drop.items.add(new File(["x"], "made-up.mp4", { type: "video/mp4" }));
+    window.dispatchEvent(new DragEvent("dragover", { dataTransfer: drop, cancelable: true }));
+    window.dispatchEvent(new DragEvent("drop", { dataTransfer: drop, cancelable: true }));
+  });
+  await expect(page.getByRole("alert")).toHaveText(/can't be read/);
+  expect(page.url()).toMatch(/^app:\/\/rowvision\/index.html#\/add$/);
 });
 
 // Before the tests that try forbidden things on purpose.
