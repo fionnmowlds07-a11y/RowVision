@@ -1,8 +1,10 @@
 """Follow each person through a clip, using per-frame pose detections."""
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 import numpy as np
+import numpy.typing as npt
 
 from rowvision import skeleton as sk
 from rowvision.skeleton import FloatArray
@@ -26,6 +28,10 @@ ZOOM_FIT_TRUNKS = 0.6
 ZOOM_MIN_FIT = 0.75
 """The share of people who must land on a detection, and agree in size, for a zoom to count."""
 ZOOM_SIZE_AGREEMENT = 1.3
+ZOOM_SCALE_SEARCH = np.linspace(0.85, 1.15, 31)
+"""Body size only roughly gives the zoom: on a real eight, bodies shrank to 0.76 while the gaps
+between seats shrank to 0.82. That error, across a whole crew, lined everyone up one seat along,
+so the zoom is searched for around the size estimate."""
 TORSO = [sk.LEFT_SHOULDER, sk.RIGHT_SHOULDER, sk.LEFT_HIP, sk.RIGHT_HIP]
 SHOULDERS = [sk.LEFT_SHOULDER, sk.RIGHT_SHOULDER]
 
@@ -129,6 +135,26 @@ def _local_motion(predicted: FloatArray, sizes: FloatArray, found: FloatArray) -
     return shifts
 
 
+Fit = tuple[tuple[int, float], FloatArray, npt.NDArray[np.intp], npt.NDArray[np.bool_]]
+
+
+def _best_fit(
+    previous: FloatArray, found: FloatArray, scales: Iterable[float], tolerance: float
+) -> Fit:
+    """The scale and shift that land the most tracks on detections, then land them closest."""
+    best: Fit | None = None
+    for scale in scales:
+        scaled = previous * scale
+        for shift in (found[None, :, :] - scaled[:, None, :]).reshape(-1, 2):
+            gaps = np.linalg.norm((scaled + shift)[:, None, :] - found[None, :, :], axis=-1)
+            within = gaps.min(axis=1) <= tolerance
+            fit = (int(within.sum()), -float(gaps.min(axis=1)[within].sum()))
+            if best is None or fit > best[0]:
+                best = (fit, scaled + shift, gaps.argmin(axis=1), within)
+    assert best is not None
+    return best
+
+
 def _zoom(
     previous: FloatArray, sizes: FloatArray, found: FloatArray, found_sizes: FloatArray
 ) -> tuple[FloatArray, FloatArray] | None:
@@ -139,30 +165,26 @@ def _zoom(
     another, so the zoom is the scale and shift that lands the most tracks on detections. People
     coming and going also move the median size, so the crew must stay the same size, and most of
     them must fit, each at the same scale. A small crew gives too little to tell the two apart.
+
+    Sizes from pose estimates are noisy, so the crew changing size is only a hint. It is a zoom
+    only if a zoom explains where everyone now is better than the camera standing still does.
     """
     fewer, more = sorted((len(previous), len(found)))
     if fewer < ZOOM_MIN_PEOPLE or fewer < ZOOM_MIN_FIT * more:
         return None
-    scale = float(np.median(found_sizes) / np.median(sizes))
-    if max(scale, 1 / scale) < ZOOM_MIN_RATIO:
+    estimate = float(np.median(found_sizes) / np.median(sizes))
+    if max(estimate, 1 / estimate) < ZOOM_MIN_RATIO:
         return None
-    scaled = previous * scale
     tolerance = ZOOM_FIT_TRUNKS * float(np.median(found_sizes))
-    best: tuple[int, float] | None = None
-    moved = scaled
-    nearest = np.zeros(len(previous), dtype=int)
-    close = np.zeros(len(previous), dtype=bool)
-    for shift in (found[None, :, :] - scaled[:, None, :]).reshape(-1, 2):
-        gaps = np.linalg.norm((scaled + shift)[:, None, :] - found[None, :, :], axis=-1)
-        within = gaps.min(axis=1) <= tolerance
-        fit = (int(within.sum()), -float(gaps.min(axis=1)[within].sum()))
-        if best is None or fit > best:
-            best, moved, nearest, close = fit, scaled + shift, gaps.argmin(axis=1), within
-    if best is None or best[0] < max(ZOOM_MIN_PEOPLE, ZOOM_MIN_FIT * fewer):
+    fit, moved, nearest, close = _best_fit(
+        previous, found, estimate * ZOOM_SCALE_SEARCH, tolerance
+    )
+    still = _best_fit(previous, found, [1.0], tolerance)[0]
+    if fit[0] < max(ZOOM_MIN_PEOPLE, ZOOM_MIN_FIT * fewer) or still[0] >= fit[0]:
         return None
-    ratios = found_sizes[nearest[close]] / (sizes[close] * scale)
+    ratios = found_sizes[nearest[close]] / (sizes[close] * estimate)
     agreeing = np.mean((ratios > 1 / ZOOM_SIZE_AGREEMENT) & (ratios < ZOOM_SIZE_AGREEMENT))
-    return (moved, sizes * scale) if agreeing >= ZOOM_MIN_FIT else None
+    return (moved, sizes * estimate) if agreeing >= ZOOM_MIN_FIT else None
 
 
 def _stitch(tracks: list[Track], fps: float) -> list[Track]:
