@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
-import { CHANNELS, type AddRequest, type Bridge, type Colours } from "../shared/bridge";
+import { CHANNELS, type AddRequest, type Analysis, type Bridge, type Colours } from "../shared/bridge";
 
 // A fixed list of calls. The page never gets ipcRenderer itself.
 const bridge: Bridge = {
@@ -9,6 +9,16 @@ const bridge: Bridge = {
   setColours: (colours: Colours) => ipcRenderer.invoke(CHANNELS.setColours, colours),
   getSetup: () => ipcRenderer.invoke(CHANNELS.getSetup),
   addClip: (request: AddRequest) => ipcRenderer.invoke(CHANNELS.addClip, request),
+  getAnalysis: () => ipcRenderer.invoke(CHANNELS.getAnalysis),
+  onAnalysis: (listener: (analysis: Analysis) => void) => {
+    // The page gets the news, never the event or the channel.
+    const pass = (_event: unknown, analysis: Analysis) => listener(analysis);
+    ipcRenderer.on(CHANNELS.analysisChanged, pass);
+    return () => void ipcRenderer.removeListener(CHANNELS.analysisChanged, pass);
+  },
+  stopClip: (id: string) => ipcRenderer.invoke(CHANNELS.stopClip, id),
+  startClip: (id: string) => ipcRenderer.invoke(CHANNELS.startClip, id),
+  tapAgain: (id: string, tap: { t: number; x: number; y: number }) => ipcRenderer.invoke(CHANNELS.tapAgain, id, tap),
   pathForFile: (file: File) => {
     try {
       return webUtils.getPathForFile(file);

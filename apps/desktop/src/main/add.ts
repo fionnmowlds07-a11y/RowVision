@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { MIN_SECONDS, SECTION_SECONDS } from "../../../web/lib/clip-checks";
 import type { AddRequest } from "../shared/bridge";
+import { writeJson } from "./library";
 import { cleanSetup } from "./settings";
 
 /** Videos the engine's ffmpeg can read, even where the page cannot play them. */
@@ -65,8 +66,6 @@ export async function addClip(library: string, request: AddRequest, now = new Da
     section_length: request.section.length,
     tap: request.tap,
   };
-  const file = path.join(folder, "clip.json");
-  await fs.writeFile(`${file}.tmp`, JSON.stringify(clip, null, 2));
-  await fs.rename(`${file}.tmp`, file);
+  await writeJson(path.join(folder, "clip.json"), clip);
   return id;
 }

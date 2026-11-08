@@ -49,7 +49,7 @@ export function AddPage() {
         section: { start: facts ? trim.start : 0, length: facts ? trim.end - trim.start : null },
         tap,
       });
-      window.location.hash = `#/clip/${id}`;
+      window.location.hash = `#/analysis/${id}`;
     } catch {
       setError("We couldn't add this clip. Check the video is still there, then try again.");
       setSaving(false);

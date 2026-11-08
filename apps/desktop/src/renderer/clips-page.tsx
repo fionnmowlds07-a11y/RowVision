@@ -4,6 +4,19 @@ import type { ClipItem } from "../shared/bridge";
 import { Placeholder } from "./placeholder";
 import { setupLine, shortDate, size } from "./format";
 
+const STATE_TEXT = {
+  waiting: "Waiting to be analysed",
+  running: "Being analysed",
+  needs_tap: "Needs you: click on yourself",
+  stopped: "Stopped",
+  failed: "Couldn't be analysed",
+} as const;
+
+function stateText(clip: ClipItem): string {
+  if (clip.state !== "done") return STATE_TEXT[clip.state];
+  return clip.band ? `Accuracy ${clip.band}` : "No scores";
+}
+
 export function ClipsPage() {
   const [clips, setClips] = useState<ClipItem[] | null>(null);
 
@@ -35,12 +48,12 @@ export function ClipsPage() {
               const score = clip.overall !== null && clip.band !== "Poor" ? Math.round(clip.overall) : null;
               return (
                 <li key={clip.id}>
-                  <a href={`#/clip/${clip.id}`} className={index === 0 && score !== null ? homeStyles.clipMain : homeStyles.clip}>
+                  <a href={clip.state === "done" ? `#/clip/${clip.id}` : `#/analysis/${clip.id}`} className={index === 0 && score !== null ? homeStyles.clipMain : homeStyles.clip}>
                     <span className={homeStyles.text}>
                       <strong>{shortDate(clip.createdAt)}</strong>
                       <span>{setupLine(clip.setup)}{clip.rate ? `, ${Math.round(clip.rate)} spm` : ""}</span>
                       {clip.setup.note ? <span>{clip.setup.note}</span> : null}
-                      <span>{clip.analysed ? (clip.band ? `Accuracy ${clip.band}` : "No scores") : "Not analysed yet"}</span>
+                      <span>{stateText(clip)}</span>
                     </span>
                     {score !== null ? <span className={homeStyles.score}>{score}</span> : null}
                   </a>
