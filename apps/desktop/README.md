@@ -21,6 +21,7 @@ Clips are analysed one at a time, oldest first, by the engine in `services/worke
 
 - Where a clip is comes from its folder: `summary.json` means done, `pause.json` means it needs a tap, `state.json` means stopped or failed, and anything else is waiting. So a clip cut off by closing the app simply starts again next time.
 - The packaged app looks for the engine in `resources/engine/` (shipping it is #157). Without it, clips wait and the screen says so. `ROWVISION_ENGINE` sets the command instead, for example `'["python", "-m", "rowvision_worker.desktop"]'`, and `ROWVISION_ENGINE_KIND=fake` gives a canned result.
+- Deleting a clip removes its folder. Removing a video deletes `working.mp4` and `frames.json` and keeps the scores. The user's original video is never touched.
 - Tests use `tests/fake-engine.mjs`, which speaks the same lines without any models.
 
 ## Locked down
