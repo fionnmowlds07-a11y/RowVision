@@ -12,6 +12,7 @@ export type ClipSetup = {
   side?: string;
   seat?: number;
   note?: string;
+  filmed_at?: string;
 };
 
 /** What the add page hands over. The video stays where it is and is read from there. */
@@ -56,13 +57,23 @@ export type ClipItem = {
   analysed: boolean;
   overall: number | null;
   band: string | null;
+  accuracy: number | null;
   rate: number | null;
+  /** The engine version that measured it. */
+  version: string | null;
+  /** The measured angles, for the trend. */
+  metrics: { name: string; value: number | null }[];
+  /** Everything in the clip's folder. */
   bytes: number;
+  /** The working copy alone, which is most of it. */
+  videoBytes: number;
+  hasVideo: boolean;
 };
+
+export type Space = { videoBytes: number; otherBytes: number; freeBytes: number | null };
 
 export type ClipDetail = ClipItem & {
   summary: Summary | null;
-  hasVideo: boolean;
   /** Where the engine stopped to ask which rower is you, in seconds into the working copy. */
   pauseSeconds: number | null;
 };
@@ -85,6 +96,11 @@ export type Bridge = {
   startClip(id: string): Promise<void>;
   /** Says which rower is you, then carries on. */
   tapAgain(id: string, tap: { t: number; x: number; y: number }): Promise<void>;
+  getSpace(): Promise<Space>;
+  /** Deletes the clip's folder. The original video, wherever it is, is never touched. */
+  deleteClip(id: string): Promise<void>;
+  /** Deletes an analysed clip's working copy and keeps its scores. */
+  removeVideo(id: string): Promise<void>;
 };
 
 export const CHANNELS = {
@@ -99,6 +115,9 @@ export const CHANNELS = {
   stopClip: "analysis:stop",
   startClip: "analysis:start",
   tapAgain: "analysis:tap",
+  getSpace: "space:get",
+  deleteClip: "clips:delete",
+  removeVideo: "clips:remove-video",
 } as const;
 
 /** Lower-case letters, digits and dashes, so an id can never be a path. */

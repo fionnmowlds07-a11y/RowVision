@@ -19,6 +19,9 @@ const bridge: Bridge = {
   stopClip: (id: string) => ipcRenderer.invoke(CHANNELS.stopClip, id),
   startClip: (id: string) => ipcRenderer.invoke(CHANNELS.startClip, id),
   tapAgain: (id: string, tap: { t: number; x: number; y: number }) => ipcRenderer.invoke(CHANNELS.tapAgain, id, tap),
+  getSpace: () => ipcRenderer.invoke(CHANNELS.getSpace),
+  deleteClip: (id: string) => ipcRenderer.invoke(CHANNELS.deleteClip, id),
+  removeVideo: (id: string) => ipcRenderer.invoke(CHANNELS.removeVideo, id),
   pathForFile: (file: File) => {
     try {
       return webUtils.getPathForFile(file);

@@ -2,7 +2,8 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { listClips, readClip } from "../../src/main/library";
+import { existsSync } from "node:fs";
+import { deleteClip, librarySpace, listClips, readClip, removeVideo } from "../../src/main/library";
 import { cleanColours, readColours, writeColours } from "../../src/main/settings";
 
 let root: string;
@@ -61,4 +62,32 @@ test("colours are checked, saved and read back", async () => {
   expect(await readColours(file)).toEqual({ ground: "#0a3d27", highlight: "#4be38a" });
   writeFileSync(file, "{ broken");
   expect(await readColours(file)).toEqual({ ground: null, highlight: null });
+});
+
+test("space is split into videos and the rest, with the disk's free space", async () => {
+  addClip("one", { "working.mp4": "x".repeat(1000), "summary.json": "{}", "clip.json": "{}" });
+  const space = await librarySpace(root, await listClips(root));
+  expect(space.videoBytes).toBe(1000);
+  expect(space.otherBytes).toBe(4);
+  expect(space.freeBytes).toBeGreaterThan(0);
+  expect((await librarySpace(path.join(root, "not-made-yet"), [])).freeBytes).toBeGreaterThan(0);
+});
+
+test("a video is removed only once analysed, and the scores stay", async () => {
+  addClip("waiting", { "working.mp4": "video", "clip.json": "{}" });
+  await expect(removeVideo(root, "waiting")).rejects.toThrow();
+  expect(existsSync(path.join(root, "waiting", "working.mp4"))).toBe(true);
+  addClip("done", { "working.mp4": "video", "frames.json": "{}", "summary.json": "{}", "clip.json": "{}" });
+  await removeVideo(root, "done");
+  expect(existsSync(path.join(root, "done", "working.mp4"))).toBe(false);
+  expect(existsSync(path.join(root, "done", "frames.json"))).toBe(false);
+  expect((await readClip(root, "done"))?.state).toBe("done");
+});
+
+test("deleting takes the whole folder, and nothing outside the library", async () => {
+  addClip("gone", { "clip.json": "{}" });
+  await deleteClip(root, "gone");
+  expect(existsSync(path.join(root, "gone"))).toBe(false);
+  await expect(deleteClip(root, "..")).rejects.toThrow();
+  expect(existsSync(root)).toBe(true);
 });

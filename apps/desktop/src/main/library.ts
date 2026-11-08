@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { Summary } from "../../../web/lib/result";
-import { CLIP_ID, type ClipDetail, type ClipItem, type ClipSetup, type ClipState } from "../shared/bridge";
+import { CLIP_ID, type ClipDetail, type ClipItem, type ClipSetup, type ClipState, type Space } from "../shared/bridge";
 
 /** Kept in a clip's folder when the user stopped it or it failed. Gone when it goes back in the queue. */
 export const STATE_FILE = "state.json";
@@ -19,7 +19,7 @@ export async function listClips(library: string): Promise<ClipItem[]> {
   const clips = await Promise.all(names.filter((name) => CLIP_ID.test(name)).map((name) => readClip(library, name)));
   return clips
     .filter((clip): clip is ClipDetail => clip !== null)
-    .map(({ summary: _summary, hasVideo: _video, pauseSeconds: _pause, ...item }) => item)
+    .map(({ summary: _summary, pauseSeconds: _pause, ...item }) => item)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
@@ -34,7 +34,8 @@ export async function readClip(library: string, id: string): Promise<ClipDetail 
   }
   if (!stat.isDirectory()) return null;
   const setup = asSetup(await readJson(path.join(folder, "clip.json")));
-  const summary = (await readJson(path.join(folder, "summary.json"))) as Summary | null;
+  // The desktop engine adds its version to the summary it writes.
+  const summary = (await readJson(path.join(folder, "summary.json"))) as (Summary & { version?: string }) | null;
   const rower = summary?.rower ?? null;
   const marked = (await readJson(path.join(folder, STATE_FILE))) as { state?: unknown; message?: unknown } | null;
   const pause = (await readJson(path.join(folder, PAUSE_FILE))) as { seconds?: unknown } | null;
@@ -52,8 +53,12 @@ export async function readClip(library: string, id: string): Promise<ClipDetail 
     analysed: summary !== null,
     overall: rower?.card.overall ?? null,
     band: rower?.rating.band ?? null,
+    accuracy: rower?.rating.accuracy ?? null,
     rate: rower?.rate_spm ?? null,
+    version: summary?.version ?? null,
+    metrics: (rower?.card.metrics ?? []).map(({ name, value }) => ({ name, value })),
     bytes: await folderBytes(folder),
+    videoBytes: await fileBytes(path.join(folder, "working.mp4")),
     summary,
     hasVideo: await exists(path.join(folder, "working.mp4")),
   };
@@ -76,6 +81,7 @@ function asSetup(value: unknown): ClipSetup {
   if (typeof raw.side === "string") setup.side = raw.side;
   if (typeof raw.seat === "number") setup.seat = raw.seat;
   if (typeof raw.note === "string") setup.note = raw.note;
+  if (typeof raw.filmed_at === "string") setup.filmed_at = raw.filmed_at;
   return setup;
 }
 
@@ -84,6 +90,14 @@ async function exists(file: string): Promise<boolean> {
     return (await fs.stat(file)).isFile();
   } catch {
     return false;
+  }
+}
+
+async function fileBytes(file: string): Promise<number> {
+  try {
+    return (await fs.stat(file)).size;
+  } catch {
+    return 0;
   }
 }
 
@@ -108,4 +122,36 @@ export async function markClip(library: string, id: string, state: "stopped" | "
   const file = path.join(library, id, STATE_FILE);
   if (state === null) await fs.rm(file, { force: true });
   else await writeJson(file, { state, message: message ?? null });
+}
+
+/** What the library uses, and what is left on the disk it lives on. */
+export async function librarySpace(library: string, clips: ClipItem[]): Promise<Space> {
+  const videoBytes = clips.reduce((sum, clip) => sum + clip.videoBytes, 0);
+  const otherBytes = clips.reduce((sum, clip) => sum + clip.bytes - clip.videoBytes, 0);
+  let freeBytes: number | null = null;
+  for (let folder = library; ; folder = path.dirname(folder)) {
+    try {
+      const disk = await fs.statfs(folder);
+      freeBytes = disk.bavail * disk.bsize;
+      break;
+    } catch {
+      if (path.dirname(folder) === folder) break;
+    }
+  }
+  return { videoBytes, otherBytes, freeBytes };
+}
+
+export async function deleteClip(library: string, id: string): Promise<void> {
+  if (!CLIP_ID.test(id)) throw new Error("Not a clip");
+  // Windows can hold a file a moment after the engine closes it.
+  await fs.rm(path.join(library, id), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+}
+
+/** Only once analysed, as the engine needs the working copy until then. */
+export async function removeVideo(library: string, id: string): Promise<void> {
+  const clip = await readClip(library, id);
+  if (clip?.state !== "done") throw new Error("Not analysed yet");
+  const folder = path.join(library, id);
+  await fs.rm(path.join(folder, "working.mp4"), { force: true });
+  await fs.rm(path.join(folder, "frames.json"), { force: true });
 }
