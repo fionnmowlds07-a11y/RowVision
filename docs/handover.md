@@ -80,6 +80,8 @@ If a check stays "pending" although the job finished, rerun that job with `gh ru
 |---|---|
 | Web app, database, worker | See `docs/runbook.md` |
 | Labelling tool, port 8766 | `PREVIEW_PORT=8766 apps/preview/start.sh` |
+| Desktop app | `npm run build && npm start` in `apps/desktop`. See its README |
+| Desktop app tests | `npm test` and `npm run test:app` in `apps/desktop` (makes its own test clip with ffmpeg) |
 | Vision tests | `pytest` in `services/vision`, inside the `rowvision-vision:dev` image |
 | Preview tests | `pytest` in `apps/preview`, same image, with the whole repo mounted |
 | Page tests | `node --test apps/preview/tests/logic.test.mjs` |
@@ -88,11 +90,13 @@ If a check stays "pending" although the job finished, rerun that job with `gh ru
 
 Host Python is too new, so Python runs in Docker. Mount the repo when testing, for example `-e PYTHONPATH=/repo/services/vision:/repo/apps/preview -v "$PWD/services:/repo/services:ro" -v "$PWD/apps:/repo/apps:ro"`. Use port 8767 for test servers, and only restart 8766 when `/api/job` is not `running`. The app does not come back by itself after a computer restart. Browser checks use Playwright from `/home/fionn/Kidscope/Kidscope/node_modules` through `createRequire`.
 
-Current suites on `main`, all passing: 272 vision, 145 preview, 71 page, 43 worker, 162 web unit, 74 database, 16 browser and 6 acceptance scenarios.
+Current suites on `main`, all passing: 272 vision, 145 preview, 71 page, 43 worker, 165 web unit, 74 database, 16 browser, 6 acceptance scenarios, 40 desktop unit and 8 desktop app tests.
 
 ## What exists
 
 **`services/vision/rowvision`** is the analysis engine. A coarse pass finds boats, seats and shots, then a fine pass measures the chosen rower. It uses YOLOX and RTMPose through ONNX Runtime. Key files: `pipeline.py`, `tracking.py`, `boats.py`, `seats.py`, `metrics.py`, `scoring.py`, `reliability.py`, `timing.py`, `reference_pose.py`, `blades.py`.
+
+**`apps/desktop`** is the Electron app (#151). It imports the results page, viewer, 3D model and logic straight from `apps/web`, so changes there reach both. The clip list and settings use the web look until the desktop designs are picked (#150).
 
 **`apps/web`** is the Next.js app. `lib/logic.ts` is ported from the preview, with its tests. `app/clips/[id]` holds the results page, viewer, freeze frames and 3D model.
 
