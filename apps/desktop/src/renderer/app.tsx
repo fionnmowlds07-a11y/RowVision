@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } 
 import { colourVariables } from "@/lib/colours";
 import shellStyles from "@/components/shell.module.css";
 import type { Colours } from "../shared/bridge";
+import { AddPage } from "./add-page";
 import { ClipPage } from "./clip-page";
 import { ClipsPage } from "./clips-page";
 import { useRoute } from "./route";
@@ -21,6 +22,7 @@ export function App() {
 
   let page: ReactNode;
   if (route.page === "clip") page = <ClipPage key={route.id} id={route.id} />;
+  else if (route.page === "add") page = <AddPage />;
   else if (route.page === "settings") page = <SettingsPage colours={colours} save={save} />;
   else page = <ClipsPage />;
 

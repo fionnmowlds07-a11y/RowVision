@@ -20,6 +20,7 @@ export function ClipsPage() {
     <>
       <div className={homeStyles.head}>
         <h1 style={{ fontSize: 32 }}>Your clips</h1>
+        <a className="button primary" href="#/add">Add a video</a>
       </div>
       <Placeholder>Placeholder in the website&apos;s look until the desktop design is picked.</Placeholder>
       {clips.length === 0 ? (

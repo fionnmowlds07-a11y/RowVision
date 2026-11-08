@@ -1,6 +1,7 @@
 /** What the page may ask the main process for. Nothing else crosses the bridge. */
 
 import type { Summary } from "../../../web/lib/result";
+import type { Setup } from "../../../web/lib/setup";
 
 export type Colours = { ground: string | null; highlight: string | null };
 
@@ -11,6 +12,17 @@ export type ClipSetup = {
   side?: string;
   seat?: number;
   note?: string;
+};
+
+/** What the add page hands over. The video stays where it is and is read from there. */
+export type AddRequest = {
+  source: string;
+  filmedAt: string;
+  setup: Setup;
+  note: string;
+  /** Length is null when the page could not play the video, so the first 60 seconds are used. */
+  section: { start: number; length: number | null };
+  tap: { t: number; x: number; y: number } | null;
 };
 
 export type ClipItem = {
@@ -31,6 +43,10 @@ export type Bridge = {
   getClip(id: string): Promise<ClipDetail | null>;
   getColours(): Promise<Colours>;
   setColours(colours: Colours): Promise<Colours>;
+  getSetup(): Promise<Setup>;
+  addClip(request: AddRequest): Promise<string>;
+  /** Where a picked or dropped file is on this computer, or "" when it is not a real file. */
+  pathForFile(file: File): string;
 };
 
 export const CHANNELS = {
@@ -38,6 +54,8 @@ export const CHANNELS = {
   getClip: "clips:get",
   getColours: "colours:get",
   setColours: "colours:set",
+  getSetup: "setup:get",
+  addClip: "clips:add",
 } as const;
 
 /** Lower-case letters, digits and dashes, so an id can never be a path. */

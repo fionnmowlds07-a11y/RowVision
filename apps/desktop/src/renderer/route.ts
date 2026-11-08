@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { CLIP_ID } from "../shared/bridge";
 
-export type Route = { page: "clips" } | { page: "clip"; id: string } | { page: "settings" };
+export type Route = { page: "clips" } | { page: "clip"; id: string } | { page: "add" } | { page: "settings" };
 
 /** Pages live in the address's hash, so moving between them never leaves the app. */
 export function readRoute(hash: string): Route {
   const [, page, id] = hash.replace(/^#/, "").split("/");
   if (page === "clip" && id && CLIP_ID.test(id)) return { page: "clip", id };
   if (page === "settings") return { page: "settings" };
+  if (page === "add") return { page: "add" };
   return { page: "clips" };
 }
 

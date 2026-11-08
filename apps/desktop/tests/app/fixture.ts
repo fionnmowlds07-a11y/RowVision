@@ -28,11 +28,12 @@ export function frameOf([r, g]: number[]): number | null {
   return tens * 10 + units;
 }
 
-function makeVideo(file: string) {
+/** Plays in Chromium unless an older codec is asked for, which only ffmpeg can read. */
+export function makeVideo(file: string, { frames = FRAMES, codec = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "10"] } = {}) {
   const frame = Buffer.alloc(WIDTH * HEIGHT * 3);
   const raw: Buffer[] = [];
-  for (let n = 0; n < FRAMES; n++) {
-    const [r, g, b] = colourOf(n);
+  for (let n = 0; n < frames; n++) {
+    const [r, g, b] = colourOf(n % 100);
     for (let i = 0; i < frame.length; i += 3) {
       frame[i] = r;
       frame[i + 1] = g;
@@ -44,11 +45,14 @@ function makeVideo(file: string) {
   const result = spawnSync(process.env.FFMPEG ?? "ffmpeg", [
     "-hide_banner", "-loglevel", "error", "-y",
     "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", `${WIDTH}x${HEIGHT}`, "-r", String(FPS), "-i", "pipe:0",
-    "-c:v", "libx264", "-preset", "veryfast", "-crf", "10", "-g", String(FPS), "-bf", "2",
-    "-pix_fmt", "yuv420p", "-color_range", "tv", "-movflags", "+faststart", file,
+    ...codec, "-g", String(FPS), "-bf", "2",
+    "-pix_fmt", "yuv420p", ...(file.endsWith(".mp4") ? ["-color_range", "tv", "-movflags", "+faststart"] : []), file,
   ], { input: Buffer.concat(raw) });
   if (result.status !== 0) throw new Error(`ffmpeg failed: ${result.stderr?.toString() ?? result.error}`);
 }
+
+/** An MPEG-4 Part 2 video in AVI, as older cameras make: ffmpeg reads it, Chromium cannot. */
+export const OLD_CODEC = ["-c:v", "mpeg4", "-q:v", "3"];
 
 function pose(frame: number) {
   const sway = Math.sin((frame / 30) * 2 * Math.PI) * 20;
