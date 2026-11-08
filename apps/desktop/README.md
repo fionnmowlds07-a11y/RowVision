@@ -13,7 +13,15 @@ Electron, with a React page that imports the results, viewer, 3D model and logic
 ## Where things live
 
 - Clips: `<app data>/clips/<id>/`, one folder each, holding what the engine writes (`working.mp4`, `video.json`, `summary.json`, `frames.json`) plus `clip.json` with the setup, trim, tap and where the original video is. Adding a video never copies it: the engine reads it in place. App data is `~/.config/RowVision` on Linux and `%APPDATA%\RowVision` on Windows. `ROWVISION_DATA_DIR` points it elsewhere, for tests.
-- Settings: `<app data>/settings.json`. Colours and the last boat, side and seat.
+- Settings: `<app data>/settings.json`. Colours, the last boat, side and seat, and how fast this computer analysed its last clip.
+
+## Analysis
+
+Clips are analysed one at a time, oldest first, by the engine in `services/worker/rowvision_worker/desktop.py`. The app writes `job.json` in the clip's folder, starts the engine and reads its progress lines. The engine's log goes to `engine.log` there.
+
+- Where a clip is comes from its folder: `summary.json` means done, `pause.json` means it needs a tap, `state.json` means stopped or failed, and anything else is waiting. So a clip cut off by closing the app simply starts again next time.
+- The packaged app looks for the engine in `resources/engine/` (shipping it is #157). Without it, clips wait and the screen says so. `ROWVISION_ENGINE` sets the command instead, for example `'["python", "-m", "rowvision_worker.desktop"]'`, and `ROWVISION_ENGINE_KIND=fake` gives a canned result.
+- Tests use `tests/fake-engine.mjs`, which speaks the same lines without any models.
 
 ## Locked down
 

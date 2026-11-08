@@ -30,6 +30,7 @@ export function ClipPage({ id }: { id: string }) {
       {!summary ? (
         <section className="card stack">
           <h2 style={{ fontSize: 24 }}>Not analysed yet</h2>
+          <a href={`#/analysis/${clip.id}`}>See how analysis is going</a>
         </section>
       ) : !summary.rower ? (
         <section className="card stack">

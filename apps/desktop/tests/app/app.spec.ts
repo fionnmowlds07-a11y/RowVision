@@ -10,6 +10,7 @@ const electronPath = createRequire(__filename)("electron") as unknown as string;
 
 let data: string;
 let sources: string;
+let control: string;
 let app: ElectronApplication;
 let page: Page;
 const problems: string[] = [];
@@ -24,18 +25,32 @@ test.beforeAll(async () => {
   makeVideo(path.join(sources, "old camera.avi"), { frames: 6 * FPS, codec: OLD_CODEC });
   makeVideo(path.join(sources, "short.mp4"));
   writeFileSync(path.join(sources, "notes.txt"), "not a video");
+  // The stand-in engine waits until a test tells it what to do.
+  control = path.join(data, "engine-control");
+  writeFileSync(control, "hang");
+  await launch();
+});
+
+async function launch() {
   app = await electron.launch({
     executablePath: electronPath,
     // CI machines have no graphics card, so the 3D model needs Chromium's software graphics.
     args: [appDir, "--enable-unsafe-swiftshader"],
-    env: { ...process.env, ROWVISION_DATA_DIR: data },
+    env: {
+      ...process.env,
+      ROWVISION_DATA_DIR: data,
+      ROWVISION_ENGINE: JSON.stringify([process.env.NODE ?? "node", path.join(__dirname, "../fake-engine.mjs")]),
+      ROWVISION_ENGINE_KIND: "fake",
+      ROWVISION_TEST_NOTICES: "1",
+      FAKE_ENGINE_CONTROL: control,
+    },
   });
   page = await app.firstWindow();
   page.on("console", (message) => {
     if (/content security policy|refused to/i.test(message.text())) problems.push(message.text());
   });
   page.on("pageerror", (error) => problems.push(error.message));
-});
+}
 
 test.afterAll(async () => {
   // A refused navigation can leave close() waiting, so stop the app outright if it does not close.
@@ -75,7 +90,7 @@ test("the page has no Node access and only the narrow bridge", async () => {
     bridge: Object.keys(window.rowvision).sort(),
     origin: location.origin,
   }));
-  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["addClip", "getClip", "getColours", "getSetup", "listClips", "pathForFile", "setColours"], origin: "app://rowvision" });
+  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["addClip", "getAnalysis", "getClip", "getColours", "getSetup", "listClips", "onAnalysis", "pathForFile", "setColours", "startClip", "stopClip", "tapAgain"], origin: "app://rowvision" });
   const prefs = await app.evaluate(({ BrowserWindow }) => {
     // Not in Electron's types, but it reports the settings the page really runs with.
     const contents = BrowserWindow.getAllWindows()[0].webContents as unknown as { getLastWebPreferences(): Electron.WebPreferences | null };
@@ -161,10 +176,14 @@ async function openAdd() {
   await expect(page.getByRole("heading", { name: "Add a video" })).toBeVisible();
 }
 
-async function addedClip() {
-  await expect(page).toHaveURL(/#\/clip\/[a-z0-9-]+$/);
-  await expect(page.getByRole("heading", { name: "Not analysed yet" })).toBeVisible();
-  const id = /#\/clip\/([a-z0-9-]+)$/.exec(page.url())![1];
+const ids: Record<string, string> = {};
+
+/** Adding a clip goes straight to its analysis screen. */
+async function addedClip(name: string, heading: string) {
+  await expect(page).toHaveURL(/#\/analysis\/[a-z0-9-]+$/);
+  await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+  const id = /#\/analysis\/([a-z0-9-]+)$/.exec(page.url())![1];
+  ids[name] = id;
   return readJson(path.join(data, "clips", id, "clip.json"));
 }
 
@@ -185,7 +204,7 @@ test("a video is picked, trimmed, tapped and added without copying it", async ()
   await expect(page.getByText("Got you")).toBeVisible();
   await page.getByRole("button", { name: "Add to your clips" }).click();
 
-  const clip = await addedClip();
+  const clip = await addedClip("row", "Analysing your clip");
   expect(clip).toMatchObject({ source: video, boat_class: "2-", side: "bow", seat: 2, note: "Saturday steady state", section_start: 0, section_length: 6 });
   expect(clip.tap.x).toBeGreaterThan(0);
   expect(clip.tap.x).toBeLessThan(0.5);
@@ -204,7 +223,7 @@ test("a video the page cannot play can still be added", async () => {
   await expect(page.getByText("can't be shown here, but it can still be analysed")).toBeVisible();
   await expect(page.getByRole("group", { name: "Trim your clip" })).toHaveCount(0);
   await page.getByRole("button", { name: "Add to your clips" }).click();
-  const clip = await addedClip();
+  const clip = await addedClip("old", "Waiting its turn");
   expect(clip).toMatchObject({ source: video, section_start: 0, section_length: null, tap: null });
 });
 
@@ -228,6 +247,78 @@ test("a dropped video is taken by the page, not opened", async () => {
   });
   await expect(page.getByRole("alert")).toHaveText(/can't be read/);
   expect(page.url()).toMatch(/^app:\/\/rowvision\/index.html#\/add$/);
+});
+
+const notices = () => app.evaluate(() => (globalThis as { rowvisionNotices?: { title: string; id: string }[] }).rowvisionNotices ?? []);
+const panel = () => page.getByRole("region", { name: "Progress" });
+
+async function openAnalysis(name: string) {
+  await page.evaluate((id) => { window.location.hash = `#/analysis/${id}`; }, ids[name]);
+}
+
+test("analysis shows its stage and the clips waiting next", async () => {
+  await openAnalysis("row");
+  await expect(page.getByRole("heading", { name: "Analysing your clip" })).toBeVisible();
+  await expect(panel().locator("[aria-current=step]")).toHaveText("Finding the boats and seats");
+  await expect(page.getByRole("link", { name: /^Analysing \d+%$/ })).toBeVisible();
+  await expect(panel().getByRole("heading", { name: "Waiting next" })).toBeVisible();
+  await panel().getByRole("button", { name: /from the queue/ }).click();
+  await expect(panel().getByRole("heading", { name: "Waiting next" })).toHaveCount(0);
+  await openAnalysis("old");
+  await expect(page.getByRole("heading", { name: "Stopped" })).toBeVisible();
+});
+
+test("a running clip can be cancelled and started again", async () => {
+  await openAnalysis("row");
+  await panel().getByRole("button", { name: "Cancel" }).click();
+  await panel().getByRole("button", { name: "Keep going" }).click();
+  await panel().getByRole("button", { name: "Cancel" }).click();
+  await panel().getByRole("button", { name: "Stop", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Stopped" })).toBeVisible();
+  await panel().getByRole("button", { name: "Start again" }).click();
+  await expect(page.getByRole("heading", { name: "Analysing your clip" })).toBeVisible();
+});
+
+test("if the engine dies, the clip says so and can be started again", async () => {
+  const pidFile = path.join(data, "clips", ids.row, "engine.pid");
+  // Once it is finding boats, the engine started again has written its process number.
+  await expect(panel().locator("[aria-current=step]")).toHaveText("Finding the boats and seats");
+  process.kill(Number(readFileSync(pidFile, "utf8")), "SIGKILL");
+  await expect(page.getByRole("heading", { name: "We couldn't analyse this clip" })).toBeVisible();
+  await expect(panel().getByRole("alert")).toHaveText(/stopped unexpectedly/);
+  await panel().getByRole("button", { name: "Start again" }).click();
+  await expect(page.getByRole("heading", { name: "Analysing your clip" })).toBeVisible();
+});
+
+test("closing the app part way through starts the clip again next time", async () => {
+  await app.close();
+  await launch();
+  await openAnalysis("row");
+  await expect(page.getByRole("heading", { name: "Analysing your clip" })).toBeVisible();
+});
+
+test("a finished clip says so, with a notification and its results", async () => {
+  await openAnalysis("row");
+  writeFileSync(control, "done");
+  await expect(page.getByRole("heading", { name: "Analysed" })).toBeVisible();
+  await expect.poll(notices).toContainEqual(expect.objectContaining({ title: "Your clip is ready", id: ids.row }));
+  await panel().getByRole("link", { name: "See your results" }).click();
+  await expect(page.getByRole("heading", { name: "No scores for this clip" })).toBeVisible();
+});
+
+test("when it can't tell which rower is you, a click carries it on", async () => {
+  writeFileSync(control, "tap");
+  await openAdd();
+  await page.locator("input[type=file]").setInputFiles(path.join(sources, "row.mp4"));
+  await page.getByRole("button", { name: "Add to your clips" }).click();
+  await addedClip("tap", "Click on yourself to carry on");
+  await expect.poll(notices).toContainEqual(expect.objectContaining({ title: "Which one is you?", id: ids.tap }));
+  const thisIsMe = panel().getByRole("button", { name: "This is me" });
+  await expect(thisIsMe).toBeDisabled();
+  await page.getByRole("button", { name: "Tap yourself on this frame" }).click({ position: { x: 60, y: 40 } });
+  await thisIsMe.click();
+  await expect(page.getByRole("heading", { name: "Analysed" })).toBeVisible();
+  expect(readJson(path.join(data, "clips", ids.tap, "clip.json")).tap).toMatchObject({ t: 1 });
 });
 
 // Before the tests that try forbidden things on purpose.
