@@ -18,7 +18,8 @@ test.beforeAll(async () => {
   makeClip(path.join(data, "clips"));
   app = await electron.launch({
     executablePath: electronPath,
-    args: [appDir],
+    // CI machines have no graphics card, so the 3D model needs Chromium's software graphics.
+    args: [appDir, "--enable-unsafe-swiftshader"],
     env: { ...process.env, ROWVISION_DATA_DIR: data },
   });
   page = await app.firstWindow();
@@ -29,7 +30,9 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  await app?.close();
+  // A refused navigation can leave close() waiting, so stop the app outright if it does not close.
+  const closed = app ? Promise.race([app.close().then(() => true), new Promise((done) => setTimeout(() => done(false), 10_000))]) : true;
+  if (!(await closed)) app.process().kill();
   rmSync(data, { recursive: true, force: true });
 });
 
