@@ -7,7 +7,8 @@ import type { Colours } from "../shared/bridge";
 const NONE: Colours = { ground: null, highlight: null };
 export const FIRST_SETUP: Setup = { boat: "8+", side: "stroke", seat: 1 };
 
-type Settings = { colours: Colours; setup: Setup };
+/** Speed is seconds of work per second of video, from the last clip this computer finished. */
+type Settings = { colours: Colours; setup: Setup; speed: number | null };
 
 /** Null means the design system's own colour. */
 export function cleanColours(value: unknown): Colours | null {
@@ -31,9 +32,10 @@ export function cleanSetup(value: unknown): Setup | null {
 async function readSettings(file: string): Promise<Settings> {
   try {
     const saved = JSON.parse(await fs.readFile(file, "utf8")) as Record<string, unknown>;
-    return { colours: cleanColours(saved.colours) ?? NONE, setup: cleanSetup(saved.setup) ?? FIRST_SETUP };
+    const speed = typeof saved.speed === "number" && Number.isFinite(saved.speed) && saved.speed > 0 ? saved.speed : null;
+    return { colours: cleanColours(saved.colours) ?? NONE, setup: cleanSetup(saved.setup) ?? FIRST_SETUP, speed };
   } catch {
-    return { colours: NONE, setup: FIRST_SETUP };
+    return { colours: NONE, setup: FIRST_SETUP, speed: null };
   }
 }
 
@@ -43,6 +45,10 @@ export async function readColours(file: string): Promise<Colours> {
 
 export async function readSetup(file: string): Promise<Setup> {
   return fitSetup((await readSettings(file)).setup);
+}
+
+export async function readSpeed(file: string): Promise<number | null> {
+  return (await readSettings(file)).speed;
 }
 
 // One change at a time, so two saves close together cannot undo each other.

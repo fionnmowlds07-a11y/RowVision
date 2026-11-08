@@ -1,10 +1,12 @@
+import { existsSync } from "node:fs";
 import path from "node:path";
-import { app, BrowserWindow, ipcMain, session, shell, type IpcMainInvokeEvent } from "electron";
-import { APP_ORIGIN, CHANNELS, CLIP_ID } from "../shared/bridge";
+import { app, BrowserWindow, ipcMain, Notification, powerMonitor, session, shell, type IpcMainInvokeEvent } from "electron";
+import { APP_ORIGIN, CHANNELS, CLIP_ID, type Analysis, type ClipItem } from "../shared/bridge";
 import { addClip, cleanAdd } from "./add";
+import { Analyser } from "./analysis";
 import { listClips, readClip } from "./library";
 import { registerSchemes, serve } from "./protocol";
-import { cleanColours, readColours, readSetup, saveSettings, writeColours } from "./settings";
+import { cleanColours, readColours, readSetup, readSpeed, saveSettings, writeColours } from "./settings";
 
 // Tests point the app at a throwaway folder. Everyone else uses the system's app data folder.
 if (process.env.ROWVISION_DATA_DIR) app.setPath("userData", path.resolve(process.env.ROWVISION_DATA_DIR));
@@ -13,6 +15,64 @@ const pageRoot = path.join(__dirname, "..", "renderer");
 const library = () => path.join(app.getPath("userData"), "clips");
 const settingsFile = () => path.join(app.getPath("userData"), "settings.json");
 const START = `${APP_ORIGIN}/index.html`;
+
+/** The measuring program, shipped beside the app. ROWVISION_ENGINE stands in for it in development and tests. */
+function engineCommand(): string[] | null {
+  if (process.env.ROWVISION_ENGINE) return JSON.parse(process.env.ROWVISION_ENGINE) as string[];
+  const program = path.join(process.resourcesPath, "engine", process.platform === "win32" ? "rowvision-engine.exe" : "rowvision-engine");
+  return existsSync(program) ? [program] : null;
+}
+
+// Tests read what would have popped up, rather than filling the desktop with notifications.
+const testNotices: { title: string; body: string; id: string }[] = [];
+(globalThis as { rowvisionNotices?: typeof testNotices }).rowvisionNotices = testNotices;
+
+function notify(title: string, body: string, id: string) {
+  if (process.env.ROWVISION_TEST_NOTICES) {
+    testNotices.push({ title, body, id });
+    return;
+  }
+  if (!Notification.isSupported()) return;
+  const notice = new Notification({ title, body });
+  notice.on("click", () => {
+    const [window] = BrowserWindow.getAllWindows();
+    if (!window) return;
+    if (window.isMinimized()) window.restore();
+    window.focus();
+    window.webContents.send(CHANNELS.analysisChanged, analyser.snapshot());
+  });
+  notice.show();
+}
+
+const analyser = new Analyser({
+  library,
+  engine: engineCommand,
+  kind: process.env.ROWVISION_ENGINE_KIND ?? "real",
+  onChange: (analysis: Analysis) => {
+    for (const window of BrowserWindow.getAllWindows()) window.webContents.send(CHANNELS.analysisChanged, analysis);
+  },
+  notify,
+  onBattery: () => powerMonitor.isOnBatteryPower(),
+  readSpeed: () => readSpeed(settingsFile()),
+  saveSpeed: (speed) => saveSettings(settingsFile(), { speed }),
+});
+
+/** The library only knows a clip is waiting. The analyser knows which one is running. */
+function withRunning<T extends ClipItem>(clip: T): T {
+  return analyser.snapshot().running?.id === clip.id ? { ...clip, state: "running" } : clip;
+}
+
+function cleanTap(value: unknown): { t: number; x: number; y: number } | null {
+  if (!value || typeof value !== "object") return null;
+  const { t, x, y } = value as Record<string, unknown>;
+  const ok = (n: unknown, top: number) => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= top;
+  return ok(t, 24 * 3600) && ok(x, 1) && ok(y, 1) ? { t: t as number, x: x as number, y: y as number } : null;
+}
+
+const clipId = (id: unknown): string => {
+  if (typeof id !== "string" || !CLIP_ID.test(id)) throw new Error("Not a clip");
+  return id;
+};
 
 registerSchemes();
 app.enableSandbox();
@@ -88,8 +148,19 @@ void app.whenReady().then(() => {
 
   serve(pageRoot, library());
 
-  handle(CHANNELS.listClips, () => listClips(library()));
-  handle(CHANNELS.getClip, async (id) => (typeof id === "string" && CLIP_ID.test(id) ? readClip(library(), id) : null));
+  handle(CHANNELS.listClips, async () => (await listClips(library())).map(withRunning));
+  handle(CHANNELS.getClip, async (id) => {
+    const clip = typeof id === "string" && CLIP_ID.test(id) ? await readClip(library(), id) : null;
+    return clip ? withRunning(clip) : null;
+  });
+  handle(CHANNELS.getAnalysis, async () => analyser.snapshot());
+  handle(CHANNELS.stopClip, (id) => analyser.stop(clipId(id)));
+  handle(CHANNELS.startClip, (id) => analyser.restart(clipId(id)));
+  handle(CHANNELS.tapAgain, (id, tap) => {
+    const point = cleanTap(tap);
+    if (!point) throw new Error("Not a tap");
+    return analyser.tap(clipId(id), point);
+  });
   handle(CHANNELS.getColours, () => readColours(settingsFile()));
   handle(CHANNELS.setColours, async (value) => {
     const colours = cleanColours(value);
@@ -104,8 +175,14 @@ void app.whenReady().then(() => {
     if (!request) throw new Error("Not a clip");
     const id = await addClip(library(), request);
     await saveSettings(settingsFile(), { setup: request.setup });
+    await analyser.next();
     return id;
   });
+
+  powerMonitor.on("on-battery", () => analyser.changed());
+  powerMonitor.on("on-ac", () => analyser.changed());
+  // Anything left waiting, or cut off when the app last closed, starts again.
+  void analyser.start();
 
   createWindow();
   app.on("activate", () => {
@@ -113,4 +190,5 @@ void app.whenReady().then(() => {
   });
 });
 
+app.on("before-quit", () => analyser.shutdown());
 app.on("window-all-closed", () => app.quit());

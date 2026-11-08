@@ -25,10 +25,34 @@ export type AddRequest = {
   tap: { t: number; x: number; y: number } | null;
 };
 
+/** Where a clip is in analysis, read from the files in its folder. */
+export type ClipState = "waiting" | "running" | "needs_tap" | "stopped" | "failed" | "done";
+
+export type Running = {
+  id: string;
+  stage: string;
+  /** Share of the whole analysis done, 0 to 1. */
+  progress: number;
+  startedAt: string;
+  secondsLeft: number | null;
+};
+
+export type Analysis = {
+  running: Running | null;
+  /** Clips waiting their turn, first in line first, with a rough wait each. */
+  waiting: { id: string; secondsUntil: number }[];
+  onBattery: boolean;
+  /** The measuring program is not installed, so nothing can be analysed yet. */
+  engineMissing: boolean;
+};
+
 export type ClipItem = {
   id: string;
   createdAt: string;
   setup: ClipSetup;
+  state: ClipState;
+  /** Why a clip failed, in plain words. */
+  message: string | null;
   analysed: boolean;
   overall: number | null;
   band: string | null;
@@ -36,7 +60,12 @@ export type ClipItem = {
   bytes: number;
 };
 
-export type ClipDetail = ClipItem & { summary: Summary | null; hasVideo: boolean };
+export type ClipDetail = ClipItem & {
+  summary: Summary | null;
+  hasVideo: boolean;
+  /** Where the engine stopped to ask which rower is you, in seconds into the working copy. */
+  pauseSeconds: number | null;
+};
 
 export type Bridge = {
   listClips(): Promise<ClipItem[]>;
@@ -47,6 +76,15 @@ export type Bridge = {
   addClip(request: AddRequest): Promise<string>;
   /** Where a picked or dropped file is on this computer, or "" when it is not a real file. */
   pathForFile(file: File): string;
+  getAnalysis(): Promise<Analysis>;
+  /** Calls back whenever analysis moves on. Returns a function that stops the calls. */
+  onAnalysis(listener: (analysis: Analysis) => void): () => void;
+  /** Cancels a running clip, or takes a waiting one out of the queue. */
+  stopClip(id: string): Promise<void>;
+  /** Puts a stopped or failed clip back in the queue. */
+  startClip(id: string): Promise<void>;
+  /** Says which rower is you, then carries on. */
+  tapAgain(id: string, tap: { t: number; x: number; y: number }): Promise<void>;
 };
 
 export const CHANNELS = {
@@ -56,6 +94,11 @@ export const CHANNELS = {
   setColours: "colours:set",
   getSetup: "setup:get",
   addClip: "clips:add",
+  getAnalysis: "analysis:get",
+  analysisChanged: "analysis:changed",
+  stopClip: "analysis:stop",
+  startClip: "analysis:start",
+  tapAgain: "analysis:tap",
 } as const;
 
 /** Lower-case letters, digits and dashes, so an id can never be a path. */
