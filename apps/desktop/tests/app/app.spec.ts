@@ -32,7 +32,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   // A refused navigation can leave close() waiting, so stop the app outright if it does not close.
   const closed = app ? Promise.race([app.close().then(() => true), new Promise((done) => setTimeout(() => done(false), 10_000))]) : true;
-  if (!(await closed)) app.process().kill();
+  if (!(await closed)) app.process().kill("SIGKILL");
   rmSync(data, { recursive: true, force: true });
 });
 
@@ -169,8 +169,16 @@ test("only the clip's video and frame data can be loaded", async () => {
 
 // Last, as a refused navigation leaves Playwright waiting on it.
 test("the app cannot be sent to another site or open windows", async () => {
-  const opened = await page.evaluate(() => window.open("https://example.com/") === null);
-  expect(opened).toBe(true);
+  // Stand in for the user's browser, so the test never opens a real one.
+  await app.evaluate(({ shell }) => {
+    const handedOver: string[] = [];
+    (globalThis as { handedOver?: string[] }).handedOver = handedOver;
+    shell.openExternal = async (url: string) => { handedOver.push(url); };
+  });
+  const opened = await page.evaluate(() => [window.open("https://example.com/") === null, window.open("http://example.com/") === null]);
+  expect(opened).toEqual([true, true]);
+  // Only the https link goes to the user's browser. Nothing opens inside the app.
+  await expect.poll(() => app.evaluate(() => (globalThis as { handedOver?: string[] }).handedOver)).toEqual(["https://example.com/"]);
   await page.evaluate(() => { window.location.href = "https://example.com/"; });
   await page.waitForTimeout(500);
   expect(page.url()).toMatch(/^app:\/\/rowvision\//);
