@@ -1,9 +1,10 @@
 import path from "node:path";
 import { app, BrowserWindow, ipcMain, session, shell, type IpcMainInvokeEvent } from "electron";
 import { APP_ORIGIN, CHANNELS, CLIP_ID } from "../shared/bridge";
+import { addClip, cleanAdd } from "./add";
 import { listClips, readClip } from "./library";
 import { registerSchemes, serve } from "./protocol";
-import { cleanColours, readColours, writeColours } from "./settings";
+import { cleanColours, readColours, readSetup, saveSettings, writeColours } from "./settings";
 
 // Tests point the app at a throwaway folder. Everyone else uses the system's app data folder.
 if (process.env.ROWVISION_DATA_DIR) app.setPath("userData", path.resolve(process.env.ROWVISION_DATA_DIR));
@@ -79,7 +80,7 @@ void app.whenReady().then(() => {
   const ours = session.defaultSession;
   // Nothing remote is ever loaded, and the page never gets the camera, microphone or anything else.
   ours.webRequest.onBeforeRequest((details, reply) => {
-    const allowed = details.url.startsWith(`${APP_ORIGIN}/`) || details.url.startsWith("rowvision:") || details.url.startsWith("devtools:");
+    const allowed = details.url.startsWith(`${APP_ORIGIN}/`) || details.url.startsWith("rowvision:") || details.url.startsWith(`blob:${APP_ORIGIN}/`) || details.url.startsWith("devtools:");
     reply({ cancel: !allowed });
   });
   ours.setPermissionRequestHandler((_, __, reply) => reply(false));
@@ -95,6 +96,15 @@ void app.whenReady().then(() => {
     if (!colours) throw new Error("Not a colour");
     await writeColours(settingsFile(), colours);
     return colours;
+  });
+
+  handle(CHANNELS.getSetup, () => readSetup(settingsFile()));
+  handle(CHANNELS.addClip, async (value) => {
+    const request = cleanAdd(value);
+    if (!request) throw new Error("Not a clip");
+    const id = await addClip(library(), request);
+    await saveSettings(settingsFile(), { setup: request.setup });
+    return id;
   });
 
   createWindow();
