@@ -1,7 +1,12 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { Summary } from "../../../web/lib/result";
-import { CLIP_ID, type ClipDetail, type ClipItem, type ClipSetup } from "../shared/bridge";
+import { CLIP_ID, type ClipDetail, type ClipItem, type ClipSetup, type ClipState } from "../shared/bridge";
+
+/** Kept in a clip's folder when the user stopped it or it failed. Gone when it goes back in the queue. */
+export const STATE_FILE = "state.json";
+/** Written by the engine when it needs the user to say which rower they are. */
+export const PAUSE_FILE = "pause.json";
 
 /** Each clip is a folder named by its id, holding what the engine writes. */
 export async function listClips(library: string): Promise<ClipItem[]> {
@@ -14,7 +19,7 @@ export async function listClips(library: string): Promise<ClipItem[]> {
   const clips = await Promise.all(names.filter((name) => CLIP_ID.test(name)).map((name) => readClip(library, name)));
   return clips
     .filter((clip): clip is ClipDetail => clip !== null)
-    .map(({ summary: _summary, hasVideo: _video, ...item }) => item)
+    .map(({ summary: _summary, hasVideo: _video, pauseSeconds: _pause, ...item }) => item)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
@@ -31,10 +36,19 @@ export async function readClip(library: string, id: string): Promise<ClipDetail 
   const setup = asSetup(await readJson(path.join(folder, "clip.json")));
   const summary = (await readJson(path.join(folder, "summary.json"))) as Summary | null;
   const rower = summary?.rower ?? null;
+  const marked = (await readJson(path.join(folder, STATE_FILE))) as { state?: unknown; message?: unknown } | null;
+  const pause = (await readJson(path.join(folder, PAUSE_FILE))) as { seconds?: unknown } | null;
+  let state: ClipState = "waiting";
+  if (summary) state = "done";
+  else if (marked?.state === "stopped" || marked?.state === "failed") state = marked.state;
+  else if (pause) state = "needs_tap";
   return {
     id,
     createdAt: typeof setup.created_at === "string" ? setup.created_at : stat.birthtime.toISOString(),
     setup,
+    state,
+    message: state === "failed" && typeof marked?.message === "string" ? marked.message : null,
+    pauseSeconds: state === "needs_tap" && typeof pause?.seconds === "number" ? pause.seconds : null,
     analysed: summary !== null,
     overall: rower?.card.overall ?? null,
     band: rower?.rating.band ?? null,
@@ -45,7 +59,7 @@ export async function readClip(library: string, id: string): Promise<ClipDetail 
   };
 }
 
-async function readJson(file: string): Promise<unknown> {
+export async function readJson(file: string): Promise<unknown> {
   try {
     return JSON.parse(await fs.readFile(file, "utf8"));
   } catch {
@@ -81,4 +95,17 @@ async function folderBytes(folder: string): Promise<number> {
     else if (entry.isDirectory()) total += await folderBytes(full);
   }
   return total;
+}
+
+/** Written beside the target first, so a crash never leaves half a file. */
+export async function writeJson(file: string, value: unknown): Promise<void> {
+  await fs.writeFile(`${file}.tmp`, JSON.stringify(value, null, 2));
+  await fs.rename(`${file}.tmp`, file);
+}
+
+/** Mark a clip stopped or failed, or with null put it back in the queue. */
+export async function markClip(library: string, id: string, state: "stopped" | "failed" | null, message?: string): Promise<void> {
+  const file = path.join(library, id, STATE_FILE);
+  if (state === null) await fs.rm(file, { force: true });
+  else await writeJson(file, { state, message: message ?? null });
 }
