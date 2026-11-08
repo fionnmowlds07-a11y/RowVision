@@ -8,6 +8,7 @@ on:
       - apps/desktop/**
       - apps/web/app/clips/**
       - apps/web/app/settings/colours.*
+      - apps/web/app/add/**
       - apps/web/app/*.css
       - apps/web/components/shell.module.css
       - apps/web/lib/**
@@ -17,6 +18,7 @@ on:
       - apps/desktop/**
       - apps/web/app/clips/**
       - apps/web/app/settings/colours.*
+      - apps/web/app/add/**
       - apps/web/app/*.css
       - apps/web/components/shell.module.css
       - apps/web/lib/**
