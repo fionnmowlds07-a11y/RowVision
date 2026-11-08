@@ -66,7 +66,9 @@ test("the page has no Node access and only the narrow bridge", async () => {
   }));
   expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["getClip", "getColours", "listClips", "setColours"], origin: "app://rowvision" });
   const prefs = await app.evaluate(({ BrowserWindow }) => {
-    const prefs = BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();
+    // Not in Electron's types, but it reports the settings the page really runs with.
+    const contents = BrowserWindow.getAllWindows()[0].webContents as unknown as { getLastWebPreferences(): Electron.WebPreferences | null };
+    const prefs = contents.getLastWebPreferences();
     return { contextIsolation: prefs?.contextIsolation, nodeIntegration: prefs?.nodeIntegration, sandbox: prefs?.sandbox };
   });
   expect(prefs).toEqual({ contextIsolation: true, nodeIntegration: false, sandbox: true });
