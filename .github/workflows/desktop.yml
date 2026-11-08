@@ -1,0 +1,70 @@
+name: Desktop app
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - apps/desktop/**
+      - apps/web/app/clips/**
+      - apps/web/app/settings/colours.*
+      - apps/web/app/*.css
+      - apps/web/components/shell.module.css
+      - apps/web/lib/**
+      - .github/workflows/desktop.yml
+  pull_request:
+    paths:
+      - apps/desktop/**
+      - apps/web/app/clips/**
+      - apps/web/app/settings/colours.*
+      - apps/web/app/*.css
+      - apps/web/components/shell.module.css
+      - apps/web/lib/**
+      - .github/workflows/desktop.yml
+
+jobs:
+  desktop:
+    name: Desktop app on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - name: Install
+        run: |
+          npm ci
+          npx electron --version
+      - name: Lint
+        run: npm run lint
+      - name: Type check
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Install ffmpeg, to make the test clip
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt-get update && sudo apt-get install -y ffmpeg xvfb
+          elif ! command -v ffmpeg >/dev/null; then
+            choco install ffmpeg -y --no-progress
+          fi
+          ffmpeg -version | head -1
+      - name: Start the app and check the viewer on a generated clip
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            xvfb-run -a npm run test:app
+          else
+            npm run test:app
+          fi

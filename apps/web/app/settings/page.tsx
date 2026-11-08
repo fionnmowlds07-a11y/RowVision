@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Shell } from "@/components/shell";
 import { requireViewer } from "@/lib/session";
-import { deleteAccount, saveName, signOut } from "./actions";
+import { deleteAccount, saveColours, saveName, signOut } from "./actions";
 import { Colours } from "./colours";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -19,7 +19,7 @@ export default async function Settings() {
         </label>
         <button className="button primary">Save</button>
       </form>
-      <Colours ground={viewer.ground} highlight={viewer.highlight} />
+      <Colours ground={viewer.ground} highlight={viewer.highlight} save={saveColours} />
       <form action={signOut}>
         <button className="button quiet">Sign out</button>
       </form>

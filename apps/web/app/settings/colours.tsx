@@ -2,10 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { DEFAULT_COLOURS, PRESETS, textOn } from "@/lib/colours";
-import { saveColours } from "./actions";
 import styles from "./colours.module.css";
 
-export function Colours({ ground: savedGround, highlight: savedHighlight }: { ground: string | null; highlight: string | null }) {
+type Props = {
+  ground: string | null;
+  highlight: string | null;
+  /** Where the colours are kept: the account on the web, a local file in the desktop app. */
+  save: (ground: string | null, highlight: string | null) => Promise<void>;
+};
+
+export function Colours({ ground: savedGround, highlight: savedHighlight, save }: Props) {
   const [ground, setGround] = useState(savedGround ?? DEFAULT_COLOURS.ground);
   const [highlight, setHighlight] = useState(savedHighlight ?? DEFAULT_COLOURS.highlight);
   const [saving, start] = useTransition();
@@ -35,7 +41,7 @@ export function Colours({ ground: savedGround, highlight: savedHighlight }: { gr
         Preview
         <span style={{ background: highlight, color: textOn(highlight) }}>87</span>
       </div>
-      <button type="button" className="button primary" disabled={saving} onClick={() => start(() => saveColours(ground, highlight))}>Save colours</button>
+      <button type="button" className="button primary" disabled={saving} onClick={() => start(() => save(ground, highlight))}>Save colours</button>
       <button
         type="button"
         className="button quiet"
@@ -43,7 +49,7 @@ export function Colours({ ground: savedGround, highlight: savedHighlight }: { gr
         onClick={() => {
           setGround(DEFAULT_COLOURS.ground);
           setHighlight(DEFAULT_COLOURS.highlight);
-          start(() => saveColours(null, null));
+          start(() => save(null, null));
         }}
       >
         Reset to the club greens
