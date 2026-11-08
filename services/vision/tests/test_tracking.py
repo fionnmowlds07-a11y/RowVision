@@ -122,3 +122,29 @@ def test_a_zoom_needs_the_whole_crew_to_fit() -> None:
     assert _zoom(before, sizes, after[:4], sizes[:4] * 0.5) is None, "half the crew left the frame"
     assert _zoom(before[:4], sizes[:4], after[:4], sizes[:4] * 0.5) is None, "too few to be sure"
     assert _zoom(before, sizes, before + 5, sizes) is None, "same size is not a zoom"
+
+
+def test_a_zoom_lines_up_each_rower_with_themselves() -> None:
+    """Measured on a real eight: bodies shrank to 0.76 while the gaps between seats shrank to
+    0.82. Trusting body size alone lined everyone up one seat along."""
+    before = np.column_stack(
+        [[386.0, 531, 689, 870, 1064, 1231, 1465, 1676, 1983], np.full(9, 300.0)]
+    )
+    after = np.column_stack(
+        [[518.0, 637, 770, 916, 1067, 1214, 1392, 1566, 1833], np.full(9, 300.0)]
+    )
+    zoomed = _zoom(before, np.full(9, 64.0), after, np.full(9, 49.0))
+    assert zoomed is not None
+    moved, _ = zoomed
+    landed = np.linalg.norm(moved[:, None, :] - after[None, :, :], axis=-1).argmin(axis=1)
+    assert landed.tolist() == list(range(9))
+
+
+def test_noisy_sizes_with_nobody_moving_are_not_a_zoom() -> None:
+    """Measured on another eight: everyone stayed put, but the median body size jumped by 30%.
+    A small zoom could still line most people up one seat along."""
+    before = np.column_stack(
+        [[78.0, 158, 205, 278, 342, 405, 463, 511, 567, 611], np.full(10, 190.0)]
+    )
+    after = np.column_stack([[77.0, 204, 278, 344, 405, 461, 512, 568, 613], np.full(9, 190.0)])
+    assert _zoom(before, np.full(10, 30.0), after, np.full(9, 39.0)) is None
