@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PRESETS, textOn } from "@/lib/colours";
 import type { Colours, Welcome } from "../shared/bridge";
 import { size } from "./format";
+import { megabytes, percent, useModels } from "./use-models";
 import styles from "./welcome.module.css";
 
 type Props = {
@@ -20,8 +21,18 @@ export function WelcomePage({ welcome: first, colours, save, done }: Props) {
   const [welcome, setWelcome] = useState(first);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const models = useModels();
   const ground = colours.ground ?? PRESETS[0].ground;
   const highlight = colours.highlight ?? PRESETS[0].highlight;
+
+  // Reaching the last step starts the download by itself, as in the picked design. A failed one waits to be retried.
+  const missing = models?.state === "missing";
+  const started = useRef(false);
+  useEffect(() => {
+    if (step !== 3 || !missing || started.current) return;
+    started.current = true;
+    void window.rowvision.downloadModels();
+  }, [step, missing]);
 
   async function changeFolder() {
     setBusy(true);
@@ -93,9 +104,9 @@ export function WelcomePage({ welcome: first, colours, save, done }: Props) {
         {step === 3 ? (
           <>
             <h1 id="welcome-title">Get the measuring ready</h1>
-            {welcome.engineMissing ? (
+            {models?.state === "no_engine" ? (
               <>
-                <p className={styles.soft}>RowVision measures with a program and models of about 180 MB. They aren&apos;t included in this test version yet.</p>
+                <p className={styles.soft}>RowVision measures with a program and two models. They aren&apos;t included in this test version yet.</p>
                 <div className={styles.box} data-testid="measuring">
                   <div className={styles.folder}>
                     <strong>Not ready yet</strong>
@@ -105,11 +116,36 @@ export function WelcomePage({ welcome: first, colours, save, done }: Props) {
               </>
             ) : (
               <>
-                <p className={styles.soft}>Everything needed to measure is on this computer. It works without the internet.</p>
+                <p className={styles.soft}>
+                  RowVision downloads its measuring models once{models && models.totalBytes > 0 ? `, about ${megabytes(models.totalBytes)}` : ""}. After that it works without the internet.
+                </p>
                 <div className={styles.box} data-testid="measuring">
-                  <div className={styles.row}><span>Ready</span><strong>100%</strong></div>
-                  <div className={styles.bar} aria-hidden="true"><span /></div>
+                  {!models || models.state === "checking" ? <div className={styles.row}><span>Checking this computer</span></div> : null}
+                  {models?.state === "ready" ? <div className={styles.row}><span>Ready</span><strong>100%</strong></div> : null}
+                  {models?.state === "downloading" || models?.state === "missing" ? (
+                    <div className={styles.row}>
+                      <span>Downloading, {megabytes(models.downloadedBytes)} of {megabytes(models.totalBytes)}</span>
+                      <strong>{percent(models)}%</strong>
+                    </div>
+                  ) : null}
+                  {models?.state === "failed" ? (
+                    <div className={styles.row}>
+                      <span role="alert">{models.message}</span>
+                    </div>
+                  ) : null}
+                  {models && models.state !== "failed" && models.state !== "checking" ? (
+                    <div className={styles.bar} aria-hidden="true"><span style={{ width: models.state === "ready" ? "100%" : `${percent(models)}%` }} /></div>
+                  ) : null}
+                  {models?.state === "downloading" ? (
+                    <button type="button" className={`button ${styles.quiet}`} onClick={() => void window.rowvision.cancelModels()}>Cancel</button>
+                  ) : null}
+                  {models?.state === "failed" ? (
+                    <button type="button" className={`button ${styles.quiet}`} onClick={() => void window.rowvision.downloadModels()}>Try again</button>
+                  ) : null}
                 </div>
+                {models && models.state !== "ready" ? (
+                  <p className={styles.small}>You can add a video while this finishes. It starts as soon as the measuring is ready.</p>
+                ) : null}
               </>
             )}
             <p className={styles.small}>Analysis works best on a laptop that is plugged in. A 30 second clip takes about 10 minutes.</p>
