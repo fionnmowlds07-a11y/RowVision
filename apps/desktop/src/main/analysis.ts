@@ -65,7 +65,7 @@ type Options = {
   saveSpeed: (secondsPerSecond: number) => Promise<void>;
 };
 
-type Current = Running & { child: ChildProcess; ended: boolean; stopping: boolean; seconds: number; timer?: NodeJS.Timeout };
+type Current = Running & { child: ChildProcess; ended: boolean; stopping: boolean; forgotten?: boolean; seconds: number; timer?: NodeJS.Timeout };
 
 /** Analyses one clip at a time, oldest first. Everything it knows is also in the clips' folders. */
 export class Analyser {
@@ -146,7 +146,7 @@ export class Analyser {
       if (current.ended) return;
       current.ended = true;
       if (current.timer) clearTimeout(current.timer);
-      if (mark) await markClip(library, id, mark, message);
+      if (mark && !current.forgotten) await markClip(library, id, mark, message);
     };
 
     createInterface({ input: child.stdout! }).on("line", (line) => {
@@ -182,7 +182,8 @@ export class Analyser {
     child.on("close", () => {
       log.end();
       // Closing the app leaves the clip waiting, so it starts again next time.
-      const mark = this.quitting ? Promise.resolve() : current.stopping ? finish("stopped") : finish("failed", UNEXPECTED);
+      // A clip being deleted gets no mark, as its folder is about to go.
+      const mark = this.quitting || current.forgotten ? Promise.resolve() : current.stopping ? finish("stopped") : finish("failed", UNEXPECTED);
       void mark.then(() => {
         if (this.current === current) this.current = null;
         if (!this.quitting) void this.next();
@@ -202,6 +203,17 @@ export class Analyser {
     }
     await markClip(this.options.library(), id, "stopped");
     await this.next();
+  }
+
+  /** Before a clip is deleted: stop it if it is running, and wait for the engine to let go of its folder. */
+  async forget(id: string): Promise<void> {
+    const current = this.current;
+    if (current?.id !== id) return;
+    current.forgotten = true;
+    const closed = new Promise<void>((done) => current.child.once("close", () => done()));
+    current.child.stdin?.end("cancel\n");
+    current.child.kill();
+    await closed;
   }
 
   /** Put a stopped or failed clip back in the queue. */

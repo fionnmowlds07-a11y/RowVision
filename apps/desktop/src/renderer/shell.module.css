@@ -1,0 +1,114 @@
+.shell {
+  min-height: 100dvh;
+  display: flex;
+  background: var(--ground);
+  color: var(--on-ground);
+}
+
+.side {
+  position: sticky;
+  top: 0;
+  width: 260px;
+  height: 100dvh;
+  flex: none;
+  box-sizing: border-box;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-right: 1px solid color-mix(in srgb, var(--on-ground) 10%, transparent);
+  overflow-y: auto;
+}
+
+.logo {
+  font: 800 22px var(--font-display);
+  letter-spacing: -0.02em;
+  color: var(--on-ground);
+  text-decoration: none;
+  padding: 0 14px 18px;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav a {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  border-radius: var(--radius-field);
+  color: var(--on-ground);
+  font-size: 15px;
+  text-decoration: none;
+}
+
+.nav a:hover {
+  background: color-mix(in srgb, var(--on-ground) 6%, transparent);
+}
+
+.nav a[aria-current="page"] {
+  background: color-mix(in srgb, var(--on-ground) 12%, transparent);
+  font-weight: 700;
+}
+
+.running {
+  font-variant-numeric: tabular-nums;
+}
+
+.fill {
+  flex: 1;
+}
+
+.space {
+  background: var(--panel);
+  color: var(--ink);
+  border-radius: var(--radius-panel);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.space h2 {
+  font-size: 16px;
+}
+
+.space p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.meter {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--quiet);
+  display: flex;
+  overflow: hidden;
+}
+
+.meter span:first-child {
+  background: var(--highlight);
+}
+
+.meter span:last-child {
+  background: color-mix(in srgb, var(--highlight) 45%, var(--panel));
+}
+
+.space :global(.button) {
+  width: 100%;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: 24px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}

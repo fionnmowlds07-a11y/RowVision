@@ -1,69 +1,113 @@
-import { useEffect, useState } from "react";
-import homeStyles from "@/app/home.module.css";
+import { useState } from "react";
+import { TREND_MINIMUM, trendPoints, type ClipRow } from "@/lib/history";
+import { Trend } from "@/app/trend";
 import type { ClipItem } from "../shared/bridge";
-import { Placeholder } from "./placeholder";
 import { setupLine, shortDate, size } from "./format";
+import styles from "./library.module.css";
 
 const STATE_TEXT = {
   waiting: "Waiting to be analysed",
   running: "Being analysed",
-  needs_tap: "Needs you: click on yourself",
+  needs_tap: "Needs you",
   stopped: "Stopped",
   failed: "Couldn't be analysed",
 } as const;
 
-function stateText(clip: ClipItem): string {
-  if (clip.state !== "done") return STATE_TEXT[clip.state];
-  return clip.band ? `Accuracy ${clip.band}` : "No scores";
+type Sort = "date" | "score" | "size";
+
+const filmed = (clip: ClipItem) => clip.setup.filmed_at ?? clip.createdAt;
+/** A Poor score stays hidden, as on the website. */
+const score = (clip: ClipItem) => (clip.state === "done" && clip.overall !== null && clip.band !== "Poor" ? Math.round(clip.overall) : null);
+
+const ORDER: Record<Sort, (a: ClipItem, b: ClipItem) => number> = {
+  date: (a, b) => filmed(b).localeCompare(filmed(a)),
+  score: (a, b) => (score(b) ?? -1) - (score(a) ?? -1),
+  size: (a, b) => b.bytes - a.bytes,
+};
+
+/** The website's trend works from rows shaped like its database's. */
+function asRows(clips: ClipItem[]): ClipRow[] {
+  return clips.map((clip) => ({
+    id: clip.id,
+    filmed_at: clip.setup.filmed_at ?? null,
+    created_at: clip.createdAt,
+    jobs: [],
+    results: clip.state === "done" ? [{
+      band: clip.band, accuracy: clip.accuracy, overall: clip.overall, code_version: clip.version ?? "", created_at: clip.createdAt,
+      summary: { rower: { card: { metrics: clip.metrics } } },
+    }] : [],
+  }));
 }
 
-export function ClipsPage() {
-  const [clips, setClips] = useState<ClipItem[] | null>(null);
-
-  useEffect(() => {
-    let live = true;
-    void window.rowvision.listClips().then((found) => { if (live) setClips(found); });
-    return () => { live = false; };
-  }, []);
-
+export function ClipsPage({ clips }: { clips: ClipItem[] | null }) {
+  const [sort, setSort] = useState<Sort>("date");
   if (clips === null) return <p aria-busy="true">Loading your clips…</p>;
-  const total = clips.reduce((sum, clip) => sum + clip.bytes, 0);
+  const sorted = clips.slice().sort(ORDER[sort]);
+  const newest = sort === "date" ? sorted.find((clip) => score(clip) !== null)?.id : undefined;
+  const points = trendPoints(asRows(clips), null);
+
+  const header = (name: Sort, label: string) => (
+    <th scope="col" aria-sort={sort === name ? "descending" : undefined}>
+      <button type="button" className={styles.sort} onClick={() => setSort(name)}>
+        {label}<span aria-hidden="true">{sort === name ? " ↓" : ""}</span>
+      </button>
+    </th>
+  );
 
   return (
     <>
-      <div className={homeStyles.head}>
+      <div className={styles.head}>
         <h1 style={{ fontSize: 32 }}>Your clips</h1>
         <a className="button primary" href="#/add">Add a video</a>
       </div>
-      <Placeholder>Placeholder in the website&apos;s look until the desktop design is picked.</Placeholder>
       {clips.length === 0 ? (
         <section className="card stack">
           <h2 style={{ fontSize: 19 }}>Nothing here yet</h2>
-          <p className="soft">Clips you add are kept on this computer, one folder each.</p>
+          <p className="soft">Add your first video to see your stroke measured. Side-on and close up works best.</p>
+          <a href="#/guide">How to film a good clip</a>
         </section>
       ) : (
-        <>
-          <ul className={homeStyles.list}>
-            {clips.map((clip, index) => {
-              const score = clip.overall !== null && clip.band !== "Poor" ? Math.round(clip.overall) : null;
-              return (
-                <li key={clip.id}>
-                  <a href={clip.state === "done" ? `#/clip/${clip.id}` : `#/analysis/${clip.id}`} className={index === 0 && score !== null ? homeStyles.clipMain : homeStyles.clip}>
-                    <span className={homeStyles.text}>
-                      <strong>{shortDate(clip.createdAt)}</strong>
-                      <span>{setupLine(clip.setup)}{clip.rate ? `, ${Math.round(clip.rate)} spm` : ""}</span>
-                      {clip.setup.note ? <span>{clip.setup.note}</span> : null}
-                      <span>{stateText(clip)}</span>
-                    </span>
-                    {score !== null ? <span className={homeStyles.score}>{score}</span> : null}
-                  </a>
-                </li>
-              );
-            })}
-          </ul>
-          <p style={{ margin: 0, color: "var(--on-ground-soft)" }}>{clips.length} {clips.length === 1 ? "clip" : "clips"}, using {size(total)}.</p>
-        </>
+        <div className={styles.tableCard}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                {header("date", "Filmed")}
+                <th scope="col">Boat and seat</th>
+                {header("score", "Overall")}
+                <th scope="col">Accuracy</th>
+                {header("size", "Size")}
+                <th scope="col">Video</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((clip) => {
+                const shown = score(clip);
+                return (
+                  <tr key={clip.id}>
+                    <td><a href={clip.state === "done" ? `#/clip/${clip.id}` : `#/analysis/${clip.id}`}>{shortDate(filmed(clip))}</a></td>
+                    <td>{setupLine(clip.setup) || "–"}{clip.setup.note ? <span className={styles.note}>{clip.setup.note}</span> : null}</td>
+                    <td>
+                      {shown !== null ? <span className={clip.id === newest ? styles.scoreMain : styles.score}>{shown}</span>
+                        : clip.state === "done" && clip.band === "Poor" ? <span className={styles.soft}>Hidden</span> : <span className={styles.soft}>–</span>}
+                    </td>
+                    <td className={clip.band ? styles[`band${clip.band}`] : undefined}>{clip.state === "done" ? clip.band ?? "No scores" : STATE_TEXT[clip.state]}</td>
+                    <td>{size(clip.bytes)}</td>
+                    <td className={styles.soft}>{clip.state !== "done" ? "–" : clip.hasVideo ? "Kept" : "Removed"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
+      {clips.length > 0 ? (
+        points.length >= TREND_MINIMUM ? <Trend points={points} /> : (
+          <section className="card stack">
+            <h2 style={{ fontSize: 19 }}>Your trend</h2>
+            <p className="soft">Appears once {TREND_MINIMUM} clips are rated Good or better. You have {points.length} so far.</p>
+          </section>
+        )
+      ) : null}
     </>
   );
 }
