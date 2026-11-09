@@ -6,6 +6,7 @@ import { addClip, cleanAdd } from "./add";
 import { Analyser } from "./analysis";
 import { deleteClip, librarySpace, listClips, readClip, removeVideo } from "./library";
 import { registerSchemes, serve } from "./protocol";
+import { cleanConsent, sendClip } from "./send";
 import { cleanColours, readColours, readSetup, readSpeed, saveSettings, writeColours } from "./settings";
 
 // Tests point the app at a throwaway folder. Everyone else uses the system's app data folder.
@@ -160,6 +161,17 @@ void app.whenReady().then(() => {
     await analyser.forget(clip);
     await deleteClip(library(), clip);
     await analyser.next();
+  });
+  // Where sent clips go. Unset until the owner sets up the service, so nothing can be sent by accident.
+  const sendBase = process.env.ROWVISION_SEND_URL ?? "";
+  handle(CHANNELS.canSend, async () => sendBase !== "");
+  handle(CHANNELS.sendClip, async (id, consent) => {
+    const clip = clipId(id);
+    const agreed = cleanConsent(consent);
+    if (!agreed || !sendBase) throw new Error("Not allowed");
+    await sendClip(library(), clip, agreed, sendBase, (sent, total) => {
+      for (const window of BrowserWindow.getAllWindows()) window.webContents.send(CHANNELS.sendProgress, { id: clip, sent, total });
+    });
   });
   handle(CHANNELS.removeVideo, (id) => removeVideo(library(), clipId(id)));
   handle(CHANNELS.stopClip, (id) => analyser.stop(clipId(id)));

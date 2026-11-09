@@ -68,6 +68,8 @@ export type ClipItem = {
   /** The working copy alone, which is most of it. */
   videoBytes: number;
   hasVideo: boolean;
+  /** When the user sent it to help RowVision learn, if they did. */
+  sentAt: string | null;
 };
 
 export type Space = { videoBytes: number; otherBytes: number; freeBytes: number | null };
@@ -101,6 +103,10 @@ export type Bridge = {
   deleteClip(id: string): Promise<void>;
   /** Deletes an analysed clip's working copy and keeps its scores. */
   removeVideo(id: string): Promise<void>;
+  /** Whether there is anywhere to send clips to yet. */
+  canSend(): Promise<boolean>;
+  sendClip(id: string, consent: { note: string; adult: boolean; allowed: boolean }): Promise<void>;
+  onSendProgress(listener: (progress: { id: string; sent: number; total: number }) => void): () => void;
 };
 
 export const CHANNELS = {
@@ -118,6 +124,9 @@ export const CHANNELS = {
   getSpace: "space:get",
   deleteClip: "clips:delete",
   removeVideo: "clips:remove-video",
+  canSend: "send:ready",
+  sendClip: "send:clip",
+  sendProgress: "send:progress",
 } as const;
 
 /** Lower-case letters, digits and dashes, so an id can never be a path. */
