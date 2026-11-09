@@ -1,19 +1,22 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { app, BrowserWindow, ipcMain, Notification, powerMonitor, session, shell, type IpcMainInvokeEvent } from "electron";
-import { APP_ORIGIN, CHANNELS, CLIP_ID, type Analysis, type ClipItem } from "../shared/bridge";
+import { app, BrowserWindow, dialog, ipcMain, Notification, powerMonitor, session, shell, type IpcMainInvokeEvent } from "electron";
+import { APP_ORIGIN, CHANNELS, CLIP_ID, type Analysis, type ClipItem, type Welcome } from "../shared/bridge";
 import { addClip, cleanAdd } from "./add";
 import { Analyser } from "./analysis";
 import { deleteClip, librarySpace, listClips, readClip, removeVideo } from "./library";
 import { registerSchemes, serve } from "./protocol";
 import { cleanConsent, sendClip } from "./send";
-import { cleanColours, readColours, readSetup, readSpeed, saveSettings, writeColours } from "./settings";
+import { cleanColours, readColours, readSetup, readSpeed, readWelcome, saveSettings, writeColours } from "./settings";
+import { checkFolder, clipsFolderIn, isEmptyLibrary } from "./welcome";
 
 // Tests point the app at a throwaway folder. Everyone else uses the system's app data folder.
 if (process.env.ROWVISION_DATA_DIR) app.setPath("userData", path.resolve(process.env.ROWVISION_DATA_DIR));
 
 const pageRoot = path.join(__dirname, "..", "renderer");
-const library = () => path.join(app.getPath("userData"), "clips");
+// Read from the settings before anything else starts. Null means the app data folder.
+let clipsDir: string | null = null;
+const library = () => clipsDir ?? path.join(app.getPath("userData"), "clips");
 const settingsFile = () => path.join(app.getPath("userData"), "settings.json");
 const START = `${APP_ORIGIN}/index.html`;
 
@@ -137,7 +140,7 @@ function createWindow() {
   void window.loadURL(START);
 }
 
-void app.whenReady().then(() => {
+void app.whenReady().then(async () => {
   const ours = session.defaultSession;
   // Nothing remote is ever loaded, and the page never gets the camera, microphone or anything else.
   ours.webRequest.onBeforeRequest((details, reply) => {
@@ -147,7 +150,8 @@ void app.whenReady().then(() => {
   ours.setPermissionRequestHandler((_, __, reply) => reply(false));
   ours.setPermissionCheckHandler(() => false);
 
-  serve(pageRoot, library());
+  clipsDir = (await readWelcome(settingsFile())).clipsDir;
+  serve(pageRoot, library);
 
   handle(CHANNELS.listClips, async () => (await listClips(library())).map(withRunning));
   handle(CHANNELS.getClip, async (id) => {
@@ -188,6 +192,34 @@ void app.whenReady().then(() => {
     await writeColours(settingsFile(), colours);
     return colours;
   });
+
+  const welcome = async (): Promise<Welcome> => {
+    const clips = await listClips(library());
+    const { welcomed } = await readWelcome(settingsFile());
+    const { freeBytes } = await librarySpace(library(), clips);
+    return { show: !welcomed && clips.length === 0, clipsDir: library(), freeBytes, canMove: await isEmptyLibrary(library()), engineMissing: analyser.snapshot().engineMissing };
+  };
+  handle(CHANNELS.getWelcome, welcome);
+  handle(CHANNELS.changeClipsFolder, async () => {
+    if (!(await isEmptyLibrary(library()))) return { welcome: await welcome(), problem: "Clips are already kept here, so the folder can't move." };
+    // Tests name the folder, rather than opening a dialog.
+    let picked = process.env.ROWVISION_TEST_PICK_FOLDER ?? null;
+    if (!picked) {
+      const [window] = BrowserWindow.getAllWindows();
+      const options: Electron.OpenDialogOptions = { title: "Where should RowVision keep clips?", defaultPath: path.dirname(library()), properties: ["openDirectory", "createDirectory"] };
+      const result = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options);
+      picked = result.canceled ? null : (result.filePaths[0] ?? null);
+    }
+    if (!picked) return { welcome: await welcome(), problem: null };
+    const folder = clipsFolderIn(picked);
+    const problem = (await checkFolder(folder)) ?? ((await isEmptyLibrary(folder)) ? null : "That folder already holds clips. Pick an empty one.");
+    if (problem) return { welcome: await welcome(), problem };
+    const fallback = path.join(app.getPath("userData"), "clips");
+    clipsDir = folder === fallback ? null : folder;
+    await saveSettings(settingsFile(), { clipsDir });
+    return { welcome: await welcome(), problem: null };
+  });
+  handle(CHANNELS.finishWelcome, () => saveSettings(settingsFile(), { welcomed: true }));
 
   handle(CHANNELS.getSetup, () => readSetup(settingsFile()));
   handle(CHANNELS.addClip, async (value) => {
