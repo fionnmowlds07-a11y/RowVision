@@ -1,0 +1,36 @@
+name: Debug Windows packaged app
+# Temporary. Finds out why the installed Windows app crashes on launch. Removed before merging.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/debug-windows-packaged.yml
+jobs:
+  debug:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: npm ci && npm run build && npx electron-builder --win --dir
+      - name: Launch the installed exe a few ways and show what it says
+        run: |
+          exe="$PWD/release/win-unpacked/RowVision.exe"
+          try() {
+            name=$1; shift
+            echo "=== $name"
+            ELECTRON_ENABLE_LOGGING=1 ROWVISION_DATA_DIR="$RUNNER_TEMP/d-$name" timeout 15 "$exe" "$@" > "$RUNNER_TEMP/out-$name.txt" 2>&1
+            echo "exit=$?"
+            head -c 1500 "$RUNNER_TEMP/out-$name.txt"
+          }
+          try plain
+          try nosandbox --no-sandbox
+          try swift --enable-unsafe-swiftshader
+          try both --no-sandbox --enable-unsafe-swiftshader
+          try nogpu --disable-gpu
+          try inspect --inspect=0 --remote-debugging-port=0 --no-sandbox --enable-unsafe-swiftshader
+        continue-on-error: true
