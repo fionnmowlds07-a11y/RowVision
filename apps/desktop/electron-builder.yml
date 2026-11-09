@@ -1,0 +1,43 @@
+# Builds the installers. `npm run dist` makes the one for the system it runs on:
+# a Windows installer on Windows, an AppImage on Linux. CI builds both (see .github/workflows/installers.yml).
+appId: app.rowvision.desktop
+productName: RowVision
+copyright: RowVision
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**
+  - build/icon.png
+  - package.json
+# The measuring program, with ffmpeg beside it. CI puts it in `engine/`; without it the app says it isn't installed.
+extraResources:
+  - from: engine
+    to: engine
+    filter: ["**/*"]
+asar: true
+compression: normal
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+  artifactName: RowVision-Setup-${version}.exe
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: RowVision
+  # Clips are the user's own, so taking the app off never deletes them.
+  deleteAppDataOnUninstall: false
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  icon: build/icons
+  executableName: rowvision
+  category: Utility
+  synopsis: Rowing technique from your own video
+  artifactName: RowVision-${version}.AppImage
