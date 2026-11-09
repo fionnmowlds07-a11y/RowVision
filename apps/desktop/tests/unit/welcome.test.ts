@@ -13,9 +13,10 @@ afterEach(() => {
 });
 
 test("clips get their own folder inside the one picked", () => {
-  expect(clipsFolderIn("/home/me/Videos")).toBe(path.join("/home/me/Videos", "RowVision"));
-  expect(clipsFolderIn("/home/me/Videos/RowVision")).toBe("/home/me/Videos/RowVision");
-  expect(clipsFolderIn("/home/me/rowvision")).toBe("/home/me/rowvision");
+  const videos = path.join(root, "Videos");
+  expect(clipsFolderIn(videos)).toBe(path.join(videos, "RowVision"));
+  expect(clipsFolderIn(path.join(videos, "RowVision"))).toBe(path.join(videos, "RowVision"));
+  expect(clipsFolderIn(path.join(root, "rowvision"))).toBe(path.join(root, "rowvision"));
 });
 
 test("a folder that can't be written to is refused in plain words", async () => {
