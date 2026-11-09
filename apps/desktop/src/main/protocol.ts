@@ -14,7 +14,7 @@ export function registerSchemes() {
   ]);
 }
 
-export function serve(pageRoot: string, library: string) {
+export function serve(pageRoot: string, library: () => string) {
   protocol.handle("app", async (request) => {
     const file = request.method === "GET" ? pageFile(pageRoot, request.url) : null;
     if (!file) return notFound();
@@ -24,7 +24,7 @@ export function serve(pageRoot: string, library: string) {
   });
 
   protocol.handle("rowvision", async (request) => {
-    const file = request.method === "GET" ? clipFile(library, request.url) : null;
+    const file = request.method === "GET" ? clipFile(library(), request.url) : null;
     if (!file) return notFound();
     const response = await sendFile(file, request.headers.get("range"));
     response.headers.set("Access-Control-Allow-Origin", APP_ORIGIN);
