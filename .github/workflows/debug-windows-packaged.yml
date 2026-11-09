@@ -23,8 +23,9 @@ jobs:
           try() {
             name=$1; shift
             echo "=== $name"
-            ELECTRON_ENABLE_LOGGING=1 ROWVISION_DATA_DIR="$RUNNER_TEMP/d-$name" timeout 15 "$exe" "$@" > "$RUNNER_TEMP/out-$name.txt" 2>&1
-            echo "exit=$?"
+            code=0
+            ELECTRON_ENABLE_LOGGING=1 ROWVISION_DATA_DIR="$RUNNER_TEMP/d-$name" timeout 15 "$exe" "$@" > "$RUNNER_TEMP/out-$name.txt" 2>&1 || code=$?
+            echo "exit=$code (124 means it was still running after 15 seconds, so it did not crash)"
             head -c 1500 "$RUNNER_TEMP/out-$name.txt"
           }
           try plain
