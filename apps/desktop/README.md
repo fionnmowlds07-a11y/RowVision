@@ -6,7 +6,8 @@ Electron, with a React page that imports the results, viewer, 3D model and logic
 |---|---|
 | Install | `npm ci` |
 | Build | `npm run build` |
-| Start | `npm start` (after a build) |
+| Start | `npm start` (after a build). Clips wait, as there is no measuring program |
+| Start with the real engine | `npm run start:engine` (after a build; Linux, needs Docker, see below) |
 | Lint, types, unit tests | `npm run lint`, `npm run typecheck`, `npm test` |
 | Installer | `npm run dist` (a Windows installer on Windows, an AppImage on Linux, in `release/`) |
 | Installed-app test | `npm run test:packaged`, after `npm run dist` |
@@ -30,6 +31,12 @@ Clips are analysed one at a time, oldest first, by the engine in `services/worke
 - Deleting a clip removes its folder. Removing a video deletes `working.mp4` and `frames.json` and keeps the scores. The user's original video is never touched.
 - Sending a clip (#156) goes to the service in `services/intake`, through one-time upload links. `ROWVISION_SEND_URL` says where it is; without it the Send button does not show.
 - Tests use `tests/fake-engine.mjs`, which speaks the same lines without any models.
+
+## Running from source with the real engine
+
+`npm run start:engine` starts the app with `scripts/dev-engine.sh` as its measuring program, until the installer carries its own (#157). It runs the engine in the `compvisionrowing-worker` Docker image with no network and 3 CPUs (`ROWVISION_ENGINE_CPUS`), and only lets it see the clip's folder and the folder the video is in. The models come from `private/cache/.cache/rtmlib` (`ROWVISION_MODELS` points elsewhere). The image has its own copy of the engine code, so rebuild it after engine changes: `docker build -t compvisionrowing-worker:latest -f services/worker/Dockerfile .` from the repo root.
+
+The window switches Vulkan off at startup (#180): on Wayland, Chromium tries it and the window goes black in full screen.
 
 ## Locked down
 

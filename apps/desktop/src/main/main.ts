@@ -79,6 +79,8 @@ const clipId = (id: unknown): string => {
 };
 
 registerSchemes();
+// On Wayland, Chromium tries Vulkan and the window goes black when it is made full screen. It does not need it.
+app.commandLine.appendSwitch("disable-features", "Vulkan");
 app.enableSandbox();
 
 if (!app.requestSingleInstanceLock()) app.quit();
