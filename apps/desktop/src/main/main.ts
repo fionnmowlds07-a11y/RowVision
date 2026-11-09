@@ -4,7 +4,7 @@ import { app, BrowserWindow, ipcMain, Notification, powerMonitor, session, shell
 import { APP_ORIGIN, CHANNELS, CLIP_ID, type Analysis, type ClipItem } from "../shared/bridge";
 import { addClip, cleanAdd } from "./add";
 import { Analyser } from "./analysis";
-import { listClips, readClip } from "./library";
+import { deleteClip, librarySpace, listClips, readClip, removeVideo } from "./library";
 import { registerSchemes, serve } from "./protocol";
 import { cleanColours, readColours, readSetup, readSpeed, saveSettings, writeColours } from "./settings";
 
@@ -154,6 +154,14 @@ void app.whenReady().then(() => {
     return clip ? withRunning(clip) : null;
   });
   handle(CHANNELS.getAnalysis, async () => analyser.snapshot());
+  handle(CHANNELS.getSpace, async () => librarySpace(library(), await listClips(library())));
+  handle(CHANNELS.deleteClip, async (id) => {
+    const clip = clipId(id);
+    await analyser.forget(clip);
+    await deleteClip(library(), clip);
+    await analyser.next();
+  });
+  handle(CHANNELS.removeVideo, (id) => removeVideo(library(), clipId(id)));
   handle(CHANNELS.stopClip, (id) => analyser.stop(clipId(id)));
   handle(CHANNELS.startClip, (id) => analyser.restart(clipId(id)));
   handle(CHANNELS.tapAgain, (id, tap) => {

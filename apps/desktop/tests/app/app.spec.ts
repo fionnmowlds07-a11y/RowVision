@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -18,6 +18,9 @@ const problems: string[] = [];
 test.beforeAll(async () => {
   data = mkdtempSync(path.join(tmpdir(), "rowvision-app-"));
   makeClip(path.join(data, "clips"));
+  // An analysed clip filmed months ago, whose video can be cleared out.
+  const old = makeClip(path.join(data, "clips"), "old-clip");
+  writeFileSync(path.join(old, "clip.json"), JSON.stringify({ created_at: "2026-05-02T09:00:00Z", filmed_at: "2026-05-01T09:00:00Z", boat_class: "1x", side: "scull", seat: 1 }));
   // Videos to add, kept outside the library as a user's would be.
   sources = path.join(data, "videos");
   mkdirSync(sources);
@@ -90,7 +93,7 @@ test("the page has no Node access and only the narrow bridge", async () => {
     bridge: Object.keys(window.rowvision).sort(),
     origin: location.origin,
   }));
-  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["addClip", "getAnalysis", "getClip", "getColours", "getSetup", "listClips", "onAnalysis", "pathForFile", "setColours", "startClip", "stopClip", "tapAgain"], origin: "app://rowvision" });
+  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["addClip", "deleteClip", "getAnalysis", "getClip", "getColours", "getSetup", "getSpace", "listClips", "onAnalysis", "pathForFile", "removeVideo", "setColours", "startClip", "stopClip", "tapAgain"], origin: "app://rowvision" });
   const prefs = await app.evaluate(({ BrowserWindow }) => {
     // Not in Electron's types, but it reports the settings the page really runs with.
     const contents = BrowserWindow.getAllWindows()[0].webContents as unknown as { getLastWebPreferences(): Electron.WebPreferences | null };
@@ -100,14 +103,22 @@ test("the page has no Node access and only the narrow bridge", async () => {
   expect(prefs).toEqual({ contextIsolation: true, nodeIntegration: false, sandbox: true });
 });
 
-test("the library lists the clip from its folder", async () => {
+test("the library lists the clips from their folders, newest first", async () => {
   await expect(page.getByRole("heading", { name: "Your clips" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /2- seat 2/ })).toBeVisible();
-  await expect(page.getByText(/1 clip, using/)).toBeVisible();
+  const rows = page.getByRole("row");
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(1)).toContainText("2- seat 2");
+  await expect(rows.nth(1)).toContainText("84");
+  await expect(rows.nth(1)).toContainText("Kept");
+  await expect(rows.nth(2)).toContainText("1x seat 1");
+  await expect(page.getByText("You have 2 so far")).toBeVisible();
+  const space = page.getByRole("region", { name: "Space on this computer" });
+  await expect(space).toContainText(/Videos \d/);
+  await expect(space).toContainText(/free/);
 });
 
 test("the viewer shows exactly the frame it says, stepping either way", async () => {
-  await page.getByRole("link", { name: /2- seat 2/ }).click();
+  await page.getByRole("row", { name: /2- seat 2/ }).getByRole("link").click();
   const viewer = page.getByRole("region", { name: "Frame viewer" });
   await expect(viewer).toBeVisible();
   await expectFrame(CATCHES[0]);
@@ -319,6 +330,54 @@ test("when it can't tell which rower is you, a click carries it on", async () =>
   await thisIsMe.click();
   await expect(page.getByRole("heading", { name: "Analysed" })).toBeVisible();
   expect(readJson(path.join(data, "clips", ids.tap, "clip.json")).tap).toMatchObject({ t: 1 });
+});
+
+test("the library sorts by score and size", async () => {
+  await page.getByRole("link", { name: "Clips" }).click();
+  await page.getByRole("button", { name: "Size" }).click();
+  await expect(page.getByRole("columnheader", { name: "Size" })).toHaveAttribute("aria-sort", "descending");
+  await page.getByRole("button", { name: "Overall" }).click();
+  // The two scored clips come first, then the unscored ones.
+  const scores = await page.getByRole("row").locator("td:nth-child(3)").allInnerTexts();
+  expect(scores.slice(0, 2)).toEqual(["84", "84"]);
+  expect(scores.slice(2).every((text) => text === "–")).toBe(true);
+});
+
+test("a video can be removed, keeping the scores", async () => {
+  await page.evaluate((id) => { window.location.hash = `#/clip/${id}`; }, ids.row);
+  await page.getByRole("button", { name: "Remove video, keep scores" }).click();
+  await page.getByRole("button", { name: "Remove video", exact: true }).click();
+  await expect(page.getByText("The video was removed, and the scores were kept.")).toBeVisible();
+  expect(existsSync(path.join(data, "clips", ids.row, "working.mp4"))).toBe(false);
+  expect(existsSync(path.join(data, "clips", ids.row, "summary.json"))).toBe(true);
+  expect(existsSync(path.join(sources, "row.mp4"))).toBe(true);
+});
+
+test("a clip can be deleted, leaving the original video alone", async () => {
+  await page.evaluate((id) => { window.location.hash = `#/clip/${id}`; }, ids.tap);
+  await page.getByRole("button", { name: "Delete clip" }).click();
+  await page.getByRole("button", { name: "Keep it" }).click();
+  await page.getByRole("button", { name: "Delete clip" }).click();
+  await page.getByRole("button", { name: "Delete clip" }).click();
+  await expect(page.getByRole("heading", { name: "Your clips" })).toBeVisible();
+  expect(existsSync(path.join(data, "clips", ids.tap))).toBe(false);
+  expect(existsSync(path.join(sources, "row.mp4"))).toBe(true);
+});
+
+test("videos over three months old can be cleared out in one go", async () => {
+  const space = page.getByRole("region", { name: "Space on this computer" });
+  await space.getByRole("button", { name: "Remove videos over 3 months old" }).click();
+  await expect(space).toContainText("Remove 1 video over 3 months old?");
+  await space.getByRole("button", { name: "Remove", exact: true }).click();
+  await expect(page.getByRole("row", { name: /1x seat 1/ })).toContainText("Removed");
+  await expect(space.getByRole("button", { name: /^Remove/ })).toHaveCount(0);
+  expect(existsSync(path.join(data, "clips", "old-clip", "working.mp4"))).toBe(false);
+});
+
+test("the filming guide is in the app", async () => {
+  await page.getByRole("link", { name: "Filming guide" }).click();
+  await expect(page.getByRole("heading", { name: "How to film a good clip" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Film side-on" })).toBeVisible();
 });
 
 // Before the tests that try forbidden things on purpose.

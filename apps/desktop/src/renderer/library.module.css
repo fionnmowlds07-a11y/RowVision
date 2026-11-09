@@ -1,0 +1,93 @@
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tableCard {
+  background: var(--panel);
+  color: var(--ink);
+  border-radius: var(--radius-panel);
+  padding: 6px 4px;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.table th,
+.table td {
+  padding: 0 14px;
+  text-align: left;
+}
+
+.table th {
+  height: 44px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.table tbody tr {
+  height: 52px;
+  border-top: 1px solid var(--quiet);
+}
+
+.table td a {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.sort {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  min-height: 32px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sort:hover {
+  color: var(--ink);
+}
+
+.note {
+  display: block;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.score,
+.scoreMain {
+  display: inline-flex;
+  min-width: 48px;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-field);
+  font: 800 19px var(--font-display);
+}
+
+.scoreMain {
+  background: var(--highlight);
+  color: var(--on-highlight);
+}
+
+.soft {
+  color: var(--ink-soft);
+}
+
+.bandPoor {
+  color: var(--danger);
+}
+
+.bandGreat,
+.bandExcellent {
+  color: var(--link);
+}
