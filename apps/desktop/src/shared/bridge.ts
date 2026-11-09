@@ -80,6 +80,18 @@ export type ClipDetail = ClipItem & {
   pauseSeconds: number | null;
 };
 
+/** What the first-run welcome needs to show. */
+export type Welcome = {
+  /** True until the welcome is finished. Never shown when clips are already there. */
+  show: boolean;
+  clipsDir: string;
+  freeBytes: number | null;
+  /** The folder can only move while it holds no clips. */
+  canMove: boolean;
+  /** The measuring program is not installed, so nothing can be analysed yet. */
+  engineMissing: boolean;
+};
+
 export type Bridge = {
   listClips(): Promise<ClipItem[]>;
   getClip(id: string): Promise<ClipDetail | null>;
@@ -106,6 +118,10 @@ export type Bridge = {
   /** Whether there is anywhere to send clips to yet. */
   canSend(): Promise<boolean>;
   sendClip(id: string, consent: { note: string; adult: boolean; allowed: boolean }): Promise<void>;
+  getWelcome(): Promise<Welcome>;
+  /** Asks where to keep clips. Says why in plain words when the folder can't be used. */
+  changeClipsFolder(): Promise<{ welcome: Welcome; problem: string | null }>;
+  finishWelcome(): Promise<void>;
   onSendProgress(listener: (progress: { id: string; sent: number; total: number }) => void): () => void;
 };
 
@@ -127,6 +143,9 @@ export const CHANNELS = {
   canSend: "send:ready",
   sendClip: "send:clip",
   sendProgress: "send:progress",
+  getWelcome: "welcome:get",
+  changeClipsFolder: "welcome:folder",
+  finishWelcome: "welcome:finish",
 } as const;
 
 /** Lower-case letters, digits and dashes, so an id can never be a path. */

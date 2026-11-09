@@ -8,7 +8,15 @@ const NONE: Colours = { ground: null, highlight: null };
 export const FIRST_SETUP: Setup = { boat: "8+", side: "stroke", seat: 1 };
 
 /** Speed is seconds of work per second of video, from the last clip this computer finished. */
-type Settings = { colours: Colours; setup: Setup; speed: number | null };
+type Settings = {
+  colours: Colours;
+  setup: Setup;
+  speed: number | null;
+  /** The welcome has been finished on this computer. */
+  welcomed: boolean;
+  /** Where clips are kept, when the user picked somewhere other than the app data folder. */
+  clipsDir: string | null;
+};
 
 /** Null means the design system's own colour. */
 export function cleanColours(value: unknown): Colours | null {
@@ -33,9 +41,11 @@ async function readSettings(file: string): Promise<Settings> {
   try {
     const saved = JSON.parse(await fs.readFile(file, "utf8")) as Record<string, unknown>;
     const speed = typeof saved.speed === "number" && Number.isFinite(saved.speed) && saved.speed > 0 ? saved.speed : null;
-    return { colours: cleanColours(saved.colours) ?? NONE, setup: cleanSetup(saved.setup) ?? FIRST_SETUP, speed };
+    const welcomed = saved.welcomed === true;
+    const clipsDir = typeof saved.clipsDir === "string" && path.isAbsolute(saved.clipsDir) ? saved.clipsDir : null;
+    return { colours: cleanColours(saved.colours) ?? NONE, setup: cleanSetup(saved.setup) ?? FIRST_SETUP, speed, welcomed, clipsDir };
   } catch {
-    return { colours: NONE, setup: FIRST_SETUP, speed: null };
+    return { colours: NONE, setup: FIRST_SETUP, speed: null, welcomed: false, clipsDir: null };
   }
 }
 
@@ -49,6 +59,11 @@ export async function readSetup(file: string): Promise<Setup> {
 
 export async function readSpeed(file: string): Promise<number | null> {
   return (await readSettings(file)).speed;
+}
+
+export async function readWelcome(file: string): Promise<{ welcomed: boolean; clipsDir: string | null }> {
+  const { welcomed, clipsDir } = await readSettings(file);
+  return { welcomed, clipsDir };
 }
 
 // One change at a time, so two saves close together cannot undo each other.

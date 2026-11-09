@@ -24,6 +24,9 @@ const bridge: Bridge = {
   removeVideo: (id: string) => ipcRenderer.invoke(CHANNELS.removeVideo, id),
   canSend: () => ipcRenderer.invoke(CHANNELS.canSend),
   sendClip: (id: string, consent: { note: string; adult: boolean; allowed: boolean }) => ipcRenderer.invoke(CHANNELS.sendClip, id, consent),
+  getWelcome: () => ipcRenderer.invoke(CHANNELS.getWelcome),
+  changeClipsFolder: () => ipcRenderer.invoke(CHANNELS.changeClipsFolder),
+  finishWelcome: () => ipcRenderer.invoke(CHANNELS.finishWelcome),
   onSendProgress: (listener: (progress: { id: string; sent: number; total: number }) => void) => {
     const pass = (_event: unknown, progress: { id: string; sent: number; total: number }) => listener(progress);
     ipcRenderer.on(CHANNELS.sendProgress, pass);

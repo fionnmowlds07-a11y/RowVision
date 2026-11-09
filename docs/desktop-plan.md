@@ -22,7 +22,7 @@ The analysis engine, working copy, scoring, results, frame viewer, 3D model, col
 
 Picked by the owner on 8 November 2026 from the mock-ups in #150:
 
-- First run: option A, three steps (where clips are kept, colours, model download).
+- First run: option A, three steps (where clips are kept, colours, model download). Built in #175; the download itself waits for #157.
 - Clip library: option B, a table with a side menu and the space used.
 - Analysis running: option A, its own screen with stages, cancel, a notification when done, and a list of clips waiting next.
 - Sending a clip: option A.

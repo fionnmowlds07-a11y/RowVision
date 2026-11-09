@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { colourVariables } from "@/lib/colours";
-import type { Colours } from "../shared/bridge";
+import type { Colours, Welcome } from "../shared/bridge";
 import { AddPage } from "./add-page";
 import { AnalysisPage } from "./analysis-page";
 import { ClipPage } from "./clip-page";
@@ -11,6 +11,7 @@ import { SettingsPage } from "./settings-page";
 import { SideMenu } from "./side-menu";
 import { useAnalysis } from "./use-analysis";
 import { useLibrary } from "./use-library";
+import { WelcomePage } from "./welcome-page";
 import styles from "./shell.module.css";
 
 export function App() {
@@ -21,13 +22,27 @@ export function App() {
   const { clips, space } = useLibrary([window.location.hash, running?.id, analysis?.waiting.length].join("|"));
   const [colours, setColours] = useState<Colours>({ ground: null, highlight: null });
 
+  // Undefined while loading, so the library never flashes up before the welcome.
+  const [welcome, setWelcome] = useState<Welcome | null | undefined>(undefined);
+
   useEffect(() => {
     void window.rowvision.getColours().then(setColours);
+    void window.rowvision.getWelcome().then((value) => setWelcome(value.show ? value : null));
   }, []);
 
   const save = useCallback(async (ground: string | null, highlight: string | null) => {
     setColours(await window.rowvision.setColours({ ground, highlight }));
   }, []);
+
+  const vars = colourVariables(colours.ground, colours.highlight) as CSSProperties;
+  if (welcome === undefined) return null;
+  if (welcome) {
+    const done = () => {
+      window.location.hash = "#/add";
+      setWelcome(null);
+    };
+    return <div style={vars}><WelcomePage welcome={welcome} colours={colours} save={save} done={done} /></div>;
+  }
 
   let page: ReactNode;
   if (route.page === "clip") page = <ClipPage key={route.id} id={route.id} />;
@@ -38,7 +53,7 @@ export function App() {
   else page = <ClipsPage clips={clips} />;
 
   return (
-    <div className={styles.shell} style={colourVariables(colours.ground, colours.highlight) as CSSProperties}>
+    <div className={styles.shell} style={vars}>
       <SideMenu route={route} running={running} clips={clips} space={space} />
       <main className={styles.main}>{page}</main>
     </div>

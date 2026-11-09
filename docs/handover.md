@@ -90,7 +90,7 @@ If a check stays "pending" although the job finished, rerun that job with `gh ru
 
 Host Python is too new, so Python runs in Docker. Mount the repo when testing, for example `-e PYTHONPATH=/repo/services/vision:/repo/apps/preview -v "$PWD/services:/repo/services:ro" -v "$PWD/apps:/repo/apps:ro"`. Use port 8767 for test servers, and only restart 8766 when `/api/job` is not `running`. The app does not come back by itself after a computer restart. Browser checks use Playwright from `/home/fionn/Kidscope/Kidscope/node_modules` through `createRequire`.
 
-Current suites on `main`, all passing: 272 vision, 145 preview, 71 page, 43 worker, 165 web unit, 74 database, 16 browser, 6 acceptance scenarios, 61 desktop unit, 24 desktop app and 2 intake tests.
+Current suites on `main`, all passing: 272 vision, 145 preview, 71 page, 43 worker, 165 web unit, 74 database, 16 browser, 6 acceptance scenarios, 65 desktop unit, 28 desktop app and 2 intake tests.
 
 ## What exists
 
