@@ -1,0 +1,161 @@
+.page {
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding: 24px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ground);
+  color: var(--on-ground);
+}
+
+/* The card stays dark whatever the colours, as in the picked design, so its text always reads. */
+.card {
+  width: 100%;
+  max-width: 600px;
+  box-sizing: border-box;
+  background: #121a15;
+  color: #ffffff;
+  border-radius: 14px;
+  padding: 36px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.card h1 {
+  font-size: 44px;
+  line-height: 1;
+}
+
+.card p {
+  margin: 0;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  color: #a9bdb0;
+}
+
+.dots {
+  display: flex;
+  gap: 6px;
+}
+
+.dots span {
+  width: 28px;
+  height: 6px;
+  border-radius: 3px;
+  background: #1f2b24;
+}
+
+.dots .on,
+.bar span {
+  background: var(--highlight);
+}
+
+.soft {
+  font-size: 16px;
+  line-height: 1.45;
+  color: #a9bdb0;
+}
+
+.small {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #a9bdb0;
+}
+
+.box {
+  background: #1f2b24;
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.folder {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.folder strong {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.row {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: #0b110d;
+  overflow: hidden;
+  display: flex;
+}
+
+.bar span {
+  width: 100%;
+}
+
+.quiet {
+  background: #2b3a31;
+  color: #ffffff;
+}
+
+.problem {
+  font-size: 14px;
+  color: #ffb4a8;
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.swatch {
+  appearance: none;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  min-height: 64px;
+  padding: 8px 10px;
+  font: 500 13px var(--font-text);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+}
+
+.swatch[aria-pressed="true"] {
+  border-color: #ffffff;
+}
+
+.swatch span {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+
+.buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
