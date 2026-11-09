@@ -1,0 +1,85 @@
+name: Installers
+
+# Builds the Windows installer and the Linux AppImage. Heavy, so it runs only when asked for, on a
+# version tag, or when this file or the installer settings change.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - .github/workflows/installers.yml
+      - apps/desktop/electron-builder.yml
+      - apps/desktop/scripts/**
+
+jobs:
+  installer:
+    name: Installer on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Bundle the engine
+        run: |
+          pip install ./services/vision ./services/worker pyinstaller
+          # rtmlib brings a desktop build of OpenCV, which needs a display library we do not use.
+          pip uninstall -y opencv-contrib-python opencv-python opencv-python-headless
+          pip install "opencv-python-headless>=4.10,<5"
+          pyinstaller --noconfirm --onedir --name rowvision-engine --exclude-module psycopg \
+            --collect-all rtmlib --collect-all onnxruntime --collect-all cv2 \
+            --collect-submodules rowvision --collect-submodules rowvision_worker \
+            --add-data "services/vision/reference:reference" --add-data "services/vision/rowvision/*.py:rowvision" \
+            services/worker/packaging/smoke.py
+          mkdir -p apps/desktop/engine
+          cp -r dist/rowvision-engine/. apps/desktop/engine/
+      - name: Put ffmpeg beside it
+        run: python apps/desktop/scripts/fetch-ffmpeg.py apps/desktop/engine
+
+      - name: Build the installer
+        working-directory: apps/desktop
+        run: |
+          npm ci
+          npm run dist
+          ls -lh release
+
+      - name: The installed engine runs a job with no Python, and finds its own ffmpeg
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then unpacked=apps/desktop/release/linux-unpacked; else unpacked=apps/desktop/release/win-unpacked; fi
+          engine="$PWD/$unpacked/resources/engine"
+          ext=""; [ "$RUNNER_OS" = "Windows" ] && ext=".exe"
+          test -x "$engine/rowvision-engine$ext"
+          test -x "$engine/ffmpeg$ext"
+          test -f "$PWD/$unpacked/resources/app.asar"
+          # Make a tiny clip with the bundled ffmpeg, then run a job on it, with the engine's folder first on the path.
+          work="$RUNNER_TEMP/clip"; mkdir -p "$work"
+          "$engine/ffmpeg$ext" -v error -y -f lavfi -i testsrc=size=320x180:rate=30 -t 3 -pix_fmt yuv420p "$work/source.mp4"
+          python -c "import json, sys; f, src, e = sys.argv[1:4]; json.dump(dict(folder=f, source=src, start=0, length=3, boat_class='2-', side='bow', seat=2, engine='fake'), open(f + '/job.json', 'w'))" "$work" "$work/source.mp4" "$engine"
+          cd "$RUNNER_TEMP"
+          PATH="$engine:/usr/bin:/bin" sleep 30 | PATH="$engine:/usr/bin:/bin" "$engine/rowvision-engine$ext" "$work/job.json" | tee events.txt
+          grep -q '"event": "done"' events.txt
+          test -s "$work/working.mp4"
+          test -s "$work/summary.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RowVision-${{ runner.os }}
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.AppImage
+          retention-days: 7
+          if-no-files-found: error
