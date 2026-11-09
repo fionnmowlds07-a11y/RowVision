@@ -46,6 +46,6 @@ Sent clips cannot be removed from the app afterwards, so no "Remove sent clip" b
 
 1. #134 goes first for the scores, on a night when the laptop is free. Desktop work that does not touch scores can run alongside it.
 2. Prove the engine can be bundled and run on Linux and Windows.
-3. Build the app, then the installers.
+3. Build the app, then the installers (first ones in #178).
 4. Test on real Windows laptops.
 5. Android speed test, then decide on Android.

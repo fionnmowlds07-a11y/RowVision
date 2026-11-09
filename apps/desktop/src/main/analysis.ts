@@ -34,6 +34,14 @@ export function clipSeconds(clip: Clip): number {
   return typeof clip.section_length === "number" ? clip.section_length : SECTION_SECONDS;
 }
 
+/** The engine's own folder goes first on the path, so the ffmpeg and ffprobe packed beside it are the ones it finds. */
+export function engineEnv(program: string, env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  if (!path.isAbsolute(program)) return env;
+  // Windows calls it Path, and a second spelling would leave the first one in charge.
+  const key = Object.keys(env).find((name) => name.toLowerCase() === "path") ?? "PATH";
+  return { ...env, [key]: [path.dirname(program), env[key]].filter(Boolean).join(path.delimiter) };
+}
+
 /** The job file the engine reads, from the clip's own record. */
 export function jobFor(folder: string, clip: Clip, kind: string): Record<string, unknown> {
   const job: Record<string, unknown> = {
@@ -132,7 +140,7 @@ export class Analyser {
     await writeJson(jobFile, jobFor(folder, clip, this.options.kind));
 
     const [program, ...rest] = command;
-    const child = spawn(program, [...rest, jobFile], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
+    const child = spawn(program, [...rest, jobFile], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true, env: engineEnv(program, process.env) });
     const log = createWriteStream(path.join(folder, "engine.log"));
     child.stderr?.pipe(log);
     child.stdin?.on("error", () => undefined);

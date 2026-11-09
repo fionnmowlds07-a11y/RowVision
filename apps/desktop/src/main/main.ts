@@ -125,6 +125,8 @@ function createWindow() {
     minHeight: 600,
     backgroundColor: "#070b09",
     title: "RowVision",
+    // The packaged app carries its icon, and this is the one a Linux window shows.
+    icon: path.join(__dirname, "..", "..", "build", "icon.png"),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "..", "preload", "preload.js"),

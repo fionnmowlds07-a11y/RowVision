@@ -44,3 +44,7 @@ videos/
 # Next.js
 next-env.d.ts
 *.tsbuildinfo
+
+# Installer builds, and the engine copied in to package
+apps/desktop/release/
+apps/desktop/engine/
