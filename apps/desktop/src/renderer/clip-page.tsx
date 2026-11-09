@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { SendClip } from "./send-dialog";
 import { libraryChanged } from "./use-library";
 import { Results } from "@/app/clips/[id]/results";
 import { clipUrl, type ClipDetail } from "../shared/bridge";
@@ -27,8 +28,13 @@ export function ClipPage({ id }: { id: string }) {
   const { summary } = clip;
   return (
     <>
-      <h1 style={{ fontSize: 32 }}>{longDate(clip.createdAt)}</h1>
-      <p style={{ margin: 0, color: "var(--on-ground-soft)" }}>{setupLine(clip.setup)}{clip.setup.note ? `. ${clip.setup.note}` : ""}</p>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <h1 style={{ fontSize: 32 }}>{longDate(clip.createdAt)}</h1>
+          <p style={{ margin: "8px 0 0", color: "var(--on-ground-soft)" }}>{setupLine(clip.setup)}{clip.setup.note ? `. ${clip.setup.note}` : ""}</p>
+        </div>
+        <SendClip clip={clip} onSent={() => setCount((value) => value + 1)} />
+      </div>
       {!summary ? (
         <section className="card stack">
           <h2 style={{ fontSize: 24 }}>Not analysed yet</h2>

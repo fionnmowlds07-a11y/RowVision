@@ -3,6 +3,8 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
+import type { Server } from "node:http";
+import { makeServer } from "../../../../services/intake/server.mjs";
 import { CATCHES, FPS, FRAMES, OLD_CODEC, frameOf, makeClip, makeVideo } from "./fixture";
 
 const appDir = path.resolve(__dirname, "../..");
@@ -11,6 +13,8 @@ const electronPath = createRequire(__filename)("electron") as unknown as string;
 let data: string;
 let sources: string;
 let control: string;
+let intake: Server;
+let intakeUrl: string;
 let app: ElectronApplication;
 let page: Page;
 const problems: string[] = [];
@@ -31,6 +35,10 @@ test.beforeAll(async () => {
   // The stand-in engine waits until a test tells it what to do.
   control = path.join(data, "engine-control");
   writeFileSync(control, "hang");
+  // A local stand-in for the service that receives sent clips.
+  intake = makeServer({ folder: path.join(data, "received"), adminToken: "owner" });
+  await new Promise<void>((done) => intake.listen(0, "127.0.0.1", done));
+  intakeUrl = `http://127.0.0.1:${(intake.address() as { port: number }).port}`;
   await launch();
 });
 
@@ -46,6 +54,7 @@ async function launch() {
       ROWVISION_ENGINE_KIND: "fake",
       ROWVISION_TEST_NOTICES: "1",
       FAKE_ENGINE_CONTROL: control,
+      ROWVISION_SEND_URL: intakeUrl,
     },
   });
   page = await app.firstWindow();
@@ -59,6 +68,7 @@ test.afterAll(async () => {
   // A refused navigation can leave close() waiting, so stop the app outright if it does not close.
   const closed = app ? Promise.race([app.close().then(() => true), new Promise((done) => setTimeout(() => done(false), 10_000))]) : true;
   if (!(await closed)) app.process().kill("SIGKILL");
+  intake?.close();
   rmSync(data, { recursive: true, force: true });
 });
 
@@ -93,7 +103,7 @@ test("the page has no Node access and only the narrow bridge", async () => {
     bridge: Object.keys(window.rowvision).sort(),
     origin: location.origin,
   }));
-  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["addClip", "deleteClip", "getAnalysis", "getClip", "getColours", "getSetup", "getSpace", "listClips", "onAnalysis", "pathForFile", "removeVideo", "setColours", "startClip", "stopClip", "tapAgain"], origin: "app://rowvision" });
+  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["addClip", "canSend", "deleteClip", "getAnalysis", "getClip", "getColours", "getSetup", "getSpace", "listClips", "onAnalysis", "onSendProgress", "pathForFile", "removeVideo", "sendClip", "setColours", "startClip", "stopClip", "tapAgain"], origin: "app://rowvision" });
   const prefs = await app.evaluate(({ BrowserWindow }) => {
     // Not in Electron's types, but it reports the settings the page really runs with.
     const contents = BrowserWindow.getAllWindows()[0].webContents as unknown as { getLastWebPreferences(): Electron.WebPreferences | null };
@@ -378,6 +388,26 @@ test("the filming guide is in the app", async () => {
   await page.getByRole("link", { name: "Filming guide" }).click();
   await expect(page.getByRole("heading", { name: "How to film a good clip" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Film side-on" })).toBeVisible();
+});
+
+test("a clip is sent only after both ticks, then marked as sent", async () => {
+  await page.evaluate(() => { window.location.hash = "#/clip/test-clip"; });
+  await page.getByRole("button", { name: "Send this clip" }).click();
+  const dialog = page.getByRole("dialog", { name: "Send this clip to help RowVision learn" });
+  await expect(dialog).toContainText("The 3 seconds you analysed");
+  const send = dialog.getByRole("button", { name: "Send clip" });
+  await expect(send).toBeDisabled();
+  await dialog.getByLabel("Anything wrong with the results? (optional)").fill("Catch marks look late");
+  await dialog.getByLabel(/18 or over/).check();
+  await expect(send).toBeDisabled();
+  await dialog.getByLabel(/happy for it to be used/).check();
+  await send.click();
+  await expect(page.getByRole("heading", { name: "Sent. Thank you" })).toBeVisible();
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect(page.getByText("Sent to RowVision")).toBeVisible();
+  const list = await (await fetch(`${intakeUrl}/admin/sends`, { headers: { authorization: "Bearer owner" } })).json();
+  expect(list.sends).toHaveLength(1);
+  expect(list.sends[0]).toMatchObject({ note: "Catch marks look late", setup: { boat: "2-", seat: 2 }, consent: { adult: true, allowed: true } });
 });
 
 // Before the tests that try forbidden things on purpose.
