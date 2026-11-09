@@ -17,11 +17,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TextIO
 
-from rowvision_worker import media
+from rowvision_worker import media, models
 from rowvision_worker.engine import Cancelled, Done, Engine, NeedsTap, Setup, Tap, Video, make_engine
 from rowvision_worker.results import headline, split_report
 
 FAILED_MESSAGE = "We couldn't analyse this clip. Try another clip, or send it to us."
+MODELS_FAILED_MESSAGE = "We couldn't get the measuring models. Check your internet connection and try again."
 PROGRESS_STEP = 0.01
 """Smallest change in progress worth telling the app about."""
 BELOW_NORMAL_PRIORITY = 0x00004000
@@ -162,7 +163,38 @@ def send_line(event: dict[str, Any]) -> None:
     print(json.dumps(event, allow_nan=False), flush=True)
 
 
+def models_main(args: list[str]) -> int:
+    """`--models status` says whether the models are there. `--models fetch` gets them, with progress."""
+    folder = models.checkpoints_dir()
+    if args == ["status"]:
+        send_line(models.status(folder))
+        return FINISHED
+    if args != ["fetch"]:
+        send_line({"event": "failed", "message": MODELS_FAILED_MESSAGE})
+        return FAILED
+    stop = threading.Event()
+    threading.Thread(target=watch_input, args=(sys.stdin, stop), daemon=True).start()
+    try:
+        models.fetch(folder, send_line, stop.is_set, os.environ.get("ROWVISION_MODELS_BASE") or None)
+    except models.Cancelled:
+        send_line({"event": "cancelled"})
+        return CANCELLED
+    except models.ModelError as error:
+        send_line({"event": "failed", "message": str(error)})
+        return FAILED
+    except Exception:  # noqa: BLE001 - the app needs a message, not a traceback
+        log.exception("could not get the models")
+        send_line({"event": "failed", "message": MODELS_FAILED_MESSAGE})
+        return FAILED
+    send_line({"event": "done"})
+    return FINISHED
+
+
 def main(argv: list[str] | None = None) -> int:
+    arguments_given = sys.argv[1:] if argv is None else argv
+    if arguments_given[:1] == ["--models"]:
+        logging.basicConfig(level=logging.INFO, stream=sys.stderr)
+        return models_main(arguments_given[1:])
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("job", type=Path, help="Path of the job file")
     arguments = parser.parse_args(argv)
