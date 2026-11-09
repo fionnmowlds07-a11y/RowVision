@@ -1,0 +1,11 @@
+{
+  "name": "rowvision-intake",
+  "private": true,
+  "type": "module",
+  "description": "Receives clips that athletes choose to send, through one-time upload links.",
+  "scripts": {
+    "start": "node start.mjs",
+    "test": "node --test test/"
+  },
+  "engines": { "node": ">=22" }
+}
