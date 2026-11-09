@@ -45,6 +45,17 @@ export type Analysis = {
   onBattery: boolean;
   /** The measuring program is not installed, so nothing can be analysed yet. */
   engineMissing: boolean;
+  /** The measuring models are not downloaded yet, so clips wait for them. */
+  modelsMissing: boolean;
+};
+
+/** The measuring models the engine needs, and whether they are on this computer. */
+export type ModelsState = {
+  state: "checking" | "ready" | "missing" | "downloading" | "failed" | "no_engine";
+  downloadedBytes: number;
+  totalBytes: number;
+  /** Why it failed, in plain words. */
+  message: string | null;
 };
 
 export type ClipItem = {
@@ -118,6 +129,11 @@ export type Bridge = {
   /** Whether there is anywhere to send clips to yet. */
   canSend(): Promise<boolean>;
   sendClip(id: string, consent: { note: string; adult: boolean; allowed: boolean }): Promise<void>;
+  getModels(): Promise<ModelsState>;
+  /** Starts the download when the models are missing. Progress arrives through onModels. */
+  downloadModels(): Promise<void>;
+  cancelModels(): Promise<void>;
+  onModels(listener: (state: ModelsState) => void): () => void;
   getWelcome(): Promise<Welcome>;
   /** Asks where to keep clips. Says why in plain words when the folder can't be used. */
   changeClipsFolder(): Promise<{ welcome: Welcome; problem: string | null }>;
@@ -143,6 +159,10 @@ export const CHANNELS = {
   canSend: "send:ready",
   sendClip: "send:clip",
   sendProgress: "send:progress",
+  getModels: "models:get",
+  downloadModels: "models:download",
+  cancelModels: "models:cancel",
+  modelsChanged: "models:changed",
   getWelcome: "welcome:get",
   changeClipsFolder: "welcome:folder",
   finishWelcome: "welcome:finish",

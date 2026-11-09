@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # The measuring program for running the app from source (Linux, needs Docker). The app calls it with a job file.
 # It runs the real engine in the worker image with no network, and only sees the clip's folder and the video's folder.
+# The image only supplies Python and its libraries. The engine code is the repo's own, so it is always current.
 # Build the image once with: docker build -t compvisionrowing-worker:latest -f services/worker/Dockerfile .
 set -euo pipefail
-job=$1
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 image=${ROWVISION_ENGINE_IMAGE:-compvisionrowing-worker:latest}
 cpus=${ROWVISION_ENGINE_CPUS:-3}
 models=${ROWVISION_MODELS:-$repo/private/cache}
+code=(-e PYTHONPATH=/repo/services/vision:/repo/services/worker -v "$repo/services:/repo/services:ro")
 
 if ! docker image inspect "$image" >/dev/null 2>&1; then
   echo "The engine image $image is missing. Build it first (see the top of scripts/dev-engine.sh)." >&2
@@ -18,6 +19,12 @@ if [ ! -d "$models/.cache/rtmlib" ]; then
   exit 1
 fi
 
+# `--models status` and `--models fetch` need no clip. In here the models are the ones in $models already.
+if [ "${1:-}" = "--models" ]; then
+  exec docker run --rm -i --user "$(id -u):$(id -g)" -e HOME=/cache "${code[@]}" -v "$models:/cache" \
+    --entrypoint python "$image" -m rowvision_worker.desktop "$@"
+fi
+job=$1
 folder=$(dirname "$job")
 source=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("source") or "")' "$job")
 mounts=(-v "$folder:$folder")
@@ -26,5 +33,5 @@ if [ -n "$source" ] && [ -e "$source" ]; then
 fi
 
 exec docker run --rm -i --network none --cpus "$cpus" --user "$(id -u):$(id -g)" -e HOME=/cache \
-  "${mounts[@]}" -v "$models:/cache" \
+  "${code[@]}" "${mounts[@]}" -v "$models:/cache" \
   --entrypoint python "$image" -m rowvision_worker.desktop "$job"

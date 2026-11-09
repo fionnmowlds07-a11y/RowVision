@@ -1,9 +1,10 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, Notification, powerMonitor, session, shell, type IpcMainInvokeEvent } from "electron";
-import { APP_ORIGIN, CHANNELS, CLIP_ID, type Analysis, type ClipItem, type Welcome } from "../shared/bridge";
+import { APP_ORIGIN, CHANNELS, CLIP_ID, type Analysis, type ClipItem, type ModelsState, type Welcome } from "../shared/bridge";
 import { addClip, cleanAdd } from "./add";
 import { Analyser } from "./analysis";
+import { Models } from "./models";
 import { deleteClip, librarySpace, listClips, readClip, removeVideo } from "./library";
 import { registerSchemes, serve } from "./protocol";
 import { cleanConsent, sendClip } from "./send";
@@ -48,7 +49,26 @@ function notify(title: string, body: string, id: string) {
   notice.show();
 }
 
+/** The engine keeps its models in the app's own folder, so removing the app's data removes them too. */
+const engineSettings = () => ({ TORCH_HOME: path.join(app.getPath("userData"), "models", "rtmlib") });
+
+let modelsWereReady = false;
+const models = new Models({
+  engine: engineCommand,
+  env: engineSettings,
+  onChange: (state: ModelsState) => {
+    for (const window of BrowserWindow.getAllWindows()) window.webContents.send(CHANNELS.modelsChanged, state);
+    // Clips that were waiting for the models can start now, or must wait again.
+    if (models.ready() !== modelsWereReady) {
+      modelsWereReady = models.ready();
+      void analyser.next();
+    }
+  },
+});
+
 const analyser = new Analyser({
+  modelsReady: () => models.ready(),
+  env: engineSettings,
   library,
   engine: engineCommand,
   kind: process.env.ROWVISION_ENGINE_KIND ?? "real",
@@ -163,6 +183,9 @@ void app.whenReady().then(async () => {
     return clip ? withRunning(clip) : null;
   });
   handle(CHANNELS.getAnalysis, async () => analyser.snapshot());
+  handle(CHANNELS.getModels, async () => models.snapshot());
+  handle(CHANNELS.downloadModels, () => models.download());
+  handle(CHANNELS.cancelModels, async () => models.cancel());
   handle(CHANNELS.getSpace, async () => librarySpace(library(), await listClips(library())));
   handle(CHANNELS.deleteClip, async (id) => {
     const clip = clipId(id);
@@ -237,8 +260,8 @@ void app.whenReady().then(async () => {
 
   powerMonitor.on("on-battery", () => analyser.changed());
   powerMonitor.on("on-ac", () => analyser.changed());
-  // Anything left waiting, or cut off when the app last closed, starts again.
-  void analyser.start();
+  // Anything left waiting, or cut off when the app last closed, starts again once the models are known to be there.
+  void models.check().then(() => analyser.start());
 
   createWindow();
   app.on("activate", () => {
@@ -246,5 +269,8 @@ void app.whenReady().then(async () => {
   });
 });
 
-app.on("before-quit", () => analyser.shutdown());
+app.on("before-quit", () => {
+  models.shutdown();
+  analyser.shutdown();
+});
 app.on("window-all-closed", () => app.quit());

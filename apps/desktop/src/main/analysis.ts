@@ -35,11 +35,12 @@ export function clipSeconds(clip: Clip): number {
 }
 
 /** The engine's own folder goes first on the path, so the ffmpeg and ffprobe packed beside it are the ones it finds. */
-export function engineEnv(program: string, env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  if (!path.isAbsolute(program)) return env;
+export function engineEnv(program: string, env: NodeJS.ProcessEnv, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const wanted = { ...env, ...extra };
+  if (!path.isAbsolute(program)) return Object.keys(extra).length === 0 ? env : wanted;
   // Windows calls it Path, and a second spelling would leave the first one in charge.
-  const key = Object.keys(env).find((name) => name.toLowerCase() === "path") ?? "PATH";
-  return { ...env, [key]: [path.dirname(program), env[key]].filter(Boolean).join(path.delimiter) };
+  const key = Object.keys(wanted).find((name) => name.toLowerCase() === "path") ?? "PATH";
+  return { ...wanted, [key]: [path.dirname(program), wanted[key]].filter(Boolean).join(path.delimiter) };
 }
 
 /** The job file the engine reads, from the clip's own record. */
@@ -71,6 +72,10 @@ type Options = {
   onBattery: () => boolean;
   readSpeed: () => Promise<number | null>;
   saveSpeed: (secondsPerSecond: number) => Promise<void>;
+  /** Whether the measuring models are on this computer. Clips wait until they are. Defaults to yes. */
+  modelsReady?: () => boolean;
+  /** Extra environment for the engine, such as where it keeps its models. */
+  env?: () => NodeJS.ProcessEnv;
 };
 
 type Current = Running & { child: ChildProcess; ended: boolean; stopping: boolean; forgotten?: boolean; seconds: number; timer?: NodeJS.Timeout };
@@ -100,7 +105,8 @@ export class Analyser {
       ahead += Math.round(seconds * this.speed);
       return item;
     });
-    return { running, waiting, onBattery: this.options.onBattery(), engineMissing: this.options.engine() === null };
+    const modelsMissing = !(this.options.modelsReady?.() ?? true);
+    return { running, waiting, onBattery: this.options.onBattery(), engineMissing: this.options.engine() === null, modelsMissing };
   }
 
   changed(): void {
@@ -120,7 +126,7 @@ export class Analyser {
     this.waiting = await Promise.all(clips.map(async (clip) => ({ id: clip.id, seconds: clipSeconds(((await readJson(path.join(library, clip.id, "clip.json"))) ?? {}) as Clip) })));
     if (this.current || this.quitting || this.waiting.length === 0) return this.changed();
     const command = this.options.engine();
-    if (!command) return this.changed();
+    if (!command || !(this.options.modelsReady?.() ?? true)) return this.changed();
     const { id } = this.waiting.shift()!;
     await this.run(id, command);
     this.changed();
@@ -140,7 +146,7 @@ export class Analyser {
     await writeJson(jobFile, jobFor(folder, clip, this.options.kind));
 
     const [program, ...rest] = command;
-    const child = spawn(program, [...rest, jobFile], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true, env: engineEnv(program, process.env) });
+    const child = spawn(program, [...rest, jobFile], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true, env: engineEnv(program, process.env, this.options.env?.()) });
     const log = createWriteStream(path.join(folder, "engine.log"));
     child.stderr?.pipe(log);
     child.stdin?.on("error", () => undefined);

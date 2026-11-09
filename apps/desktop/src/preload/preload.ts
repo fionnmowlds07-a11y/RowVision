@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
-import { CHANNELS, type AddRequest, type Analysis, type Bridge, type Colours } from "../shared/bridge";
+import { CHANNELS, type AddRequest, type Analysis, type Bridge, type Colours, type ModelsState } from "../shared/bridge";
 
 // A fixed list of calls. The page never gets ipcRenderer itself.
 const bridge: Bridge = {
@@ -24,6 +24,14 @@ const bridge: Bridge = {
   removeVideo: (id: string) => ipcRenderer.invoke(CHANNELS.removeVideo, id),
   canSend: () => ipcRenderer.invoke(CHANNELS.canSend),
   sendClip: (id: string, consent: { note: string; adult: boolean; allowed: boolean }) => ipcRenderer.invoke(CHANNELS.sendClip, id, consent),
+  getModels: () => ipcRenderer.invoke(CHANNELS.getModels),
+  downloadModels: () => ipcRenderer.invoke(CHANNELS.downloadModels),
+  cancelModels: () => ipcRenderer.invoke(CHANNELS.cancelModels),
+  onModels: (listener: (state: ModelsState) => void) => {
+    const pass = (_event: unknown, state: ModelsState) => listener(state);
+    ipcRenderer.on(CHANNELS.modelsChanged, pass);
+    return () => void ipcRenderer.removeListener(CHANNELS.modelsChanged, pass);
+  },
   getWelcome: () => ipcRenderer.invoke(CHANNELS.getWelcome),
   changeClipsFolder: () => ipcRenderer.invoke(CHANNELS.changeClipsFolder),
   finishWelcome: () => ipcRenderer.invoke(CHANNELS.finishWelcome),

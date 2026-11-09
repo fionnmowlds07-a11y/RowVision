@@ -14,8 +14,10 @@ let control: string;
 let notices: string[];
 let speed: number | null;
 let engine: string[] | null;
+let modelsReady = true;
 
 beforeEach(() => {
+  modelsReady = true;
   root = mkdtempSync(path.join(tmpdir(), "rowvision-analysis-"));
   library = path.join(root, "clips");
   control = path.join(root, "control");
@@ -43,6 +45,7 @@ function make(): Analyser {
     onBattery: () => false,
     readSpeed: async () => speed,
     saveSpeed: async (value) => { speed = value; },
+    modelsReady: () => modelsReady,
   });
   return analyser;
 }
@@ -176,4 +179,18 @@ test("without the engine, clips wait and nothing runs", async () => {
   const runner = make();
   await runner.start();
   expect(runner.snapshot()).toMatchObject({ running: null, engineMissing: true, waiting: [{ id: "one" }] });
+});
+
+test("clips wait for the measuring models, and start once they are there", async () => {
+  modelsReady = false;
+  addClip("a", "2026-11-08T09:00:00Z");
+  const a = make();
+  await a.start();
+  expect(a.snapshot()).toMatchObject({ running: null, engineMissing: false, modelsMissing: true });
+  expect(a.snapshot().waiting.map((item) => item.id)).toEqual(["a"]);
+  expect(await state("a")).toBe("waiting");
+  modelsReady = true;
+  await a.next();
+  await settled("a", "done");
+  expect(a.snapshot().modelsMissing).toBe(false);
 });
