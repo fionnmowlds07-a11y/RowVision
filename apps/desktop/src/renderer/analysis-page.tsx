@@ -61,7 +61,7 @@ export function AnalysisPage({ id }: { id: string }) {
 
   let timeText = "";
   if (mine) timeText = mine.secondsLeft !== null ? `${minutesText(mine.secondsLeft)} left` : "Working out how long";
-  else if (state === "waiting" && place) timeText = analysis.engineMissing ? "Not started" : `Starts in ${minutesText(place.secondsUntil)}`;
+  else if (state === "waiting" && place) timeText = analysis.engineMissing || analysis.modelsMissing ? "Not started" : `Starts in ${minutesText(place.secondsUntil)}`;
   else if (state === "needs_tap") timeText = "Paused";
 
   function tapFrame(event: MouseEvent<HTMLButtonElement>) {
@@ -128,6 +128,9 @@ export function AnalysisPage({ id }: { id: string }) {
             })}
           </ol>
 
+          {!analysis.engineMissing && analysis.modelsMissing && state === "waiting" ? (
+            <p className={styles.caution}>The measuring models aren&apos;t downloaded yet, so clips wait here until they are. <a href="#/settings">Download them in Settings</a>.</p>
+          ) : null}
           {analysis.engineMissing && state === "waiting" ? (
             <p className={styles.caution}>The measuring part of RowVision isn&apos;t installed on this computer yet, so clips wait here until it is.</p>
           ) : null}
@@ -143,7 +146,7 @@ export function AnalysisPage({ id }: { id: string }) {
                 {others.map((other) => (
                   <li key={other.id}>
                     <a href={`#/analysis/${other.id}`}>{nameOf(other.id)}</a>
-                    <span className="soft">{analysis.engineMissing ? "" : `in ${minutesText(other.secondsUntil)}`}</span>
+                    <span className="soft">{analysis.engineMissing || analysis.modelsMissing ? "" : `in ${minutesText(other.secondsUntil)}`}</span>
                     <button type="button" className="button quiet" aria-label={`Remove ${nameOf(other.id)} from the queue`} onClick={() => void window.rowvision.stopClip(other.id)}>Remove</button>
                   </li>
                 ))}

@@ -20,7 +20,15 @@ Electron, with a React page that imports the results, viewer, 3D model and logic
 
 ## First run
 
-A three-step welcome (#175, First run A from #150) shows until it is finished, and never when clips already exist: where clips are kept (with the free space and Change), colours, and whether measuring is ready. Change puts clips in a `RowVision` folder inside the one picked, and only works while the library is empty. Step 3 uses the same "engine missing" state as the analysis screen, and says plainly the measuring program isn't included yet. A real model download waits for #157. Tests set `ROWVISION_TEST_PICK_FOLDER` instead of opening the folder dialog.
+A three-step welcome (#175, First run A from #150) shows until it is finished, and never when clips already exist: where clips are kept (with the free space and Change), colours, and getting the measuring ready. Change puts clips in a `RowVision` folder inside the one picked, and only works while the library is empty.
+
+Step 3 shows what is really on the computer. Without the measuring program it says so plainly. With it, the models download by themselves (#182), with progress, Cancel and Try again. "Ready" only shows once both files are there and checked. The same card is in Settings, and clips wait for the models: the analysis screen says so and links to Settings.
+
+## Measuring models
+
+Two models, about 145 MB in all (the "balanced" pair from rtmlib: a person detector and a pose model). The engine knows the list, so there is one place to change it: `services/worker/rowvision_worker/models.py` has each file's name, size and SHA-256. `rowvision-engine --models status` says what is missing, and `--models fetch` gets it, writing progress as JSON lines, from download.openmmlab.com with the Hugging Face copy as a fallback. Every file is checked before it is put in place, so a damaged or cut-off download is never used. The app tells the engine to keep them in `<app data>/models/rtmlib/hub/checkpoints/` (`TORCH_HOME`), where rtmlib looks, so it never downloads anything quietly itself. Removing the app's data removes them.
+
+Tests use `ROWVISION_MODELS_BASE` for a local server, and `FAKE_MODELS_CONTROL` (`ready`, `missing`, `offline`, `slow`) for the stand-in engine. Tests set `ROWVISION_TEST_PICK_FOLDER` instead of opening the folder dialog.
 
 ## Analysis
 
@@ -34,7 +42,7 @@ Clips are analysed one at a time, oldest first, by the engine in `services/worke
 
 ## Running from source with the real engine
 
-`npm run start:engine` starts the app with `scripts/dev-engine.sh` as its measuring program, until the installer carries its own (#157). It runs the engine in the `compvisionrowing-worker` Docker image with no network and 3 CPUs (`ROWVISION_ENGINE_CPUS`), and only lets it see the clip's folder and the folder the video is in. The models come from `private/cache/.cache/rtmlib` (`ROWVISION_MODELS` points elsewhere). The image has its own copy of the engine code, so rebuild it after engine changes: `docker build -t compvisionrowing-worker:latest -f services/worker/Dockerfile .` from the repo root.
+`npm run start:engine` starts the app with `scripts/dev-engine.sh` as its measuring program, until the installer carries its own (#157). It runs the engine in the `compvisionrowing-worker` Docker image with no network and 3 CPUs (`ROWVISION_ENGINE_CPUS`), and only lets it see the clip's folder and the folder the video is in. The models come from `private/cache/.cache/rtmlib` (`ROWVISION_MODELS` points elsewhere). The engine code is the repo's own, mounted over the image, so engine changes show up straight away.
 
 The window switches Vulkan off at startup (#180): on Wayland, Chromium tries it and the window goes black in full screen.
 
@@ -54,4 +62,4 @@ The `Installers` workflow builds both in CI, only when started by hand, on a ver
 - Without `engine/` the installer still builds, and the app says plainly the measuring program isn't installed.
 - ffmpeg has to be a GPL build because the working copy uses libx264. Check this under #115 before giving the app to anyone.
 - The Windows installer is not signed, so Windows shows a warning. Updates are not checked yet (#157).
-- Models are not in the installer. See #157.
+- Models are not in the installer. The app downloads them on first run (#182). The installed-app test does this for real in CI, then checks the bundled engine loads what was downloaded. The model licences are still to be checked under #115.

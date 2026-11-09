@@ -75,6 +75,36 @@ jobs:
           test -s "$work/working.mp4"
           test -s "$work/summary.json"
 
+      - name: Install what the installed-app test needs on Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Start the installed app, let it download the real models, and wait for Ready
+        working-directory: apps/desktop
+        env:
+          CI: "1"
+          PACKAGED_DATA_DIR: ${{ runner.temp }}/rowvision-data
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            xvfb-run -a npm run test:packaged
+          else
+            npm run test:packaged
+          fi
+
+      - name: The bundled engine loads the models the app downloaded, with no Python
+        run: |
+          unpacked=apps/desktop/release/$([ "$RUNNER_OS" = "Linux" ] && echo linux-unpacked || echo win-unpacked)
+          engine="$PWD/$unpacked/resources/engine/rowvision-engine"
+          [ "$RUNNER_OS" = "Windows" ] && engine="$engine.exe"
+          cd "$RUNNER_TEMP"
+          # With no arguments the bundle loads both models and runs each once. The folder named here is the app's own.
+          # Nothing would be downloaded if they are all there, so a missing one would show up as a download, not a pass.
+          models="$RUNNER_TEMP/rowvision-data/models/rtmlib"
+          before=$(find "$models/hub/checkpoints" -type f | wc -l)
+          TORCH_HOME="$models" PATH="$(dirname "$engine"):/usr/bin:/bin" "$engine"
+          after=$(find "$models/hub/checkpoints" -type f | wc -l)
+          test "$before" = "$after"
+
       - uses: actions/upload-artifact@v4
         with:
           name: RowVision-${{ runner.os }}
