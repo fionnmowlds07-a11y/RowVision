@@ -20,8 +20,8 @@ test("the installed app starts, knows it is packaged, and tells the truth about 
   mkdirSync(data, { recursive: true });
   const app = await electron.launch({
     executablePath: program,
-    // CI runners cannot set up Chromium's own sandbox for an unpacked app.
-    args: process.env.CI ? ["--no-sandbox", "--enable-unsafe-swiftshader"] : ["--enable-unsafe-swiftshader"],
+    // Linux CI runners cannot set up Chromium's own sandbox for an unpacked app. On Windows the flag crashes the app.
+    args: process.env.CI && process.platform === "linux" ? ["--no-sandbox", "--enable-unsafe-swiftshader"] : ["--enable-unsafe-swiftshader"],
     env: { ...process.env, ROWVISION_DATA_DIR: data, ROWVISION_ENGINE: "", ROWVISION_TEST_NOTICES: "1" },
   });
   try {
