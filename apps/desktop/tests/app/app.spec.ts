@@ -369,9 +369,9 @@ test("videos over three months old can be cleared out in one go", async () => {
   await space.getByRole("button", { name: "Remove videos over 3 months old" }).click();
   await expect(space).toContainText("Remove 1 video over 3 months old?");
   await space.getByRole("button", { name: "Remove", exact: true }).click();
-  await expect(space.getByRole("button", { name: "Remove videos over 3 months old" })).toHaveCount(0);
-  expect(existsSync(path.join(data, "clips", "old-clip", "working.mp4"))).toBe(false);
   await expect(page.getByRole("row", { name: /1x seat 1/ })).toContainText("Removed");
+  await expect(space.getByRole("button", { name: /^Remove/ })).toHaveCount(0);
+  expect(existsSync(path.join(data, "clips", "old-clip", "working.mp4"))).toBe(false);
 });
 
 test("the filming guide is in the app", async () => {
