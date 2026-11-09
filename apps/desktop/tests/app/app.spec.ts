@@ -167,6 +167,24 @@ test("the 3D model opens", async () => {
   await expect(dialog).toHaveCount(0);
 });
 
+test("the results show what to work on, the measures and a freeze frame for each stroke", async () => {
+  await page.evaluate(() => { window.location.hash = "#/clip/test-clip"; });
+  await expect(page.getByRole("heading", { name: "Work on next" })).toBeVisible();
+  const measures = page.getByRole("region", { name: "Measures" });
+  await expect(measures).toContainText("Body angle at the catch");
+  await expect(measures).toContainText("Knee at the catch");
+  // Opening a measure shows a freeze frame for each stroke, and one jumps the viewer to that frame.
+  await measures.getByRole("button", { name: /Body angle at the catch/ }).click();
+  const freezes = page.getByRole("button", { name: /^Stroke \d+, go to frame \d+$/ });
+  await expect(freezes.first()).toBeVisible();
+  const count = await freezes.count();
+  expect(count).toBeGreaterThanOrEqual(CATCHES.length);
+  await freezes.nth(1).click();
+  await expectFrame(CATCHES[1]);
+  // Leave the clip page as the other tests found it.
+  await page.evaluate(() => { window.location.hash = "#/"; });
+});
+
 test("colours are saved on this computer", async () => {
   await page.getByRole("link", { name: "Settings" }).click();
   await page.getByRole("button", { name: "Forest" }).click();
