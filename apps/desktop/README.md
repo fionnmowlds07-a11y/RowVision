@@ -13,7 +13,11 @@ Electron, with a React page that imports the results, viewer, 3D model and logic
 ## Where things live
 
 - Clips: `<app data>/clips/<id>/`, one folder each, holding what the engine writes (`working.mp4`, `video.json`, `summary.json`, `frames.json`) plus `clip.json` with the setup, trim, tap and where the original video is. Adding a video never copies it: the engine reads it in place. App data is `~/.config/RowVision` on Linux and `%APPDATA%\RowVision` on Windows. `ROWVISION_DATA_DIR` points it elsewhere, for tests.
-- Settings: `<app data>/settings.json`. Colours, the last boat, side and seat, and how fast this computer analysed its last clip.
+- Settings: `<app data>/settings.json`. Colours, the last boat, side and seat, how fast this computer analysed its last clip, whether the welcome is done, and the clips folder if the user moved it.
+
+## First run
+
+A three-step welcome (#175, First run A from #150) shows until it is finished, and never when clips already exist: where clips are kept (with the free space and Change), colours, and whether measuring is ready. Change puts clips in a `RowVision` folder inside the one picked, and only works while the library is empty. Step 3 uses the same "engine missing" state as the analysis screen, and says plainly the measuring program isn't included yet. A real model download waits for #157. Tests set `ROWVISION_TEST_PICK_FOLDER` instead of opening the folder dialog.
 
 ## Analysis
 
