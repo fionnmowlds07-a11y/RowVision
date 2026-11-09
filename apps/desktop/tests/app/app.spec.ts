@@ -103,7 +103,7 @@ test("the page has no Node access and only the narrow bridge", async () => {
     bridge: Object.keys(window.rowvision).sort(),
     origin: location.origin,
   }));
-  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["addClip", "canSend", "deleteClip", "getAnalysis", "getClip", "getColours", "getSetup", "getSpace", "listClips", "onAnalysis", "onSendProgress", "pathForFile", "removeVideo", "sendClip", "setColours", "startClip", "stopClip", "tapAgain"], origin: "app://rowvision" });
+  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["addClip", "canSend", "changeClipsFolder", "deleteClip", "finishWelcome", "getAnalysis", "getClip", "getColours", "getSetup", "getSpace", "getWelcome", "listClips", "onAnalysis", "onSendProgress", "pathForFile", "removeVideo", "sendClip", "setColours", "startClip", "stopClip", "tapAgain"], origin: "app://rowvision" });
   const prefs = await app.evaluate(({ BrowserWindow }) => {
     // Not in Electron's types, but it reports the settings the page really runs with.
     const contents = BrowserWindow.getAllWindows()[0].webContents as unknown as { getLastWebPreferences(): Electron.WebPreferences | null };
