@@ -8,6 +8,8 @@ Electron, with a React page that imports the results, viewer, 3D model and logic
 | Build | `npm run build` |
 | Start | `npm start` (after a build) |
 | Lint, types, unit tests | `npm run lint`, `npm run typecheck`, `npm test` |
+| Installer | `npm run dist` (a Windows installer on Windows, an AppImage on Linux, in `release/`) |
+| Installed-app test | `npm run test:packaged`, after `npm run dist` |
 | App tests | `npm run test:app` (needs `ffmpeg`; makes its own test clip, never real footage) |
 
 ## Where things live
@@ -34,3 +36,15 @@ Clips are analysed one at a time, oldest first, by the engine in `services/worke
 - The page has no Node access: `contextIsolation`, `sandbox`, no `nodeIntegration`. The preload exposes a fixed list of calls (`src/shared/bridge.ts`), and the main process checks every argument. A video path from the page must be absolute and end in a video extension and that the call comes from the app's own page.
 - The page is served from `app://rowvision/`. Video and frame data come only from `rowvision://clip/<id>/working.mp4` and `frames.json`, with ids and file names checked so nothing outside the library can be read. The add page previews the picked video from a `blob:` address it makes itself.
 - A strict content security policy, no remote requests at all, no new windows, no navigation away, and every permission refused. Research links open in the user's own browser.
+
+## Installers (#178)
+
+`electron-builder.yml` builds a Windows installer (`RowVision-Setup-<version>.exe`) and a Linux AppImage (`RowVision-<version>.AppImage`). The icon is in `build/`: `icon.png`, `icon.ico` and one PNG for each size in `icons/`. The small sizes are a bolder, larger version of the rower so they stay readable. The artwork it came from is in `build/source/`.
+
+The `Installers` workflow builds both in CI, only when started by hand, on a version tag, or when it or the installer settings change. It bundles the engine with PyInstaller (the same way as the engine bundle check), puts ffmpeg and ffprobe beside it (`scripts/fetch-ffmpeg.py`, pinned and checked against the published checksums), builds the installer, then runs the bundled engine on a clip made by the bundled ffmpeg with no Python on the path. Installers are kept for 7 days as workflow files.
+
+- The app puts the engine's own folder first on the path, so the ffmpeg packed beside it is the one used.
+- Without `engine/` the installer still builds, and the app says plainly the measuring program isn't installed.
+- ffmpeg has to be a GPL build because the working copy uses libx264. Check this under #115 before giving the app to anyone.
+- The Windows installer is not signed, so Windows shows a warning. Updates are not checked yet (#157).
+- Models are not in the installer. See #157.
