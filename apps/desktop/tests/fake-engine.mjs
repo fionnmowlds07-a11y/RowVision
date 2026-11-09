@@ -4,6 +4,47 @@
 import { copyFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
+// `--models status` and `--models fetch`, as the real engine has. What it does comes from the file named by
+// FAKE_MODELS_CONTROL (ready when there is none): "ready", "missing", "offline" (fetching fails) or "slow"
+// (fetching stops part way until the file changes).
+const TOTAL = 145_022_899;
+if (process.argv[2] === "--models") {
+  const state = () => {
+    try {
+      return readFileSync(process.env.FAKE_MODELS_CONTROL, "utf8").trim();
+    } catch {
+      return "ready";
+    }
+  };
+  const say = (event) => process.stdout.write(`${JSON.stringify(event)}\n`);
+  const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+  if (process.argv[3] === "status") {
+    say({ event: "status", ready: state() === "ready", download_bytes: state() === "ready" ? 0 : TOTAL, total_bytes: TOTAL });
+    process.exit(0);
+  }
+  let stopped = false;
+  process.stdin.on("data", (chunk) => { if (chunk.toString().includes("cancel")) stopped = true; });
+  process.stdin.on("end", () => { stopped = true; });
+  process.stdin.resume();
+  say({ event: "models", downloaded: 0, total: TOTAL });
+  if (state() === "offline") {
+    say({ event: "failed", message: "Couldn't reach the download. Check your internet connection and try again." });
+    process.exit(1);
+  }
+  say({ event: "models", downloaded: Math.round(TOTAL * 0.4), total: TOTAL });
+  while (state() === "slow" && !stopped) await sleep(50);
+  if (stopped) {
+    say({ event: "cancelled" });
+    process.exit(4);
+  }
+  say({ event: "models", downloaded: Math.round(TOTAL * 0.8), total: TOTAL });
+  await sleep(100);
+  writeFileSync(process.env.FAKE_MODELS_CONTROL, "ready");
+  say({ event: "models", downloaded: TOTAL, total: TOTAL });
+  say({ event: "done" });
+  process.exit(0);
+}
+
 const job = JSON.parse(readFileSync(process.argv[2], "utf8"));
 const folder = job.folder;
 const mode = () => {
