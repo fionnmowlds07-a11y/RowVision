@@ -5,6 +5,9 @@ import path from "node:path";
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { makeClip } from "./fixture";
 
+const FAKE = path.resolve(__dirname, "../fake-engine.mjs");
+const withFake = (control: string) => ({ ROWVISION_ENGINE: JSON.stringify([process.env.NODE ?? "node", FAKE]), ROWVISION_ENGINE_KIND: "fake", FAKE_ENGINE_CONTROL: path.join(data, "engine-control"), FAKE_MODELS_CONTROL: control });
+
 const appDir = path.resolve(__dirname, "../..");
 const electronPath = createRequire(__filename)("electron") as unknown as string;
 
@@ -105,4 +108,73 @@ test("people who already have clips skip the welcome", async () => {
   await launch();
   await expect(page.getByRole("navigation")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Welcome to RowVision" })).toHaveCount(0);
+});
+
+test("step 3 starts the download by itself, shows how far it is, and ends ready", async () => {
+  const control = path.join(data, "models-control");
+  writeFileSync(control, "slow");
+  await launch(withFake(control));
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect(page.getByRole("heading", { name: "Get the measuring ready" })).toBeVisible();
+  await expect(page.getByText("about 145 MB")).toBeVisible();
+  // It started without a click, and stops at 40% (58 of 145 MB) until told to carry on.
+  await expect(page.getByTestId("measuring")).toContainText("Downloading, 58 MB of 145 MB");
+  await expect(page.getByTestId("measuring")).toContainText("40%");
+  await expect(page.getByTestId("measuring")).not.toContainText("Ready");
+  writeFileSync(control, "missing");
+  await expect(page.getByTestId("measuring")).toContainText("Ready");
+  await expect(page.getByTestId("measuring")).toContainText("100%");
+  await page.getByRole("button", { name: "Add your first video" }).click();
+  await expect(page).toHaveURL(/#\/add$/);
+});
+
+test("a download that fails says why and can be tried again", async () => {
+  const control = path.join(data, "models-control");
+  writeFileSync(control, "offline");
+  await launch(withFake(control));
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect(page.getByRole("alert")).toHaveText("Couldn't reach the download. Check your internet connection and try again.");
+  // It does not keep hammering a failed download by itself.
+  await page.waitForTimeout(500);
+  await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+  writeFileSync(control, "missing");
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByTestId("measuring")).toContainText("Ready");
+});
+
+test("the download can be cancelled and picked up again from Settings", async () => {
+  const control = path.join(data, "models-control");
+  writeFileSync(control, "slow");
+  writeFileSync(path.join(data, "settings.json"), JSON.stringify({ welcomed: true }));
+  await launch(withFake(control));
+  await page.getByRole("link", { name: "Settings" }).click();
+  const card = page.getByTestId("models-card");
+  await expect(card).toContainText("Not downloaded yet");
+  await card.getByRole("button", { name: "Download" }).click();
+  await expect(card).toContainText("Downloading, 58 MB of 145 MB (40%)");
+  await card.getByRole("button", { name: "Cancel" }).click();
+  await expect(card).toContainText("Not downloaded yet");
+  writeFileSync(control, "missing");
+  await card.getByRole("button", { name: "Download" }).click();
+  await expect(card).toContainText("Downloaded.");
+});
+
+test("clips wait for the models, and are measured once they are downloaded", async () => {
+  const control = path.join(data, "models-control");
+  writeFileSync(control, "missing");
+  writeFileSync(path.join(data, "settings.json"), JSON.stringify({ welcomed: true }));
+  const folder = path.join(data, "clips", "waiting-clip");
+  mkdirSync(folder, { recursive: true });
+  writeFileSync(path.join(data, "source.mp4"), "pretend video");
+  writeFileSync(path.join(folder, "clip.json"), JSON.stringify({ created_at: "2026-11-09T09:00:00Z", source: path.join(data, "source.mp4"), boat_class: "2-", side: "bow", seat: 2, section_start: 0, section_length: 10 }));
+  await launch(withFake(control));
+  await page.evaluate(() => { window.location.hash = "#/analysis/waiting-clip"; });
+  await expect(page.getByText("The measuring models aren't downloaded yet")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Waiting its turn" })).toBeVisible();
+  expect(await page.evaluate(async () => (await window.rowvision.listClips())[0].state)).toBe("waiting");
+  await page.getByRole("link", { name: "Download them in Settings" }).click();
+  await page.getByTestId("models-card").getByRole("button", { name: "Download" }).click();
+  await expect.poll(() => page.evaluate(async () => (await window.rowvision.listClips())[0].state), { timeout: 20_000 }).toBe("done");
 });
