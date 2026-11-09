@@ -33,7 +33,8 @@ export async function readClip(library: string, id: string): Promise<ClipDetail 
     return null;
   }
   if (!stat.isDirectory()) return null;
-  const setup = asSetup(await readJson(path.join(folder, "clip.json")));
+  const raw = (await readJson(path.join(folder, "clip.json"))) as Record<string, unknown> | null;
+  const setup = asSetup(raw);
   // The desktop engine adds its version to the summary it writes.
   const summary = (await readJson(path.join(folder, "summary.json"))) as (Summary & { version?: string }) | null;
   const rower = summary?.rower ?? null;
@@ -61,6 +62,7 @@ export async function readClip(library: string, id: string): Promise<ClipDetail 
     videoBytes: await fileBytes(path.join(folder, "working.mp4")),
     summary,
     hasVideo: await exists(path.join(folder, "working.mp4")),
+    sentAt: typeof raw?.sent_at === "string" ? raw.sent_at : null,
   };
 }
 

@@ -36,6 +36,21 @@ Athletes can delete any clip or their whole account at any time, and this remove
 
 The 30-day deletion runs from the web host on a schedule, so it does not depend on the worker's computer. If the schedule stops, deletion stops, so it needs watching.
 
+## The desktop app
+
+The desktop app keeps everything on the user's computer: clips, scores, colours and settings, in its own folder. There is no account. Analysis runs on the computer, and nothing leaves it unless the user presses Send on a clip.
+
+Sending a clip, after two ticks (everyone recognisable is 18 or over, and the people in it are happy for it to be used), sends:
+
+- the working copy of the analysed part, up to 60 seconds
+- the boat, side, seat and trim
+- the results summary
+- the optional note saying what looks wrong.
+
+It never sends the user's name or email, the original video or its file name or location, their own clip note, other clips, or anything else on the computer. The app holds no storage keys: a small service hands out one-time upload links that work once and expire after an hour, and lists what came in for the owner only. There is no way to withdraw a sent clip from the app. So far that service runs only as a local stand-in (`services/intake`); hosting it, and where sent clips are stored, needs the owner's go-ahead.
+
+Deleting a clip in the app removes its folder. Removing a video keeps the scores. The user's original video is never changed or deleted.
+
 ## Before under-18s
 
 The issues in the "Before juniors" milestone must be done first. Rowing Ireland's filming policy asks that parents and juniors both consent, which goes further than the digital consent age of 16. Talk to the club's safeguarding lead first. Footage from adults can still show juniors and other crews.

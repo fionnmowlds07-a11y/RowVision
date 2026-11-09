@@ -11,6 +11,7 @@ on:
       - apps/web/app/add/**
       - apps/web/app/guide/**
       - apps/web/app/trend.tsx
+      - services/intake/**
       - apps/web/app/*.css
       - apps/web/components/shell.module.css
       - apps/web/lib/**
@@ -23,6 +24,7 @@ on:
       - apps/web/app/add/**
       - apps/web/app/guide/**
       - apps/web/app/trend.tsx
+      - services/intake/**
       - apps/web/app/*.css
       - apps/web/components/shell.module.css
       - apps/web/lib/**
@@ -56,6 +58,9 @@ jobs:
       - name: Type check
         run: npm run typecheck
       - name: Unit tests
+        run: npm test
+      - name: Intake service tests
+        working-directory: services/intake
         run: npm test
       - name: Build
         run: npm run build
