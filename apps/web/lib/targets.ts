@@ -23,8 +23,8 @@ const MIN_STROKES = 3;
 export const TARGET_METRICS: { name: TargetName; label: string; help: string; phase: "catch" | "finish"; min: number; max: number }[] = [
   { name: "catch_lean_deg", label: "Body angle at the catch", help: "Trunk from vertical, forward is positive", phase: "catch", min: 0, max: 60 },
   { name: "finish_lean_deg", label: "Body angle at the finish", help: "Leaning back is negative", phase: "finish", min: -50, max: 10 },
-  { name: "catch_knee_deg", label: "Knee angle at the catch", help: "Inner angle, 180 is a straight leg", phase: "catch", min: 20, max: 100 },
-  { name: "finish_knee_deg", label: "Knee angle at the finish", help: "Inner angle, 180 is a straight leg", phase: "finish", min: 120, max: 185 },
+  { name: "catch_knee_deg", label: "Knee angle at the catch", help: "Inner angle, 180 is a straight leg. The boat often hides the feet, so this is partly a guess", phase: "catch", min: 20, max: 100 },
+  { name: "finish_knee_deg", label: "Knee angle at the finish", help: "Inner angle, 180 is a straight leg. The boat often hides the feet, so this is partly a guess", phase: "finish", min: 120, max: 185 },
 ];
 
 /** Knees are shown as a rough guide until the athlete chooses to count them. */
