@@ -32,7 +32,7 @@ Comment=Rowing technique from your own video
 Exec=$dest/rowvision %U
 Icon=rowvision
 Terminal=false
-Categories=Utility;Video;
+Categories=AudioVideo;Sports;
 Keywords=rowing;rowvision;technique;video;
 StartupWMClass=RowVision
 DESKTOP
