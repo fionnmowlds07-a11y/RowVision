@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { Summary } from "../../../web/lib/result";
+import { rescore, type TargetChoices } from "../../../web/lib/targets";
 import { CLIP_ID, type ClipDetail, type ClipItem, type ClipSetup, type ClipState, type Space } from "../shared/bridge";
 
 /** Kept in a clip's folder when the user stopped it or it failed. Gone when it goes back in the queue. */
@@ -9,21 +10,22 @@ export const STATE_FILE = "state.json";
 export const PAUSE_FILE = "pause.json";
 
 /** Each clip is a folder named by its id, holding what the engine writes. */
-export async function listClips(library: string): Promise<ClipItem[]> {
+export async function listClips(library: string, targets: TargetChoices | null = null): Promise<ClipItem[]> {
   let names: string[];
   try {
     names = await fs.readdir(library);
   } catch {
     return [];
   }
-  const clips = await Promise.all(names.filter((name) => CLIP_ID.test(name)).map((name) => readClip(library, name)));
+  const clips = await Promise.all(names.filter((name) => CLIP_ID.test(name)).map((name) => readClip(library, name, targets)));
   return clips
     .filter((clip): clip is ClipDetail => clip !== null)
     .map(({ summary: _summary, pauseSeconds: _pause, ...item }) => item)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export async function readClip(library: string, id: string): Promise<ClipDetail | null> {
+/** With the athlete's targets, the scores are worked out again from the saved measurements. */
+export async function readClip(library: string, id: string, targets: TargetChoices | null = null): Promise<ClipDetail | null> {
   if (!CLIP_ID.test(id)) return null;
   const folder = path.join(library, id);
   let stat;
@@ -36,7 +38,8 @@ export async function readClip(library: string, id: string): Promise<ClipDetail 
   const raw = (await readJson(path.join(folder, "clip.json"))) as Record<string, unknown> | null;
   const setup = asSetup(raw);
   // The desktop engine adds its version to the summary it writes.
-  const summary = (await readJson(path.join(folder, "summary.json"))) as (Summary & { version?: string }) | null;
+  const saved = (await readJson(path.join(folder, "summary.json"))) as (Summary & { version?: string }) | null;
+  const summary = saved?.rower ? { ...saved, rower: rescore(saved.rower, targets) } : saved;
   const rower = summary?.rower ?? null;
   const marked = (await readJson(path.join(folder, STATE_FILE))) as { state?: unknown; message?: unknown } | null;
   const pause = (await readJson(path.join(folder, PAUSE_FILE))) as { seconds?: unknown } | null;

@@ -8,7 +8,8 @@ import { Models } from "./models";
 import { deleteClip, librarySpace, listClips, readClip, removeVideo } from "./library";
 import { registerSchemes, serve } from "./protocol";
 import { cleanConsent, sendClip } from "./send";
-import { cleanColours, readColours, readSetup, readSpeed, readWelcome, saveSettings, writeColours } from "./settings";
+import { cleanTargets } from "../../../web/lib/targets";
+import { cleanColours, readColours, readSetup, readSpeed, readTargets, readWelcome, saveSettings, writeColours } from "./settings";
 import { checkFolder, clipsFolderIn, isEmptyLibrary } from "./welcome";
 
 // Tests point the app at a throwaway folder. Everyone else uses the system's app data folder.
@@ -177,9 +178,9 @@ void app.whenReady().then(async () => {
   clipsDir = (await readWelcome(settingsFile())).clipsDir;
   serve(pageRoot, library);
 
-  handle(CHANNELS.listClips, async () => (await listClips(library())).map(withRunning));
+  handle(CHANNELS.listClips, async () => (await listClips(library(), await readTargets(settingsFile()))).map(withRunning));
   handle(CHANNELS.getClip, async (id) => {
-    const clip = typeof id === "string" && CLIP_ID.test(id) ? await readClip(library(), id) : null;
+    const clip = typeof id === "string" && CLIP_ID.test(id) ? await readClip(library(), id, await readTargets(settingsFile())) : null;
     return clip ? withRunning(clip) : null;
   });
   handle(CHANNELS.getAnalysis, async () => analyser.snapshot());
@@ -211,6 +212,13 @@ void app.whenReady().then(async () => {
     const point = cleanTap(tap);
     if (!point) throw new Error("Not a tap");
     return analyser.tap(clipId(id), point);
+  });
+  handle(CHANNELS.getTargets, () => readTargets(settingsFile()));
+  handle(CHANNELS.setTargets, async (value) => {
+    const targets = cleanTargets(value);
+    if (!targets) throw new Error("Not a valid set of targets");
+    await saveSettings(settingsFile(), { targets });
+    return targets;
   });
   handle(CHANNELS.getColours, () => readColours(settingsFile()));
   handle(CHANNELS.setColours, async (value) => {

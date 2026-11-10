@@ -91,3 +91,28 @@ test("deleting takes the whole folder, and nothing outside the library", async (
   await expect(deleteClip(root, "..")).rejects.toThrow();
   expect(existsSync(root)).toBe(true);
 });
+
+test("the athlete's targets score a saved clip again, and the file on disk is never changed", async () => {
+  const { GENERAL_TARGETS } = await import("../../../web/lib/targets");
+  const metric = (name: string, phase: string, value: number, score: number | null, low: number, high: number) =>
+    ({ name, label: name, phase, value, spread: 2, score, reason: null, target: { low, high, sources: [], evidence: "" } });
+  const summary = {
+    rower: {
+      rate_spm: 30, rating: { band: "Good", accuracy: 80 }, strokes: [{}, {}, {}, {}],
+      card: {
+        overall: 60, phases: { catch: 20, finish: 100 },
+        metrics: [metric("catch_lean_deg", "catch", 39, 20, 26, 31), metric("finish_lean_deg", "finish", -22, 100, -25, -20)],
+      },
+    },
+  };
+  addClip("scored", { "summary.json": JSON.stringify(summary) });
+
+  expect((await readClip(root, "scored", GENERAL_TARGETS))?.overall).toBe(60);
+  const mine = { ...GENERAL_TARGETS, catch_lean_deg: { low: 36, high: 40, counts: true } };
+  const detail = await readClip(root, "scored", mine);
+  expect(detail?.overall).toBe(100);
+  expect(detail?.summary?.rower?.card.metrics[0]).toMatchObject({ value: 39, score: 100, target: { low: 36, high: 40 } });
+  expect((await listClips(root, mine))[0].overall).toBe(100);
+  // Without the choices, the clip reads as the engine scored it.
+  expect((await readClip(root, "scored"))?.overall).toBe(60);
+});

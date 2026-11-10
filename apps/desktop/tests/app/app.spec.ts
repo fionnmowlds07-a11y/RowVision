@@ -103,7 +103,7 @@ test("the page has no Node access and only the narrow bridge", async () => {
     bridge: Object.keys(window.rowvision).sort(),
     origin: location.origin,
   }));
-  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["addClip", "canSend", "cancelModels", "changeClipsFolder", "deleteClip", "downloadModels", "finishWelcome", "getAnalysis", "getClip", "getColours", "getModels", "getSetup", "getSpace", "getWelcome", "listClips", "onAnalysis", "onModels", "onSendProgress", "pathForFile", "removeVideo", "sendClip", "setColours", "startClip", "stopClip", "tapAgain"], origin: "app://rowvision" });
+  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["addClip", "canSend", "cancelModels", "changeClipsFolder", "deleteClip", "downloadModels", "finishWelcome", "getAnalysis", "getClip", "getColours", "getModels", "getSetup", "getSpace", "getTargets", "getWelcome", "listClips", "onAnalysis", "onModels", "onSendProgress", "pathForFile", "removeVideo", "sendClip", "setColours", "setTargets", "startClip", "stopClip", "tapAgain"], origin: "app://rowvision" });
   const prefs = await app.evaluate(({ BrowserWindow }) => {
     // Not in Electron's types, but it reports the settings the page really runs with.
     const contents = BrowserWindow.getAllWindows()[0].webContents as unknown as { getLastWebPreferences(): Electron.WebPreferences | null };
@@ -199,6 +199,34 @@ test("colours are saved on this computer", async () => {
   await page.reload();
   const ground = await page.locator("main").evaluate((element) => getComputedStyle(element.parentElement!).getPropertyValue("--ground").trim());
   expect(ground).toBe("#0a3d27");
+});
+
+test("targets: type a range, make a knee count, and it is kept on this computer", async () => {
+  await page.getByRole("link", { name: "Settings" }).click();
+  const card = page.getByTestId("targets-card");
+  await expect(card).toContainText("General standard");
+  // Only the body angles count at first.
+  await expect(card.getByTestId("target-catch_knee_deg").getByRole("button", { name: "Add to score" })).toBeVisible();
+  // A range wider than 5 degrees is refused and not saved.
+  const top = card.getByRole("spinbutton", { name: "Top of the range for Body angle at the catch" });
+  await top.fill("45");
+  await expect(card.getByRole("alert")).toContainText("5°");
+  expect(readJson(path.join(data, "settings.json"))?.targets?.catch_lean_deg ?? { low: 26, high: 31 }).toMatchObject({ low: 26, high: 31 });
+  // A valid range typed in is saved.
+  await card.getByRole("spinbutton", { name: "Bottom of the range for Body angle at the catch" }).fill("34");
+  await top.fill("38");
+  await card.getByTestId("target-catch_knee_deg").getByRole("button", { name: "Add to score" }).click();
+  await expect.poll(() => readJson(path.join(data, "settings.json"))?.targets).toMatchObject({
+    catch_lean_deg: { low: 34, high: 38, counts: true },
+    catch_knee_deg: { counts: true },
+  });
+  await expect(card).toContainText("Your own setup");
+  // The knee has moved to the group that counts.
+  await expect(card.getByTestId("target-catch_knee_deg").getByRole("button", { name: "Stop counting" })).toBeVisible();
+  // Back to the standard in one press.
+  await card.getByRole("button", { name: "Reset everything to the general standard" }).click();
+  await expect(card).toContainText("General standard");
+  await expect.poll(() => readJson(path.join(data, "settings.json"))?.targets?.catch_lean_deg).toMatchObject({ low: 26, high: 31 });
 });
 
 function readJson(file: string) {
