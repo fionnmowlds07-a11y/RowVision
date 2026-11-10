@@ -69,3 +69,9 @@ The `Installers` workflow builds both in CI, only when started by hand, on a ver
 - ffmpeg has to be a GPL build because the working copy uses libx264. Check this under #115 before giving the app to anyone.
 - The Windows installer is not signed, so Windows shows a warning. Updates are not checked yet (#157).
 - Models are not in the installer. The app downloads them on first run (#182). The installed-app test does this for real in CI, then checks the bundled engine loads what was downloaded. The model licences are still to be checked under #115.
+
+## Building and installing on this computer (Linux)
+
+`bash scripts/build-installer.sh` makes the full installer without CI: it bundles the engine in a Python 3.12 Docker container, puts ffmpeg beside it, then builds the AppImage (about 370 MB) in `release/`. An existing `engine/` is reused, so delete it to rebuild the measuring program. The Windows installer still has to be built on Windows (the Installers workflow).
+
+`bash scripts/install-linux.sh` (or `build-installer.sh --install`) copies the unpacked build to `~/.local/share/rowvision` and adds a RowVision entry and icons to the app launcher, so it can be searched for and opened. It uses the unpacked build as AppImages need FUSE, which not every system has. `install-linux.sh --remove` takes it off again and keeps the clips.
