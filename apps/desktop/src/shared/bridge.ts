@@ -2,6 +2,7 @@
 
 import type { Summary } from "../../../web/lib/result";
 import type { Setup } from "../../../web/lib/setup";
+import type { TargetChoices } from "../../../web/lib/targets";
 
 export type Colours = { ground: string | null; highlight: string | null };
 
@@ -109,6 +110,9 @@ export type Bridge = {
   getColours(): Promise<Colours>;
   setColours(colours: Colours): Promise<Colours>;
   getSetup(): Promise<Setup>;
+  getTargets(): Promise<TargetChoices>;
+  /** Saves the athlete's targets, and refuses any that are not valid. Returns what was saved. */
+  setTargets(targets: TargetChoices): Promise<TargetChoices>;
   addClip(request: AddRequest): Promise<string>;
   /** Where a picked or dropped file is on this computer, or "" when it is not a real file. */
   pathForFile(file: File): string;
@@ -147,6 +151,8 @@ export const CHANNELS = {
   getColours: "colours:get",
   setColours: "colours:set",
   getSetup: "setup:get",
+  getTargets: "targets:get",
+  setTargets: "targets:set",
   addClip: "clips:add",
   getAnalysis: "analysis:get",
   analysisChanged: "analysis:changed",
