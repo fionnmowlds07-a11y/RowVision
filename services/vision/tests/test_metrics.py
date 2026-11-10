@@ -90,6 +90,21 @@ def test_an_ankle_above_the_hip_is_not_believed() -> None:
     assert not legs_believable(misplaced_ankle(clip, slice(None))).any()
 
 
+def test_a_far_knee_much_higher_than_the_near_knee_gives_no_knee_angle() -> None:
+    """The user's case: one knee drawn far above the other pulls the averaged angle up."""
+    clip = generate()
+    points = clip.points.copy()
+    trunk = np.linalg.norm(sk.shoulders(points) - sk.hips(points), axis=-1)
+    points[40:60, sk.LEFT_KNEE, 1] -= 0.3 * trunk[40:60]
+    knee = angle_series(points, clip.facing, 0).knee
+    assert np.isnan(knee[40:60]).all()
+    assert np.isfinite(knee[:40]).all()
+    # A small difference between the legs is normal and still measured.
+    points = clip.points.copy()
+    points[40:60, sk.LEFT_KNEE, 1] -= 0.05 * trunk[40:60]
+    assert np.isfinite(angle_series(points, clip.facing, 0).knee[40:60]).all()
+
+
 def test_an_impossible_leg_gives_no_knee_angle() -> None:
     clip = generate()
     points = misplaced_ankle(clip, slice(40, 60))
