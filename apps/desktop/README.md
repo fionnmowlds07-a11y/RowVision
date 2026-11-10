@@ -24,6 +24,12 @@ A three-step welcome (#175, First run A from #150) shows until it is finished, a
 
 Step 3 shows what is really on the computer. Without the measuring program it says so plainly. With it, the models download by themselves (#182), with progress, Cancel and Try again. "Ready" only shows once both files are there and checked. The same card is in Settings, and clips wait for the models: the analysis screen says so and links to Settings.
 
+## Technique targets (#185)
+
+Settings has a "Technique targets" card: the range for each body angle (catch and finish trunk, catch and finish knee), and whether each one counts towards the score. A range is 5° wide at most, and can be dragged on its bar or typed. Only the two trunk angles count at first. The overall score needs at least one catch and one finish measure counting.
+
+The choices are saved in `settings.json` under `targets`. The engine does not know about them: it always scores with the general standard in `services/vision/reference/general.yaml`. The scores are worked out again when a clip is read (`rescore` in `apps/web/lib/targets.ts`), from the measurements saved in `summary.json`, so changing a range needs no new analysis and the file on disk is never changed. `GENERAL_TARGETS` in that file must match the yaml, and a test checks it does. "Legs before body" and drive share are not editable yet.
+
 ## Measuring models
 
 Two models, about 145 MB in all (the "balanced" pair from rtmlib: a person detector and a pose model). The engine knows the list, so there is one place to change it: `services/worker/rowvision_worker/models.py` has each file's name, size and SHA-256. `rowvision-engine --models status` says what is missing, and `--models fetch` gets it, writing progress as JSON lines, from download.openmmlab.com with the Hugging Face copy as a fallback. Every file is checked before it is put in place, so a damaged or cut-off download is never used. The app tells the engine to keep them in `<app data>/models/rtmlib/hub/checkpoints/` (`TORCH_HOME`), where rtmlib looks, so it never downloads anything quietly itself. Removing the app's data removes them.

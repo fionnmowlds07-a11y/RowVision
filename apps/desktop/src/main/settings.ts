@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { isColour } from "../../../web/lib/colours";
+import { GENERAL_TARGETS, cleanTargets, type TargetChoices } from "../../../web/lib/targets";
 import { BOAT_SEATS, fitSetup, seatsFor, sidesFor, type Setup } from "../../../web/lib/setup";
 import type { Colours } from "../shared/bridge";
 
@@ -16,6 +17,8 @@ type Settings = {
   welcomed: boolean;
   /** Where clips are kept, when the user picked somewhere other than the app data folder. */
   clipsDir: string | null;
+  /** The athlete's own ranges, and which measures count towards the score. */
+  targets: TargetChoices;
 };
 
 /** Null means the design system's own colour. */
@@ -43,14 +46,18 @@ async function readSettings(file: string): Promise<Settings> {
     const speed = typeof saved.speed === "number" && Number.isFinite(saved.speed) && saved.speed > 0 ? saved.speed : null;
     const welcomed = saved.welcomed === true;
     const clipsDir = typeof saved.clipsDir === "string" && path.isAbsolute(saved.clipsDir) ? saved.clipsDir : null;
-    return { colours: cleanColours(saved.colours) ?? NONE, setup: cleanSetup(saved.setup) ?? FIRST_SETUP, speed, welcomed, clipsDir };
+    return { colours: cleanColours(saved.colours) ?? NONE, setup: cleanSetup(saved.setup) ?? FIRST_SETUP, speed, welcomed, clipsDir, targets: cleanTargets(saved.targets) ?? GENERAL_TARGETS };
   } catch {
-    return { colours: NONE, setup: FIRST_SETUP, speed: null, welcomed: false, clipsDir: null };
+    return { colours: NONE, setup: FIRST_SETUP, speed: null, welcomed: false, clipsDir: null, targets: GENERAL_TARGETS };
   }
 }
 
 export async function readColours(file: string): Promise<Colours> {
   return (await readSettings(file)).colours;
+}
+
+export async function readTargets(file: string): Promise<TargetChoices> {
+  return (await readSettings(file)).targets;
 }
 
 export async function readSetup(file: string): Promise<Setup> {

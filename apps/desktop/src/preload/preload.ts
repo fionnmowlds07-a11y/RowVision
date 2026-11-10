@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
+import type { TargetChoices } from "../../../web/lib/targets";
 import { CHANNELS, type AddRequest, type Analysis, type Bridge, type Colours, type ModelsState } from "../shared/bridge";
 
 // A fixed list of calls. The page never gets ipcRenderer itself.
@@ -8,6 +9,8 @@ const bridge: Bridge = {
   getColours: () => ipcRenderer.invoke(CHANNELS.getColours),
   setColours: (colours: Colours) => ipcRenderer.invoke(CHANNELS.setColours, colours),
   getSetup: () => ipcRenderer.invoke(CHANNELS.getSetup),
+  getTargets: () => ipcRenderer.invoke(CHANNELS.getTargets),
+  setTargets: (targets: TargetChoices) => ipcRenderer.invoke(CHANNELS.setTargets, targets),
   addClip: (request: AddRequest) => ipcRenderer.invoke(CHANNELS.addClip, request),
   getAnalysis: () => ipcRenderer.invoke(CHANNELS.getAnalysis),
   onAnalysis: (listener: (analysis: Analysis) => void) => {
