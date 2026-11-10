@@ -46,3 +46,15 @@ def knees(points: FloatArray) -> FloatArray:
 
 def ankles(points: FloatArray) -> FloatArray:
     return midpoint(points, LEFT_ANKLE, RIGHT_ANKLE)
+
+
+def near_leg(points: FloatArray, facing: int) -> tuple[FloatArray, FloatArray, FloatArray]:
+    """Return the hip, knee and ankle of the leg nearest the camera.
+
+    The camera sees the side of the rower that faces it, and which side that is follows from the
+    direction they face in the picture: facing right shows their right side, facing left their left.
+    The far leg is mostly hidden behind the body and the boat, so the pose model often loses it.
+    """
+    left = facing < 0
+    hip, knee, ankle = (LEFT_HIP, LEFT_KNEE, LEFT_ANKLE) if left else (RIGHT_HIP, RIGHT_KNEE, RIGHT_ANKLE)
+    return points[..., hip, :], points[..., knee, :], points[..., ankle, :]
