@@ -14,10 +14,6 @@ ONSET_FRACTION = 0.2
 MIN_ANKLE_DROP_TRUNKS = 0.02
 """Feet sit below the seat, so an ankle level with or above the hip has been misplaced."""
 MIN_SHIN_TO_THIGH, MAX_SHIN_TO_THIGH = 0.5, 1.7
-MAX_KNEE_HEIGHT_GAP, MAX_ANKLE_HEIGHT_GAP = 0.15, 0.2
-"""How far apart, in trunk lengths, the left and right knees or ankles may sit vertically. In side view
-the two legs are level, so more than this means the model has put the hidden leg in the wrong place.
-Across real clips the gap is under 0.12 on a good frame, and often over 0.23 on a bad one."""
 CATCH_KNEE_RANGE = (30.0, 115.0)
 FINISH_KNEE_RANGE = (130.0, 185.0)
 """What a body can do at each moment. Values outside are misplaced joints, not poor technique."""
@@ -49,25 +45,21 @@ class StrokeMetrics:
     """How far the legs lead the trunk off the catch, as a share of the drive. Positive is legs first."""
 
 
-def legs_believable(side_on: FloatArray) -> NDArray[np.bool_]:
+def legs_believable(side_on: FloatArray, facing: int) -> NDArray[np.bool_]:
     """Return which frames have a lower leg a real body could make.
 
-    The hull hides the feet, so the pose model often guesses, and can put an ankle up by the hands, or
-    put the far leg well above the near one. Averaging a misplaced joint into the knee would drag the
-    angle, so such frames are left out. Model confidence does not reliably show this (left and right
-    are about equally confident), so the check uses anatomy instead.
+    The hull hides the feet, so the pose model often guesses, and can put an ankle up by the hands.
+    Model confidence does not reliably show this, so the check uses anatomy instead. Only the leg
+    nearest the camera is checked, as it is the only one the knee angle is read from.
     """
-    hip, knee, ankle = sk.hips(side_on), sk.knees(side_on), sk.ankles(side_on)
-    trunk = np.linalg.norm(sk.shoulders(side_on) - hip, axis=-1)
-    knee_gap = np.abs(side_on[..., sk.LEFT_KNEE, 1] - side_on[..., sk.RIGHT_KNEE, 1])
-    ankle_gap = np.abs(side_on[..., sk.LEFT_ANKLE, 1] - side_on[..., sk.RIGHT_ANKLE, 1])
+    hip, knee, ankle = sk.near_leg(side_on, facing)
+    trunk = np.linalg.norm(sk.shoulders(side_on) - sk.hips(side_on), axis=-1)
     shin = np.linalg.norm(knee - ankle, axis=-1)
     thigh = np.linalg.norm(knee - hip, axis=-1)
     with np.errstate(divide="ignore", invalid="ignore"):
         drop = (ankle[..., 1] - hip[..., 1]) / trunk
         ratio = shin / thigh
-        level = (knee_gap <= MAX_KNEE_HEIGHT_GAP * trunk) & (ankle_gap <= MAX_ANKLE_HEIGHT_GAP * trunk)
-    return level & (drop >= MIN_ANKLE_DROP_TRUNKS) & (ratio >= MIN_SHIN_TO_THIGH) & (ratio <= MAX_SHIN_TO_THIGH)
+    return (drop >= MIN_ANKLE_DROP_TRUNKS) & (ratio >= MIN_SHIN_TO_THIGH) & (ratio <= MAX_SHIN_TO_THIGH)
 
 
 def _within(value: float, limits: tuple[float, float]) -> float:
@@ -80,10 +72,12 @@ def angle_series(points: FloatArray, facing: int, view_deg: float | FloatArray) 
     side_on = undo_foreshortening(points, hip[:, None, :], view_deg)
     hip = sk.hips(side_on)
     shoulder = sk.shoulders(side_on)
-    knee = joint_angle(hip, sk.knees(side_on), sk.ankles(side_on))
+    # The knee is read from the near leg alone. Averaging in the far leg, which the model often loses,
+    # dragged the angle up or down by the same amount the far knee was misplaced.
+    knee = joint_angle(*sk.near_leg(side_on, facing))
     return AngleSeries(
         trunk_lean=lean_from_vertical(hip, shoulder, facing),
-        knee=np.where(legs_believable(side_on), knee, np.nan),
+        knee=np.where(legs_believable(side_on, facing), knee, np.nan),
         elbow=joint_angle(shoulder, sk.elbows(side_on), sk.wrists(side_on)),
     )
 

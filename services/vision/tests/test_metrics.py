@@ -86,23 +86,31 @@ def misplaced_ankle(clip: SyntheticClip, frames: slice) -> np.ndarray:
 
 def test_an_ankle_above_the_hip_is_not_believed() -> None:
     clip = generate()
-    assert legs_believable(clip.points).all()
-    assert not legs_believable(misplaced_ankle(clip, slice(None))).any()
+    assert legs_believable(clip.points, clip.facing).all()
+    assert not legs_believable(misplaced_ankle(clip, slice(None)), clip.facing).any()
 
 
-def test_a_far_knee_much_higher_than_the_near_knee_gives_no_knee_angle() -> None:
-    """The user's case: one knee drawn far above the other pulls the averaged angle up."""
+def test_a_lost_far_leg_does_not_move_the_knee_angle() -> None:
+    """The far knee is often placed far from where it is. Only the near leg gives the angle."""
     clip = generate()
-    points = clip.points.copy()
-    trunk = np.linalg.norm(sk.shoulders(points) - sk.hips(points), axis=-1)
-    points[40:60, sk.LEFT_KNEE, 1] -= 0.3 * trunk[40:60]
-    knee = angle_series(points, clip.facing, 0).knee
-    assert np.isnan(knee[40:60]).all()
-    assert np.isfinite(knee[:40]).all()
-    # A small difference between the legs is normal and still measured.
-    points = clip.points.copy()
-    points[40:60, sk.LEFT_KNEE, 1] -= 0.05 * trunk[40:60]
-    assert np.isfinite(angle_series(points, clip.facing, 0).knee[40:60]).all()
+    near, far = (sk.RIGHT_KNEE, sk.LEFT_KNEE) if clip.facing > 0 else (sk.LEFT_KNEE, sk.RIGHT_KNEE)
+    trunk = np.linalg.norm(sk.shoulders(clip.points) - sk.hips(clip.points), axis=-1)
+    steady = angle_series(clip.points, clip.facing, 0).knee
+    lost = clip.points.copy()
+    lost[40:60, far, 1] -= 0.4 * trunk[40:60]
+    assert np.allclose(angle_series(lost, clip.facing, 0).knee, steady, equal_nan=True)
+    # The same misplacement of the near knee does change it.
+    lost = clip.points.copy()
+    lost[40:60, near, 1] -= 0.4 * trunk[40:60]
+    assert not np.allclose(angle_series(lost, clip.facing, 0).knee, steady, equal_nan=True)
+
+
+def test_the_near_leg_is_the_one_the_rower_faces_away_from() -> None:
+    points = np.zeros((1, 17, 2))
+    points[0, sk.LEFT_KNEE] = (1, 1)
+    points[0, sk.RIGHT_KNEE] = (2, 2)
+    assert sk.near_leg(points, 1)[1][0, 0] == 2  # facing right shows the right side
+    assert sk.near_leg(points, -1)[1][0, 0] == 1
 
 
 def test_an_impossible_leg_gives_no_knee_angle() -> None:
