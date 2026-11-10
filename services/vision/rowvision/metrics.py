@@ -45,14 +45,15 @@ class StrokeMetrics:
     """How far the legs lead the trunk off the catch, as a share of the drive. Positive is legs first."""
 
 
-def legs_believable(side_on: FloatArray) -> NDArray[np.bool_]:
+def legs_believable(side_on: FloatArray, facing: int) -> NDArray[np.bool_]:
     """Return which frames have a lower leg a real body could make.
 
     The hull hides the feet, so the pose model often guesses, and can put an ankle up by the hands.
-    Model confidence does not reliably show this, so the check uses anatomy instead.
+    Model confidence does not reliably show this, so the check uses anatomy instead. Only the leg
+    nearest the camera is checked, as it is the only one the knee angle is read from.
     """
-    hip, knee, ankle = sk.hips(side_on), sk.knees(side_on), sk.ankles(side_on)
-    trunk = np.linalg.norm(sk.shoulders(side_on) - hip, axis=-1)
+    hip, knee, ankle = sk.near_leg(side_on, facing)
+    trunk = np.linalg.norm(sk.shoulders(side_on) - sk.hips(side_on), axis=-1)
     shin = np.linalg.norm(knee - ankle, axis=-1)
     thigh = np.linalg.norm(knee - hip, axis=-1)
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -71,10 +72,12 @@ def angle_series(points: FloatArray, facing: int, view_deg: float | FloatArray) 
     side_on = undo_foreshortening(points, hip[:, None, :], view_deg)
     hip = sk.hips(side_on)
     shoulder = sk.shoulders(side_on)
-    knee = joint_angle(hip, sk.knees(side_on), sk.ankles(side_on))
+    # The knee is read from the near leg alone. Averaging in the far leg, which the model often loses,
+    # dragged the angle up or down by the same amount the far knee was misplaced.
+    knee = joint_angle(*sk.near_leg(side_on, facing))
     return AngleSeries(
         trunk_lean=lean_from_vertical(hip, shoulder, facing),
-        knee=np.where(legs_believable(side_on), knee, np.nan),
+        knee=np.where(legs_believable(side_on, facing), knee, np.nan),
         elbow=joint_angle(shoulder, sk.elbows(side_on), sk.wrists(side_on)),
     )
 
