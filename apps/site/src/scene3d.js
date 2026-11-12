@@ -6,6 +6,7 @@ import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { buildBoat, PIN, INB, OUTB } from './boat3d.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
 export const COL = { hl: '#35d07f', knee: '#ffb547', hip: '#5cc8ff', back: '#c49bff', elbow: '#ff7ab6' };
@@ -77,38 +78,7 @@ export function createScene(canvas, overlay) {
   const buoyGeo = new THREE.SphereGeometry(.09, 16, 12), bw = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: .35 }), bo = new THREE.MeshStandardMaterial({ color: 0xff7a1a, roughness: .35 });
   for (let i = -24; i <= 24; i++) for (const z of [-6.5, 6.5]) { const b = new THREE.Mesh(buoyGeo, Math.abs(i) % 4 == 0 ? bo : bw); b.position.set(i * BP, .02, z); buoys.add(b); }
 
-  // Boat: a long glossy white hull, dark deck, wing rigger, seat, footplate.
-  const boat = new THREE.Group(); scene.add(boat);
-  const hullMat = new THREE.MeshPhysicalMaterial({ color: 0xf4f4f2, roughness: .18, clearcoat: 1, clearcoatRoughness: .08 });
-  const hullGeo = new THREE.SphereGeometry(1, 96, 24); const hp = hullGeo.attributes.position;
-  for (let i = 0; i < hp.count; i++) { const x = hp.getX(i), y = hp.getY(i), z = hp.getZ(i), taper = Math.pow(1 - x * x, .55); hp.setXYZ(i, x * 4.1, y * .13 * taper, z * .15 * taper); }
-  hullGeo.computeVertexNormals(); const hull = new THREE.Mesh(hullGeo, hullMat); hull.position.y = .03; hull.castShadow = true; boat.add(hull);
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(1.5, .02, .26), new THREE.MeshStandardMaterial({ color: 0x1a1d1c, roughness: .7 })); deck.position.set(-.25, .15, 0); boat.add(deck);
-  const carbon = new THREE.MeshPhysicalMaterial({ color: 0x15191a, roughness: .35, metalness: .3, clearcoat: .6 });
-  const metal = new THREE.MeshStandardMaterial({ color: 0x9aa3a6, roughness: .3, metalness: .9 });
-  const rod = (a, b, r, mat) => { const d = b.clone().sub(a), mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 1, 14), mat); mesh.scale.y = d.length(); mesh.position.copy(a).add(b).multiplyScalar(.5); mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); mesh.castShadow = true; return mesh; };
-  const PIN = { x: -.12, y: .42, z: .8 };
-  for (const sd of [-1, 1]) {
-    boat.add(rod(new THREE.Vector3(.05, .19, sd * .13), new THREE.Vector3(PIN.x, PIN.y - .05, sd * PIN.z), .022, carbon));
-    boat.add(rod(new THREE.Vector3(.45, .18, sd * .12), new THREE.Vector3(PIN.x + .05, PIN.y - .06, sd * (PIN.z - .05)), .011, carbon));
-    boat.add(rod(new THREE.Vector3(PIN.x, PIN.y - .06, sd * PIN.z), new THREE.Vector3(PIN.x, PIN.y + .06, sd * PIN.z), .012, metal));
-    boat.add(rod(new THREE.Vector3(-1.05, .2, sd * .07), new THREE.Vector3(.35, .2, sd * .07), .006, metal)); // slides
-  }
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(.28, .03, .26), carbon); seat.castShadow = true; boat.add(seat);
-  const foot = new THREE.Mesh(new THREE.BoxGeometry(.04, .26, .3), carbon); foot.position.set(-1.12, .3, 0); foot.rotation.z = -.7; boat.add(foot);
-
-  // Oars: carbon shaft, green blade. Pivot at the pin; blade feathers on the recovery.
-  const bladeMat = new THREE.MeshPhysicalMaterial({ color: 0x0f8a4c, roughness: .3, clearcoat: .8, side: THREE.DoubleSide });
-  const INB = .88, OUTB = 2.0;
-  const oars = [-1, 1].map(sd => {
-    const pivot = new THREE.Group(); pivot.position.set(PIN.x, PIN.y, sd * PIN.z); boat.add(pivot);
-    const arm = new THREE.Group(); pivot.add(arm); // rotates for height (pitch) and feather (roll)
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(.016, .02, INB + OUTB, 14), carbon); shaft.rotation.x = Math.PI / 2; shaft.position.z = sd * (OUTB - INB) / 2; shaft.castShadow = true; arm.add(shaft);
-    const grip = new THREE.Mesh(new THREE.CylinderGeometry(.02, .02, .14, 14), new THREE.MeshStandardMaterial({ color: 0xe8e2d0, roughness: .9 })); grip.rotation.x = Math.PI / 2; grip.position.z = -sd * (INB - .07); arm.add(grip);
-    const bshape = new THREE.Shape(); bshape.moveTo(0, -.03); bshape.quadraticCurveTo(.25, -.12, .44, -.06); bshape.quadraticCurveTo(.47, .05, .4, .1); bshape.quadraticCurveTo(.2, .08, 0, .03);
-    const blade = new THREE.Mesh(new THREE.ExtrudeGeometry(bshape, { depth: .006, bevelEnabled: false }), bladeMat); blade.rotation.y = -sd * Math.PI / 2; blade.position.z = sd * (OUTB - .44); blade.castShadow = true; arm.add(blade);
-    return { sd, pivot, arm };
-  });
+  const B = buildBoat(); const boat = B.boat, seat = B.seat, oars = B.oars; scene.add(boat);
 
   // Mannequin: smooth graphite segments with glowing joint markers.
   const skin = new THREE.MeshPhysicalMaterial({ color: 0x2a2f2d, roughness: .42, metalness: .15, clearcoat: .5, clearcoatRoughness: .3, sheen: .4, sheenColor: new THREE.Color(0x6b7a72) });
@@ -150,7 +120,7 @@ export function createScene(canvas, overlay) {
 
   function pose(t) {
     const { L, B, A } = parts(t);
-    const hipX = -.5 + .44 * L; seat.position.set(hipX, .23, 0);
+    const hipX = -.5 + .44 * L; seat.position.set(hipX, .215, 0);
     const hipC = new THREE.Vector3(hipX, .36, 0);
     const lean = THREE.MathUtils.degToRad(30 - 52 * B); // + = towards the stern
     const up = new THREE.Vector3(-Math.sin(lean), Math.cos(lean), 0);
@@ -165,7 +135,7 @@ export function createScene(canvas, overlay) {
     const out = {};
     oars.forEach(o => {
       o.pivot.rotation.set(0, o.sd * phi, 0);
-      o.arm.rotation.set(o.sd * pitch, 0, 0); o.arm.children[2].rotation.z = feather * Math.PI / 2 * o.sd;
+      o.arm.rotation.set(o.sd * pitch, 0, 0); o.blade.rotation.z = feather * Math.PI / 2;
       const handle = new THREE.Vector3(0, 0, -o.sd * (INB - .06)); o.arm.localToWorld(handle); boat.worldToLocal(handle);
       const bl = new THREE.Vector3(0, 0, o.sd * (OUTB - .2)); o.arm.localToWorld(bl); out['blade' + o.sd] = bl;
       out['hand' + o.sd] = handle;
