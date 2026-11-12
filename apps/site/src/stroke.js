@@ -5,7 +5,7 @@ import { BODY, D2R, INB, OUTB, GRIP_IN, BLADE_IN, PIN, PIN_LEFT_UP, HIP_Y, HIP_C
 import { CURVES } from './stroke-data.js';
 
 export const DRIVE = CURVES.drive;          // share of the cycle spent on the drive
-const LEAN_CATCH = 27 * D2R, LEAN_FINISH = -19 * D2R; // trunk lean, + = forward towards the stern
+const LEAN_CATCH = 27 * D2R, LEAN_FINISH = -23 * D2R; // trunk lean, + = forward towards the stern
 const R_MAX = .985 * (BODY.upper + BODY.fore);        // shoulder to wrist with the arms long
 const R_FIN = .325;                                     // and at the finish, hands drawn in to the ribs
 const R_HANDLE = INB - GRIP_IN, R_BLADE = OUTB - BLADE_IN;

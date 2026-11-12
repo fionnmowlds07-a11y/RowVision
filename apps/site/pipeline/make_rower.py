@@ -58,20 +58,26 @@ knee, hipj, sh, neck = bone("calf_l"), bone("thigh_l"), bone("upperarm_l"), bone
 leg_cut = knee.z + 0.42 * (hipj.z - knee.z)
 ARM = ("upperarm", "lowerarm", "hand", "index", "middle", "ring", "pinky", "thumb")
 col = mesh.color_attributes.new("Col", "FLOAT_COLOR", "POINT")
+U = height / 1.9                       # the measurements below are for a 1.90 m athlete
+shx = abs(sh.x)
 for v in mesh.vertices:
     p = W @ v.co
+    ax = abs(p.x)
     arm = sum(g.weight for g in v.groups if names[g.group].startswith(ARM))
     head = sum(g.weight for g in v.groups if names[g.group] in ("neck_01", "head"))
-    k = 0.0
-    if leg_cut < p.z < neck.z + 0.01 and arm < 0.45 and head < 0.35:
-        k = 1.0
-        if p.z > sh.z - 0.02:  # shoulder straps and neck scoop
-            strap = 0.045 < abs(p.x) < abs(sh.x) - 0.035
-            k = 1.0 if strap and p.z < neck.z - 0.005 else 0.0
-        if p.z > sh.z - 0.11 and abs(p.x) < 0.05 + (p.z - (sh.z - 0.11)) * 0.5 and p.y < 0:
-            k = 0.0  # scooped front (the body faces -y in Blender)
-        if abs(p.x) > abs(sh.x) - 0.045 and p.z > sh.z - 0.13:
-            k = 0.0  # arm holes
+    # Signed distances to each edge of the kit (positive = inside). Storing a smooth value, not on/off,
+    # lets the shader draw a clean line through the middle of a polygon.
+    scoop = (0.15 if p.y < 0 else 0.07) * U      # deeper at the front (the body faces -y in Blender)
+    xi = 0.075 * U
+    neckline = sh.z + 0.045 * U - scoop * max(0.0, 1 - (ax / xi) ** 2)
+    d = min(
+        p.z - leg_cut,
+        neckline - p.z,
+        (shx - 0.035 * U - ax) + max(0.0, sh.z - 0.15 * U - p.z) * 1.5,   # arm holes, closing below the armpit
+        (0.5 - arm) * 0.12 * U,
+        (0.4 - head) * 0.12 * U,
+    )
+    k = min(1.0, max(0.0, 0.5 + d / (0.05 * U)))
     col.data[v.index].color = (k, k, k, 1.0)
 mesh.color_attributes.active_color = col
 mesh.color_attributes.render_color_index = 0

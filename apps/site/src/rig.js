@@ -37,4 +37,4 @@ export const ANKLE = {
 
 // Slide: where the hip joint sits at the catch (shins vertical) and how far the seat travels to the finish.
 export const HIP_CATCH = ANKLE.x + .41;
-export const TRAVEL = .54;
+export const TRAVEL = .547;

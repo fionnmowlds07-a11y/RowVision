@@ -1,7 +1,6 @@
 // Home page 3D scene: a graphite athlete sculling a single at dawn.
 // Motion comes from src/stroke.js (fitted to elite sculling), not from tracking, so it is perfectly smooth.
 import * as THREE from 'three';
-import { Water } from 'three/examples/jsm/objects/Water.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
@@ -10,12 +9,13 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { Pass } from 'three/examples/jsm/postprocessing/Pass.js';
 import { buildBoat } from './boat3d.js';
+import { createWater } from './water.js';
 import { createRower } from './rower3d.js';
 import { stroke } from './stroke.js';
 import { ANKLE, HIP_Y, SEAT_TOP, STRETCHER } from './rig.js';
 
 export const COL = { hl: '#35d07f', knee: '#ffb547', hip: '#5cc8ff', back: '#c49bff', elbow: '#ff7ab6' };
-const STROKE_S = 2.5;   // seconds per stroke (24 strokes a minute, steady state)
+const STROKE_S = 2.3;   // seconds per stroke (26 strokes a minute)
 const BOAT_V = 4.4;     // mean hull speed, m/s
 const R2D = 180 / Math.PI;
 
@@ -23,20 +23,7 @@ const R2D = 180 / Math.PI;
 const QS = new URLSearchParams(location.search);
 // &cam=x,y,z,fov,look sets a free camera (offset from the hips).
 const FIX_CAM = QS.has('cam') ? QS.get('cam').split(',') : null;
-const FIX_T = QS.has('t') ? parseFloat(QS.get('t')) : null, FIX_SHOT = QS.has('shot') ? parseInt(QS.get('shot')) : null;
-
-function waterNormals() {
-  const N = 256, c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d'), img = g.createImageData(N, N);
-  const hgt = new Float32Array(N * N), waves = [];
-  for (let i = 0; i < 28; i++) waves.push([Math.round((Math.random() - .5) * 14), Math.round((Math.random() - .5) * 14), Math.random() * 6.28, 1 / (1 + i * .25)]);
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { let v = 0; for (const [kx, ky, p, a] of waves) v += a * Math.sin(6.2832 * (kx * x + ky * y) / N + p); hgt[y * N + x] = v; }
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const hx = hgt[y * N + (x + 1) % N] - hgt[y * N + (x - 1 + N) % N], hy = hgt[((y + 1) % N) * N + x] - hgt[((y - 1 + N) % N) * N + x];
-    const n = new THREE.Vector3(-hx * .35, -hy * .35, 1).normalize(), o = (y * N + x) * 4;
-    img.data[o] = (n.x * .5 + .5) * 255; img.data[o + 1] = (n.y * .5 + .5) * 255; img.data[o + 2] = (n.z * .5 + .5) * 255; img.data[o + 3] = 255;
-  }
-  g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
-}
+const FIX_T = QS.has('t') && !isNaN(parseFloat(QS.get('t'))) ? parseFloat(QS.get('t')) : null, FIX_SHOT = QS.has('shot') ? parseInt(QS.get('shot')) : null;
 
 // Graphite "sculpture" body. The model's vertex colour marks the kit, which is a shade darker and glossier.
 function athleteMaterial() {
@@ -72,11 +59,7 @@ export function createScene(canvas, overlay) {
   key.shadow.mapSize.set(2048, 2048); Object.assign(key.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 120 }); key.shadow.bias = -.0004;
   scene.add(key, key.target, new THREE.HemisphereLight(0xbfd3ff, 0x2a3326, .55));
 
-  const water = new Water(new THREE.PlaneGeometry(6000, 6000), {
-    textureWidth: 1024, textureHeight: 1024, waterNormals: waterNormals(), sunDirection: sun.clone(), sunColor: 0xffe0b0,
-    waterColor: 0x14261f, distortionScale: .9, fog: true, alpha: 1,
-  });
-  water.rotation.x = -Math.PI / 2; water.material.uniforms.size.value = 6; scene.add(water);
+  const lake = createWater({ sun }), water = lake.mesh; scene.add(water);
 
   // Lane buoys every 12.5 m on both sides of the lane.
   const buoys = new THREE.Group(); scene.add(buoys); const BP = 12.5;
@@ -94,8 +77,8 @@ export function createScene(canvas, overlay) {
   // Splash particles at each catch.
   const SPL = 260, sg = new THREE.BufferGeometry(), spos = new Float32Array(SPL * 3), svel = new Float32Array(SPL * 3), slife = new Float32Array(SPL);
   sg.setAttribute('position', new THREE.BufferAttribute(spos, 3));
-  const splash = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: .035, transparent: true, opacity: .85, depthWrite: false })); scene.add(splash);
-  let sNext = 0; const burst = (p, k) => { for (let i = 0; i < k; i++) { const j = sNext++ % SPL; spos.set([p.x, p.y, p.z], j * 3); svel.set([(Math.random() - .5) * 1.2, 1 + Math.random() * 1.6, (Math.random() - .5) * 1.2], j * 3); slife[j] = .6 + Math.random() * .4; } };
+  const splash = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: .018, transparent: true, opacity: .7, depthWrite: false })); scene.add(splash);
+  let sNext = 0; const burst = (p, k) => { for (let i = 0; i < k; i++) { const j = sNext++ % SPL; spos.set([p.x, p.y, p.z], j * 3); svel.set([(Math.random() - .5) * .9 + (p.vx || 0), .5 + Math.random() * .9, (Math.random() - .5) * .9], j * 3); slife[j] = .25 + Math.random() * .3; } };
 
   // Glow only for the joint markers: they are drawn alone (hidden where the body covers them), blurred, and added on top.
   // The sky never blooms, so the picture stays crisp when the camera looks towards the light.
@@ -111,11 +94,12 @@ export function createScene(canvas, overlay) {
     }
   }
   const glowComposer = new EffectComposer(renderer); glowComposer.renderToScreen = false;
-  glowComposer.addPass(new MarkerPass()); glowComposer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 2.6, .7, 0));
+  glowComposer.addPass(new MarkerPass()); glowComposer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 1.0, .5, 0));
   const composer = new EffectComposer(renderer); composer.addPass(new RenderPass(scene, camera));
   const addGlow = new ShaderPass({ uniforms: { tDiffuse: { value: null }, tGlow: { value: glowComposer.readBuffer.texture } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
     fragmentShader: 'uniform sampler2D tDiffuse, tGlow; varying vec2 vUv; void main(){ gl_FragColor = texture2D(tDiffuse, vUv) + vec4(texture2D(tGlow, vUv).rgb, 0.); }' });
+  addGlow.uniforms.tGlow.value = glowComposer.readBuffer.texture; // (ShaderPass clones its uniforms and drops render-target textures)
   composer.addPass(addGlow); composer.addPass(new OutputPass());
   renderer.shadowMap.autoUpdate = false;
 
@@ -196,9 +180,12 @@ export function createScene(canvas, overlay) {
     // Boat run: checks just after the catch, runs on through the early recovery.
     const speed = BOAT_V * s.speed;
     dist += speed * dt;
-    buoys.position.x = -(dist % BP); water.position.x = -(dist % 400);
-    water.material.uniforms.time.value = time * .6;
-    if (s.drive && !prevDrive) res.blades.forEach(b => burst(boat.localToWorld(b.clone()).setY(0), 40));
+    buoys.position.x = -(dist % BP);
+    // Water: flows past at hull speed; the working blades churn it and leave a puddle each at the release.
+    lake.update(dt, time, speed * dt, s.speed);
+    res.blades.forEach((b, i) => lake.blade(i, b.x, b.z, s.drive ? s.buried * (.35 + .65 * Math.sin(Math.PI * Math.min(1, s.t / .4))) : 0));
+    if (s.drive && !prevDrive) res.blades.forEach(b => burst(boat.localToWorld(b.clone()).setY(0), 14));
+    if (!s.drive && prevDrive) res.blades.forEach(b => { lake.puddle(b.x, b.z, 1); burst(boat.localToWorld(b.clone()).setY(0), 8); });
     prevDrive = s.drive;
     for (let i = 0; i < SPL; i++) { if (slife[i] <= 0) { spos[i * 3 + 1] = -10; continue; } slife[i] -= dt; svel[i * 3 + 1] -= 9.8 * dt; spos[i * 3] += (svel[i * 3] - speed) * dt; spos[i * 3 + 1] = Math.max(-.02, spos[i * 3 + 1] + svel[i * 3 + 1] * dt); spos[i * 3 + 2] += svel[i * 3 + 2] * dt; }
     sg.attributes.position.needsUpdate = true;
