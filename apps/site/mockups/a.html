@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RowVision. Mock-up A, Darkroom</title>
+<link rel="stylesheet" href="./a.css">
+</head>
+<body>
+<header class="nav">
+  <a class="mark" href="#top">RowVision</a>
+  <nav aria-label="Main"><a href="#how">How it works</a><a href="#about">About</a><a class="get" href="#get">Download</a></nav>
+</header>
+<main id="top">
+<section class="film" id="film">
+  <div class="stage">
+    <figure class="print" id="print">
+      <canvas id="cv" width="1440" height="840" role="img" aria-label="A sculler filmed from the bank, printed in black and green, with the joints RowVision follows drawn over the picture"></canvas>
+      <figcaption id="edge">Frame <b id="fno">001</b> of <span id="ftot">095</span> <i id="phase">Catch</i></figcaption>
+    </figure>
+
+    <div class="scene s1" id="s1">
+      <h1><span class="l1">You can’t see</span> <span class="l2">yourself row.</span></h1>
+      <div class="lede">
+        <p>RowVision reads your stroke from ordinary phone video shot from the launch, and shows you knees, hips, back and arms at every catch and finish.</p>
+        <a class="btn" href="#get">Download for Windows and Linux</a>
+        <small>Free. Installers coming soon.</small>
+      </div>
+    </div>
+
+    <div class="scene s2" id="s2">
+      <h2>Legs. Back.<br>Then arms.</h2>
+      <p class="note">Scroll through one stroke. The numbers are read from this clip, frame by frame.</p>
+      <dl class="reads">
+        <div><dt>Knee</dt><dd id="rKnee">0°</dd></div>
+        <div><dt id="lBack">Body laid back</dt><dd id="rBack">0°</dd></div>
+        <div><dt>Elbow</dt><dd id="rElbow">0°</dd></div>
+      </dl>
+      <div class="ruler" id="ruler" aria-hidden="true"><i class="head" id="head"></i></div>
+    </div>
+
+    <div class="scene s3" id="s3">
+      <h2>Every catch.<br>Every finish.</h2>
+      <p class="note">RowVision marks the catch and the finish of each stroke and measures you there, against targets you can set yourself.</p>
+      <ol class="sheet" id="sheet"></ol>
+    </div>
+  </div>
+</section>
+</main>
+<script type="module" src="./a.js"></script>
+</body>
+</html>

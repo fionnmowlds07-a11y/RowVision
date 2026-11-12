@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RowVision. Mock-up C, Footage to data</title>
+<link rel="stylesheet" href="./c.css">
+</head>
+<body>
+<header class="nav">
+  <a class="mark" href="#top">RowVision</a>
+  <nav aria-label="Main"><a href="#how">How it works</a><a href="#about">About</a><a class="get" href="#get">Download</a></nav>
+</header>
+<main id="top">
+<section class="film" id="film">
+  <div class="stage">
+    <div class="rig" id="rig">
+      <div class="phone" id="phone">
+        <canvas id="cv" width="1280" height="720" role="img" aria-label="Phone video of a sculler filmed from the bank. As you scroll, the picture fades and the rower's joints are drawn in its place"></canvas>
+        <div class="fan" id="fan" aria-hidden="true"></div>
+      </div>
+    </div>
+
+    <div class="scene s1" id="s1">
+      <h1><span class="l1">Film your outing.</span> <span class="l2">See your stroke.</span></h1>
+      <div class="lede">
+        <p>Prop a phone in the launch and row. RowVision turns that video into knees, hips, back and arms, measured at every catch and finish.</p>
+        <a class="btn" href="#get">Download for Windows and Linux</a>
+        <small>Free. Installers coming soon.</small>
+      </div>
+    </div>
+
+    <div class="scene s2" id="s2">
+      <h2>It finds you, then follows every joint.</h2>
+      <p>You tap yourself once on a clear frame. From there RowVision tracks shoulder, elbow, wrist, hip, knee and ankle through the whole clip.</p>
+    </div>
+
+    <div class="scene s3" id="s3">
+      <h2>One drive, taken apart.</h2>
+      <p>Nine moments from the catch to the finish of the stroke you just watched. These numbers are measured from that clip.</p>
+      <dl class="strip">
+        <div class="main"><dt>Knee at the catch</dt><dd id="tKnee">0°</dd></div>
+        <div><dt>Hip at the catch</dt><dd id="tHip">0°</dd></div>
+        <div><dt id="tLeanL">Body at the finish</dt><dd id="tLean">0°</dd></div>
+        <div><dt>Elbow at the finish</dt><dd id="tElbow">0°</dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+</main>
+<script type="module" src="./c.js"></script>
+</body>
+</html>

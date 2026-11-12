@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RowVision. Mock-up B, Stroke in space</title>
+<link rel="stylesheet" href="./b.css">
+</head>
+<body>
+<header class="nav">
+  <a class="mark" href="#top">RowVision</a>
+  <nav aria-label="Main"><a href="#how">How it works</a><a href="#about">About</a><a class="get" href="#get">Download</a></nav>
+</header>
+<main id="top">
+<section class="film" id="film">
+  <div class="stage">
+    <canvas id="gl" role="img" aria-label="A rower drawn as points and lines of light above dark water, moving through a real stroke, with each earlier moment of the stroke left standing behind"></canvas>
+    <div id="labels" aria-hidden="true"><output id="aKnee"></output><output id="aHip"></output><output id="aElbow"></output></div>
+
+    <div class="scene s1" id="s1">
+      <h1>Every stroke you take, left standing.</h1>
+      <div class="lede">
+        <p>RowVision reads your rowing from ordinary phone video and measures knees, hips, back and arms through every catch and finish.</p>
+        <a class="btn" href="#get">Download for Windows and Linux</a>
+        <small>Free. Installers coming soon.</small>
+      </div>
+    </div>
+
+    <div class="scene s2" id="s2">
+      <h2>Stroke one, beside stroke three.</h2>
+      <p>This is one clip: <b id="nStrokes">3</b> strokes, <b id="nFrames">281</b> moments, each left where it was rowed. Line them up and you can see where the shape of your stroke changes.</p>
+    </div>
+
+    <div class="scene s3" id="s3">
+      <h2>Measured, not guessed.</h2>
+      <p>The angles are read from the same joints you are looking at. When the footage is not good enough to measure, RowVision says so and gives no score.</p>
+      <dl class="reads">
+        <div><dt>Knee</dt><dd id="rKnee">0°</dd></div>
+        <div><dt>Hip</dt><dd id="rHip">0°</dd></div>
+        <div><dt>Elbow</dt><dd id="rElbow">0°</dd></div>
+        <div><dt>Phase</dt><dd id="rPhase">Drive</dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+</main>
+<script type="module" src="./b.js"></script>
+</body>
+</html>
