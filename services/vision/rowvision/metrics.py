@@ -18,6 +18,9 @@ CATCH_KNEE_RANGE = (30.0, 115.0)
 FINISH_KNEE_RANGE = (130.0, 185.0)
 """What a body can do at each moment. Values outside are misplaced joints, not poor technique."""
 MAX_STROKE_PERIODS = 1.6
+CATCH_LEAN_FRAMES_BEFORE = 3
+"""The marked catch sits up to a few frames after the blade goes in, and one frame's lean is noisy,
+so catch lean is the median of the catch frame and the frames just before it."""
 
 
 @dataclass(frozen=True)
@@ -100,6 +103,13 @@ def _legs_lead(angles: AngleSeries, catch: int, finish: int) -> float:
     return (trunk - legs) / (finish - catch)
 
 
+def _catch_lean(trunk_lean: FloatArray, catch: int) -> float:
+    window = trunk_lean[max(catch - CATCH_LEAN_FRAMES_BEFORE, 0) : catch + 1]
+    if not np.isfinite(window).any():
+        return float("nan")
+    return float(np.nanmedian(window))
+
+
 def per_stroke(angles: AngleSeries, timeline: StrokeTimeline) -> list[StrokeMetrics]:
     """Measure each complete stroke: a catch, the finish after it, and the next catch."""
     results = []
@@ -114,7 +124,7 @@ def per_stroke(angles: AngleSeries, timeline: StrokeTimeline) -> list[StrokeMetr
                 catch_frame=catch,
                 finish_frame=finish,
                 next_catch_frame=next_catch,
-                catch_lean_deg=float(angles.trunk_lean[catch]),
+                catch_lean_deg=_catch_lean(angles.trunk_lean, catch),
                 finish_lean_deg=float(angles.trunk_lean[finish]),
                 catch_knee_deg=_within(float(angles.knee[catch]), CATCH_KNEE_RANGE),
                 finish_knee_deg=_within(float(angles.knee[finish]), FINISH_KNEE_RANGE),
