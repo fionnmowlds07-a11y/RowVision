@@ -125,8 +125,8 @@ export function createScene(canvas, overlay) {
 
   function pose(t) {
     const { L, B, A } = parts(t);
-    const hipX = -.5 + .46 * L; seat.position.set(hipX, .15, 0);
-    const hipC = new THREE.Vector3(hipX, .27, 0);
+    const hipX = -.5 + .46 * L; seat.position.set(hipX, .075, 0);
+    const hipC = new THREE.Vector3(hipX, .19, 0);
     const lean = THREE.MathUtils.degToRad(30 - 52 * B); // + = towards the stern
     const up = new THREE.Vector3(-Math.sin(lean), Math.cos(lean), 0);
     const shC = hipC.clone().add(up.clone().multiplyScalar(.52));
@@ -147,7 +147,7 @@ export function createScene(canvas, overlay) {
       out['hand' + o.sd] = handle;
     });
     const sides = [-1, 1].map(sd => {
-      const z = sd * .1, hip = hipC.clone().setZ(z), ank = new THREE.Vector3(-1.0, .2, sd * .1);
+      const z = sd * .1, hip = hipC.clone().setZ(z), ank = new THREE.Vector3(-.99, .1, sd * .1);
       const knee = ik(hip, ank, .46, .45, new THREE.Vector3(.2, 1, 0));
       const sh = shC.clone().setZ(sd * .19), hand = out['hand' + sd].clone(); hand.z = THREE.MathUtils.clamp(hand.z, -.42, .42);
       const elb = ik(sh, hand, .3, .29, new THREE.Vector3(.4, -1, sd * .8));
@@ -159,7 +159,7 @@ export function createScene(canvas, overlay) {
       place(segs['thigh' + S], W(s.hip), W(s.knee)); place(segs['shin' + S], W(s.knee), W(s.ank));
       place(segs['upper' + S], W(s.sh), W(s.elb)); place(segs['fore' + S], W(s.elb), W(s.hand));
       kneeBalls[i].position.copy(W(s.knee)); elbBalls[i].position.copy(W(s.elb)); handBalls[i].position.copy(W(s.hand)); shBalls[i].position.copy(W(s.sh)); ankBalls[i].position.copy(W(s.ank));
-      feet[i].position.copy(W(s.ank.clone().add(new THREE.Vector3(.02, .05, 0)))); feet[i].rotation.z = -.7;
+      feet[i].visible = false; ankBalls[i].visible = false;
     });
     place(segs.torso, W(hipC.clone().add(up.clone().multiplyScalar(-.04))), W(shC.clone().add(up.clone().multiplyScalar(.04)))); segs.torso.scale.x = .72; segs.torso.scale.z = 1.05;
     const neckTop = shC.clone().add(up.clone().multiplyScalar(.14)); place(segs.neck, W(shC), W(neckTop));
