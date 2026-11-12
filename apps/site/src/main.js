@@ -42,7 +42,7 @@ function render(st,mix,opts={}){
   const cv=st.cv,d=size(cv),g=cv.getContext('2d'),W=cv.width,H=cv.height,C=st.clip,V=C.v;g.fillStyle='#000';g.fillRect(0,0,W,H);
   if(!ready(C))return;const S=C.S,t=ft(C),i=Math.round(t),b=at(S,t);
   const ta=target(mix.a,b),tb=target(mix.b,b),f=mix.f;
-  const T={x:ta.x+(tb.x-ta.x)*f,y:ta.y+(tb.y-ta.y)*f,z:ta.z+(tb.z-ta.z)*f};
+  const T={x:ta.x+(tb.x-ta.x)*f,y:ta.y+(tb.y-ta.y)*f,z:opts.zoom||(ta.z+(tb.z-ta.z)*f)};
   const k=reduce?1:(opts.glide||.1);st.cam.x+=(T.x-st.cam.x)*k;st.cam.y+=(T.y-st.cam.y)*k;st.cam.z+=(T.z-st.cam.z)*k;
   const Vw=C.pose.w,Vh=C.pose.h,s=Math.max(W/Vw,H/Vh)*st.cam.z;const hw=W/(2*s*Vw),hh=H/(2*s*Vh);
   const cx=Math.min(1-hw,Math.max(hw,st.cam.x)),cy=Math.min(1-hh,Math.max(hh,st.cam.y));
@@ -128,7 +128,7 @@ function loop(){cx+=(mx-cx)*.2;cy+=(my-cy)*.2;cur.style.left=cx+'px';cur.style.t
   if(!reduce&&innerWidth>820){const r=heroSt.getBoundingClientRect();const p=Math.max(0,Math.min(1,-r.top/r.height));heroSt.style.transform=`scale(${1-p*.08})`;heroSt.style.opacity=1-p*.6}
   simple.forEach(s=>{if(vis(s.cv))render(s,{a:s.ch,b:s.ch,f:0},{angles:s.angles,trace:s.trace,skel:s.skel??1,box:s.box?undefined:false})});
   if(vis(scene.cv)&&innerWidth>820)render(scene,{a:CUR,b:CUR,f:0},{glide:.05});
-  if(vis(how.cv))render(how,{a:how.ch,b:how.ch,f:0},{angles:how.angles,skel:how.skel,box:how.box?undefined:false});
+  if(vis(how.cv))render(how,{a:1,b:1,f:0},{zoom:3,angles:how.angles,skel:how.skel,box:how.box?undefined:false});
   tiles();chart();requestAnimationFrame(loop)}
 Object.values(CLIPS).forEach(c=>fetch(c.url).then(r=>r.json()).then(j=>{c.pose=j;build(c)}).catch(()=>{}));
 splitText();route();requestAnimationFrame(loop);
