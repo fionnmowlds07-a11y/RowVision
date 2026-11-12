@@ -138,3 +138,29 @@ def test_a_camera_that_swings_is_corrected_frame_by_frame() -> None:
     assert np.abs(angle_series(points, side_on.facing, views).trunk_lean - truth).max() < 1
     one_figure = angle_series(points, side_on.facing, 22.5).trunk_lean
     assert np.abs(one_figure - truth).max() > 3
+
+
+def lean_series(values: dict[int, float], frames: int = 120) -> AngleSeries:
+    lean = np.full(frames, 20.0)
+    for frame, value in values.items():
+        lean[frame] = value
+    flat = np.full(frames, 90.0)
+    return AngleSeries(trunk_lean=lean, knee=flat, elbow=flat)
+
+
+def test_one_bad_frame_at_the_catch_does_not_set_catch_lean() -> None:
+    angles = lean_series({30: 45.0})
+    strokes = per_stroke(angles, StrokeTimeline([30, 90], [60], 30.0, 1.0, 60.0))
+    assert strokes[0].catch_lean_deg == pytest.approx(20.0)
+
+
+def test_catch_lean_includes_the_frames_just_before_the_catch() -> None:
+    angles = lean_series({27: 30.0, 28: 30.0, 29: 30.0, 30: 22.0})
+    strokes = per_stroke(angles, StrokeTimeline([30, 90], [60], 30.0, 1.0, 60.0))
+    assert strokes[0].catch_lean_deg == pytest.approx(30.0)
+
+
+def test_catch_lean_ignores_missing_frames() -> None:
+    angles = lean_series({27: np.nan, 28: np.nan, 29: 25.0, 30: 25.0})
+    strokes = per_stroke(angles, StrokeTimeline([30, 90], [60], 30.0, 1.0, 60.0))
+    assert strokes[0].catch_lean_deg == pytest.approx(25.0)
