@@ -1,6 +1,7 @@
+import { createScene } from './scene3d.js';
 const COL={hl:'#35d07f',link:'#7fe3ad',knee:'#ffb547',hip:'#5cc8ff',back:'#c49bff',elbow:'#ff7ab6'};
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
-const CLIPS={scull:{v:document.getElementById('src'),url:'/data/pose-scull.json',label:'YOU',slow:2,rate:1},eight:{v:document.getElementById('src2'),spot:true,url:'/data/pose-eight.json',label:'3 SEAT · YOU',slow:1,rate:.6}};
+const CLIPS={scull:{v:document.getElementById('src'),url:'/data/pose-scull.json',label:'YOU',slow:2,rate:1}};
 Object.values(CLIPS).forEach(c=>{const r=()=>{c.v.defaultPlaybackRate=c.rate;c.v.playbackRate=c.rate;if(c.scrub)c.v.pause()};r();c.v.addEventListener('loadedmetadata',r);c.v.addEventListener('play',r);});
 const ease=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
 const deg=(a,b,c)=>{const v1=[a[0]-b[0],a[1]-b[1]],v2=[c[0]-b[0],c[1]-b[1]];return Math.acos(Math.max(-1,Math.min(1,(v1[0]*v2[0]+v1[1]*v2[1])/(Math.hypot(...v1)*Math.hypot(...v2)||1))))*180/Math.PI};
@@ -24,13 +25,13 @@ const fi=c=>Math.floor(ft(c));
 const lerp2=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
 function at(S,t){t=Math.max(0,t);const i=Math.floor(t),j=Math.min(S.B.length-1,i+1),u=t-i,A=S.B[i],B=S.B[j],o={near:A.near.map((p,k)=>lerp2(p,B.near[k],u)),far:A.far.map((p,k)=>lerp2(p,B.far[k],u))};['sh','el','wr','hp','kn','an'].forEach(k=>o[k]=lerp2(A[k],B[k],u));o.v=k=>S[k][i]+(S[k][j]-S[k][i])*u;return o}
 const CH=[
- {t:'One sculler. Seventeen points.',p:'An ordinary phone clip from the bank. RowVision finds the rower and marks every joint.',z:1,at:'mid',angles:[],skel:0},
- {t:'Locked on.',p:'It follows you for the whole piece, through splash, glare and a moving camera.',z:1.6,at:'body',angles:[],skel:1,box:1},
- {t:'Legs.',p:'Knee angle through every stroke. How deep you come to the catch, and when the legs finish.',z:2.2,at:'kn',angles:['knee'],skel:1,cls:'c-knee'},
- {t:'Hips and back.',p:'Hip angle and back lean. Did the body swing open too early, or hang on at the finish?',z:2,at:'hp',angles:['hip','back'],skel:1,cls:'c-back'},
- {t:'Arms.',p:'Elbow angle shows when the arms break. They should come in last, after the legs and back.',z:2.2,at:'el',angles:['elbow'],skel:1,cls:'c-elbow'},
- {t:'All of it, every frame.',p:'Four angles tracked together, 30 times a second, scored at every catch and finish.',z:1.6,at:'body',angles:['knee','hip','back','elbow'],skel:1},
- {t:'See every stroke.',p:'Free on Windows and Linux.',z:1,at:'body',angles:['knee','back'],skel:1,cta:1}];
+ {t:'See every <span class="hl">stroke.</span>',p:'RowVision reads your rowing technique from ordinary phone video. Knees, hips, back and arms, through every catch and finish.',big:1,angles:[],z:1,at:'mid'},
+ {t:'The stroke, joint by joint.',p:'Every rower moves through the same four phases. RowVision measures each one.',angles:[],z:1.6,at:'body'},
+ {t:'Legs.',p:'Knee angle through every stroke. How deep you come to the catch, and when the legs finish.',angles:['knee'],cls:'c-knee',z:2.2,at:'kn'},
+ {t:'Hips and back.',p:'Hip angle and back lean. Did the body swing open too early, or hang on at the finish?',angles:['hip','back'],cls:'c-back',z:2,at:'hp'},
+ {t:'Arms.',p:'Elbow angle shows when the arms break. They should come in last, after the legs and back.',angles:['elbow'],cls:'c-elbow',z:2.2,at:'el'},
+ {t:'All of it, every frame.',p:'Four angles tracked together, scored at every catch and finish against targets your coach can set.',angles:['knee','hip','back','elbow'],z:1.6,at:'body'},
+ {t:'Your turn.',p:'Film your next outing. Free on Windows and Linux.',cta:1,angles:['knee','back'],z:1,at:'body'}];
 function target(ch,b){const c=CH[ch];let p=[.5,.45];if(b&&c.at!='mid'){p=c.at=='body'?[(b.sh[0]+b.hp[0]+b.kn[0])/3,(b.sh[1]+b.hp[1]+b.kn[1])/3]:b[c.at];}return {x:p[0],y:p[1],z:c.z}}
 function mkStage(cv,clip){return {cv,clip:CLIPS[clip||cv.dataset.clip||'scull'],cam:{x:.5,y:.45,z:1}}}
 function size(cv){const r=cv.getBoundingClientRect(),d=Math.min(2,devicePixelRatio||1);const w=Math.round(r.width*d),h=Math.round(r.height*d);if(cv.width!=w||cv.height!=h){cv.width=w;cv.height=h}return d}
@@ -78,24 +79,23 @@ function render(st,mix,opts={}){
     g.strokeStyle=COL.knee;g.lineWidth=2*d;g.beginPath();S.knee.forEach((v,j)=>{const x=x0+j/N*(x1-x0),y=y1-(v-40)/150*(y1-y0);j?g.lineTo(x,y):g.moveTo(x,y)});g.stroke();g.fillStyle='#fff';g.fillRect(x0+i/N*(x1-x0)-d,y0,2*d,y1-y0);}
 }
 const simple=[...document.querySelectorAll('canvas[data-cam]')].filter(c=>c.id!='howCv').map(cv=>({...mkStage(cv),ch:+cv.dataset.cam,angles:cv.dataset.angles?cv.dataset.angles.split(','):[],trace:!!cv.dataset.trace}));
-const scene=mkStage(document.getElementById('sceneCv'),'scull');let CUR=0,lock=0;
+const S3=createScene(document.getElementById('gl'),document.getElementById('ov'));let CUR=0,lock=0;
 const how={...mkStage(document.getElementById('howCv')),ch:0,angles:[],skel:0};
 const chaps=document.getElementById('chaps'),prog=document.getElementById('prog'),mch=document.getElementById('mchaps');
-CH.forEach((c,n)=>{const el=document.createElement('div');el.className='chap';el.innerHTML=`<span class="num">${String(n+1).padStart(2,'0')} / ${String(CH.length).padStart(2,'0')}</span><h2 class="${c.cls||''}">${c.t}</h2><p>${c.p}</p>${c.cta?'<div style="pointer-events:auto"><a class="btn" href="#get">Download free</a></div>':''}`;chaps.append(el);prog.append(document.createElement('i'));
-  const m=document.createElement('div');m.className='mchap rv';m.innerHTML=`<div class="stage"><canvas></canvas></div><span class="eyebrow">${String(n+1).padStart(2,'0')}</span><h2 class="h3 ${c.cls||''}">${c.t}</h2><p class="soft" style="margin:0">${c.p}</p>`;mch.append(m);
-  simple.push({...mkStage(m.querySelector('canvas'),'scull'),ch:n,angles:c.angles,box:c.box,skel:c.skel});});
+CH.forEach((c,n)=>{const el=document.createElement('div');el.className='chap';el.innerHTML=`<span class="num">${String(n+1).padStart(2,'0')} / ${String(CH.length).padStart(2,'0')}</span>${c.big?`<h1 class="h1">${c.t}</h1>`:`<h2 class="${c.cls||''}">${c.t}</h2>`}<p>${c.p}</p>${c.cta?'<div style="pointer-events:auto"><a class="btn" href="#get">Download free</a></div>':''}`;chaps.append(el);prog.append(document.createElement('i'));
+});
 const steps=[...document.querySelectorAll('.step')],howcap=document.getElementById('howcap'),capT=['Raw clip','Finding 3 seat','Pose, every frame','Angles, live'];
 const SIO=new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting)return;steps.forEach(x=>x.classList.remove('on'));e.target.classList.add('on');const n=steps.indexOf(e.target);how.ch=+e.target.dataset.cam;how.angles=e.target.dataset.angles?e.target.dataset.angles.split(','):[];how.skel=e.target.dataset.skel=='0'?0:1;how.box=!!e.target.dataset.box;howcap.textContent=capT[n]}),{rootMargin:'-45% 0px -45% 0px'});
 steps.forEach(x=>SIO.observe(x));
-const live=[...document.querySelectorAll('[data-live]')];
+const live=[...document.querySelectorAll('[data-live]')],live3=[...document.querySelectorAll('[data-live3]')];let autoNext=performance.now()+5000;
 function tiles(){const C=CLIPS.scull;if(!ready(C))return;const i=fi(C),S=C.S;live.forEach(el=>{const k=el.dataset.live;el.textContent=k=='phase'?S.phase[i]:(k=='back'&&S.back[i]>0?'+':'')+Math.round(S[k][i])+'°'})}
 function chart(){const cv=document.getElementById('seqChart'),C=CLIPS.scull;if(!ready(C)||!cv.closest('.page.on'))return;const S=C.S,d=size(cv),g=cv.getContext('2d'),W=cv.width,H=cv.height,N=S.knee.length,now=fi(C),pad=36*d;g.clearRect(0,0,W,H);
   g.strokeStyle='#1f2b24';g.lineWidth=1;g.fillStyle='#a9bdb0';g.font=`500 ${11*d}px "DM Sans"`;
   [-40,0,60,120,180].forEach(a=>{const y=H-pad-((a+40)/220)*(H-2*pad);g.beginPath();g.moveTo(pad,y);g.lineTo(W-8*d,y);g.stroke();g.fillText(a+'°',2*d,y+4*d)});
   [['knee',COL.knee],['hip',COL.hip],['back',COL.back],['elbow',COL.elbow]].forEach(([k,c])=>{g.strokeStyle=c;g.lineWidth=2.2*d;g.beginPath();S[k].forEach((v,j)=>{if(j>now)return;const x=pad+j/N*(W-pad-8*d),y=H-pad-((v+40)/220)*(H-2*pad);j?g.lineTo(x,y):g.moveTo(x,y)});g.stroke()});
   g.fillStyle='#a9bdb0';g.fillText('time →',W-56*d,H-8*d);}
-function sceneUI(){[...chaps.children].forEach((c,n)=>c.classList.toggle('on',n==CUR));[...prog.children].forEach((c,n)=>c.classList.toggle('on',n==CUR));document.getElementById('readout').style.opacity=CUR>=2?1:0;document.getElementById('hint').style.opacity=CUR<CH.length-1?1:0}
-function go(n){CUR=Math.max(0,Math.min(CH.length-1,n));lock=performance.now()+950;sceneUI()}
+function sceneUI(){S3.setShot(CUR,CH[CUR].angles);[...chaps.children].forEach((c,n)=>c.classList.toggle('on',n==CUR));[...prog.children].forEach((c,n)=>c.classList.toggle('on',n==CUR));document.getElementById('readout').style.opacity=CUR>=2?1:0;document.getElementById('hint').style.opacity=CUR<CH.length-1?1:0}
+function go(n){CUR=Math.max(0,Math.min(CH.length-1,n));lock=performance.now()+1100;sceneUI()}
 [...prog.children].forEach((d,n)=>d.onclick=()=>go(n));
 const sceneEl=document.getElementById('scene');
 function sceneTop(){return sceneEl.getBoundingClientRect().top-64}
@@ -123,11 +123,11 @@ const cur=document.getElementById('cur');let mx=0,my=0,cx=0,cy=0;
 addEventListener('pointermove',e=>{mx=e.clientX;my=e.clientY;cur.classList.toggle('big',!!e.target.closest('.stage,.btn,.card,.scene'))});
 document.querySelectorAll('.btn').forEach(b=>{b.addEventListener('pointermove',e=>{if(reduce)return;const r=b.getBoundingClientRect();b.style.transform=`translate(${(e.clientX-r.left-r.width/2)*.25}px,${(e.clientY-r.top-r.height/2)*.35}px)`});b.addEventListener('pointerleave',()=>b.style.transform='')});
 const vis=el=>{if(!el.closest('.page.on'))return false;const r=el.getBoundingClientRect();return r.bottom>0&&r.top<innerHeight&&r.width>0};
-const heroSt=document.getElementById('heroStage');
+
 function loop(){cx+=(mx-cx)*.2;cy+=(my-cy)*.2;cur.style.left=cx+'px';cur.style.top=cy+'px';
-  if(!reduce&&innerWidth>820){const r=heroSt.getBoundingClientRect();const p=Math.max(0,Math.min(1,-r.top/r.height));heroSt.style.transform=`scale(${1-p*.08})`;heroSt.style.opacity=1-p*.6}
   simple.forEach(s=>{if(vis(s.cv))render(s,{a:s.ch,b:s.ch,f:0},{angles:s.angles,trace:s.trace,skel:s.skel??1,box:s.box?undefined:false})});
-  if(vis(scene.cv)&&innerWidth>820)render(scene,{a:CUR,b:CUR,f:0},{glide:.05});
+  if(sceneEl.closest('.page.on')&&sceneEl.getBoundingClientRect().bottom>0){S3.frame(performance.now(),reduce);live3.forEach(el=>{const k=el.dataset.live3,v=S3.angles[k];el.textContent=k=='phase'?v:(k=='back'&&v>0?'+':'')+Math.round(v)+'°'})}
+  if(innerWidth<=820&&performance.now()>autoNext){autoNext=performance.now()+5000;go((CUR+1)%CH.length)}
   if(vis(how.cv))render(how,{a:1,b:1,f:0},{zoom:3,angles:how.angles,skel:how.skel,box:how.box?undefined:false});
   tiles();chart();requestAnimationFrame(loop)}
 Object.values(CLIPS).forEach(c=>fetch(c.url).then(r=>r.json()).then(j=>{c.pose=j;build(c)}).catch(()=>{}));
