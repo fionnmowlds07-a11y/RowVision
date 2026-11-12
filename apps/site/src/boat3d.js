@@ -5,17 +5,17 @@
 import * as THREE from 'three';
 
 const HALF = 4.1;          // half length
-const BEAM = .14;          // half beam at the widest point
+const BEAM = .155;          // half beam at the widest point
 const COCK = [-1.35, .45]; // cockpit opening, stern end to bow end
-export const PIN = { x: -.12, y: .42, z: .8 };
+export const PIN = { x: -.52, y: .36, z: .8 };
 export const INB = .88, OUTB = 2.0;
 const GREEN = '#0f8a4c', GRIP = '#35d07f';
 
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 // Plan shape: widest just behind the cockpit, long fine ends, knife-edge tips.
 const halfBeam = x => { const u = x / HALF; const s = u > 0 ? Math.pow(1 - u, .9) * Math.pow(1 + u, .35) : Math.pow(1 + u, .9) * Math.pow(1 - u, .35); return BEAM * Math.min(1, s * 1.05) * smooth(-1, -.97, u) * (1 - smooth(.97, 1, u)) + .002; };
-const deckY = x => .055 + .075 * Math.pow(1 - Math.pow(x / HALF, 2), .6); // sheer: higher in the middle
-const keelY = x => -.1 * Math.pow(1 - Math.pow(x / HALF, 2), .5) - .005;   // slight rocker
+const deckY = x => .035 + .085 * Math.pow(1 - Math.pow(x / HALF, 2), .7); // sheer: higher in the middle
+const keelY = x => -.13 * Math.pow(1 - Math.pow(x / HALF, 2), .45) - .005;   // slight rocker
 
 function canvasTex(w, h, draw, repeat) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...repeat); } return t; }
 
@@ -45,7 +45,7 @@ function hullGeometries() {
   for (let i = 0; i <= NX; i++) {
     const x = -HALF + 2 * HALF * i / NX, b = halfBeam(x), dy = deckY(x), ky = keelY(x);
     // topsides + bottom: from the port gunwale down round the keel to the starboard gunwale
-    for (let j = 0; j <= NS; j++) { const a = Math.PI * j / NS; const z = -b * Math.cos(a), y = dy - .02 - (dy - .02 - ky) * Math.pow(Math.sin(a), .55); sides.push(x, y, z); sideUV.push(i / NX, j / NS); }
+    for (let j = 0; j <= NS; j++) { const a = Math.PI * j / NS; const ca = Math.cos(a), z = -b * Math.sign(ca) * Math.pow(Math.abs(ca), .45), y = dy - .02 - (dy - .02 - ky) * Math.pow(Math.sin(a), 1.6); sides.push(x, y, z); sideUV.push(i / NX, j / NS); }
     // crowned deck: 9 points across
     for (let j = 0; j <= 8; j++) { const v = j / 8, z = -b + 2 * b * v; deck.push(x, dy + .012 * (1 - Math.pow(2 * v - 1, 2)) - (j == 0 || j == 8 ? .02 : 0), z); deckUV.push(i / NX, v); }
   }
@@ -92,18 +92,18 @@ export function buildBoat() {
 
   // Cockpit tub: carbon floor and walls sunk into the deck
   const cl = COCK[1] - COCK[0], cx = (COCK[0] + COCK[1]) / 2;
-  const floor = shadow(new THREE.Mesh(new THREE.BoxGeometry(cl, .01, .22), carbon)); floor.position.set(cx, .06, 0); boat.add(floor);
-  for (const sd of [-1, 1]) { const wall = shadow(new THREE.Mesh(new THREE.BoxGeometry(cl, .09, .012), carbon)); wall.position.set(cx, .11, sd * .112); boat.add(wall); }
-  for (const x of COCK) { const end = shadow(new THREE.Mesh(new THREE.BoxGeometry(.012, .09, .23), carbon)); end.position.set(x, .11, 0); boat.add(end); }
-  const coaming = shadow(new THREE.Mesh(new THREE.TorusGeometry(1, .006, 6, 64), carbonPlain)); coaming.scale.set(cl / 2, .118, 1); coaming.rotation.x = Math.PI / 2; coaming.position.set(cx, .155, 0); boat.add(coaming);
+  const floor = shadow(new THREE.Mesh(new THREE.BoxGeometry(cl, .01, .22), carbon)); floor.position.set(cx, .02, 0); boat.add(floor);
+  for (const sd of [-1, 1]) { const wall = shadow(new THREE.Mesh(new THREE.BoxGeometry(cl, .1, .012), carbon)); wall.position.set(cx, .07, sd * .125); boat.add(wall); }
+  for (const x of COCK) { const end = shadow(new THREE.Mesh(new THREE.BoxGeometry(.012, .1, .25), carbon)); end.position.set(x, .07, 0); boat.add(end); }
+  const coaming = shadow(new THREE.Mesh(new THREE.TorusGeometry(1, .006, 6, 64), carbonPlain)); coaming.scale.set(cl / 2, .13, 1); coaming.rotation.x = Math.PI / 2; coaming.position.set(cx, .12, 0); boat.add(coaming);
   // Slide rails and stretcher
-  for (const sd of [-1, 1]) { const rail = shadow(new THREE.Mesh(new THREE.BoxGeometry(.78, .012, .012), alu)); rail.position.set(-.3, .2, sd * .07); boat.add(rail); }
-  const stretcher = new THREE.Group(); stretcher.position.set(-1.12, .2, 0); stretcher.rotation.z = -.72; boat.add(stretcher);
-  const plate = shadow(new THREE.Mesh(new THREE.BoxGeometry(.02, .34, .26), carbonPlain)); stretcher.add(plate);
+  for (const sd of [-1, 1]) { const rail = shadow(new THREE.Mesh(new THREE.BoxGeometry(.8, .012, .012), alu)); rail.position.set(-.3, .13, sd * .07); boat.add(rail); }
+  const stretcher = new THREE.Group(); stretcher.position.set(-1.1, .13, 0); stretcher.rotation.z = -.78; boat.add(stretcher);
+  const plate = shadow(new THREE.Mesh(new THREE.BoxGeometry(.012, .3, .2), alu)); plate.position.y = .1; stretcher.add(plate);
   for (const sd of [-1, 1]) {
-    const bar = shadow(new THREE.Mesh(new THREE.BoxGeometry(.012, .42, .02), alu)); bar.position.set(.02, -.02, sd * .14); stretcher.add(bar);
+    const bar = shadow(new THREE.Mesh(new THREE.BoxGeometry(.008, .3, .03), alu)); bar.position.set(.004, .1, sd * .105); stretcher.add(bar);
     const shoe = shadow(new THREE.Mesh(new THREE.CapsuleGeometry(.045, .2, 6, 16), new THREE.MeshPhysicalMaterial({ color: 0x1f4fd1, roughness: .45, clearcoat: .4 })));
-    shoe.position.set(.05, .06, sd * .06); shoe.scale.set(1, 1, .9); stretcher.add(shoe);
+    shoe.position.set(.045, .13, sd * .055); shoe.scale.set(.9, 1, .85); stretcher.add(shoe);
   }
   // Seat: carbon pan with two hip hollows
   const seat = new THREE.Group(); boat.add(seat);
@@ -112,8 +112,8 @@ export function buildBoat() {
 
   // Back-mounted wing rigger: one swept carbon wing, a V seen from above.
   const wingPath = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(PIN.x + .02, PIN.y - .07, -PIN.z + .02), new THREE.Vector3(.2, .27, -.42), new THREE.Vector3(.44, .19, -.13),
-    new THREE.Vector3(.48, .18, 0), new THREE.Vector3(.44, .19, .13), new THREE.Vector3(.2, .27, .42), new THREE.Vector3(PIN.x + .02, PIN.y - .07, PIN.z - .02)], false, 'centripetal');
+    new THREE.Vector3(PIN.x + .02, PIN.y - .07, -PIN.z + .02), new THREE.Vector3(-.05, .24, -.45), new THREE.Vector3(.38, .15, -.14),
+    new THREE.Vector3(.45, .14, 0), new THREE.Vector3(.38, .15, .14), new THREE.Vector3(-.05, .24, .45), new THREE.Vector3(PIN.x + .02, PIN.y - .07, PIN.z - .02)], false, 'centripetal');
   const prof = new THREE.Shape(); prof.absellipse(0, 0, .016, .045, 0, Math.PI * 2);
   const wing = shadow(new THREE.Mesh(new THREE.ExtrudeGeometry(prof, { steps: 160, extrudePath: wingPath, bevelEnabled: false }), carbonPlain)); boat.add(wing);
   for (const sd of [-1, 1]) {

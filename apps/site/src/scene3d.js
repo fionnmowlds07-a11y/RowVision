@@ -15,10 +15,15 @@ const clamp01 = x => Math.max(0, Math.min(1, x));
 const ez = x => x < .5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
 
 // Stroke phase t in [0,1): drive 0..0.38, recovery after. Legs, then back, then arms; reverse on the way back.
+// Stroke phase t in [0,1): drive 0..DRIVE, recovery after. Phases overlap so nothing stops and starts:
+// legs lead the drive with the back and arms blending in; on the recovery hands away, body over, then a steady slide.
+const DRIVE = .4;
+const sstep = (a, b, x) => { const u = clamp01((x - a) / (b - a)); return u * u * u * (u * (u * 6 - 15) + 10); };
 function parts(t) {
   let L, B, A;
-  if (t < .38) { const u = t / .38; L = ez(clamp01(u / .62)); B = ez(clamp01((u - .3) / .5)); A = ez(clamp01((u - .62) / .38)); }
-  else { const u = (t - .38) / .62; A = 1 - ez(clamp01(u / .2)); B = 1 - ez(clamp01((u - .12) / .3)); L = 1 - ez(clamp01((u - .3) / .7)); }
+  if (t < DRIVE) { const u = t / DRIVE; L = sstep(0, .72, u); B = sstep(.18, .88, u); A = sstep(.5, 1, u); }
+  else { const u = (t - DRIVE) / (1 - DRIVE); A = 1 - sstep(0, .26, u); B = 1 - sstep(.06, .42, u);
+    L = 1 - (u < .3 ? 0 : (u - .3) / .7 - Math.sin(2 * Math.PI * (u - .3) / .7) / (2 * Math.PI) * .55); } // near-steady slide, easing into the catch
   return { L, B, A };
 }
 
@@ -120,18 +125,19 @@ export function createScene(canvas, overlay) {
 
   function pose(t) {
     const { L, B, A } = parts(t);
-    const hipX = -.5 + .44 * L; seat.position.set(hipX, .215, 0);
-    const hipC = new THREE.Vector3(hipX, .36, 0);
+    const hipX = -.5 + .46 * L; seat.position.set(hipX, .15, 0);
+    const hipC = new THREE.Vector3(hipX, .27, 0);
     const lean = THREE.MathUtils.degToRad(30 - 52 * B); // + = towards the stern
     const up = new THREE.Vector3(-Math.sin(lean), Math.cos(lean), 0);
     const shC = hipC.clone().add(up.clone().multiplyScalar(.52));
     // Oar sweep follows the handle travel: legs carry most of it, then back, then arms.
-    const prog = .55 * L + .27 * B + .18 * A;
-    const phi = THREE.MathUtils.degToRad(52 - 66 * prog); // handle angle towards the stern
-    const inWater = t < .38 ? 1 : (t > .97 ? (t - .97) / .03 : 0);
-    const bladeY = THREE.MathUtils.lerp(.22, -.06, Math.min(1, inWater * 1.4));
+    const prog = .56 * L + .26 * B + .18 * A;
+    const phi = THREE.MathUtils.degToRad(57 - 97 * prog); // oar angle: +57° at the catch, -40° at the finish
+    // Blade height: drops in fast at the catch, stays just covered, taps out square, then skims low on the recovery.
+    const inWater = t < DRIVE ? sstep(0, .035, t) * (1 - sstep(DRIVE - .03, DRIVE + .01, t)) : sstep(.985, 1, t) * .6;
+    const bladeY = THREE.MathUtils.lerp(.13, -.13, inWater);
     const pitch = Math.atan2(PIN.y - bladeY, OUTB); // oar tilts so the blade sits in or above water
-    const feather = t > .4 && t < .93 ? Math.min(1, (t - .4) / .05, (.93 - t) / .05) : 0;
+    const feather = sstep(DRIVE + .005, DRIVE + .06, t) * (1 - sstep(.8, .93, t)); // feather just after extraction, square up late
     const out = {};
     oars.forEach(o => {
       o.pivot.rotation.set(0, o.sd * phi, 0);
@@ -141,9 +147,9 @@ export function createScene(canvas, overlay) {
       out['hand' + o.sd] = handle;
     });
     const sides = [-1, 1].map(sd => {
-      const z = sd * .1, hip = hipC.clone().setZ(z), ank = new THREE.Vector3(-1.02, .27, sd * .1);
+      const z = sd * .1, hip = hipC.clone().setZ(z), ank = new THREE.Vector3(-1.0, .2, sd * .1);
       const knee = ik(hip, ank, .46, .45, new THREE.Vector3(.2, 1, 0));
-      const sh = shC.clone().setZ(sd * .19), hand = out['hand' + sd].clone(); hand.z = THREE.MathUtils.clamp(hand.z, -.25, .25) + sd * .02;
+      const sh = shC.clone().setZ(sd * .19), hand = out['hand' + sd].clone(); hand.z = THREE.MathUtils.clamp(hand.z, -.42, .42);
       const elb = ik(sh, hand, .3, .29, new THREE.Vector3(.4, -1, sd * .8));
       return { hip, ank, knee, sh, hand, elb };
     });
@@ -165,8 +171,8 @@ export function createScene(canvas, overlay) {
     Object.assign(J, { hip: W(n.hip), knee: W(n.knee), ank: W(n.ank), sh: W(n.sh), elb: W(n.elb), hand: W(n.hand), up: W(n.hip.clone().add(new THREE.Vector3(0, .55, 0))) });
     const ang = (a, b, c) => THREE.MathUtils.radToDeg(a.clone().sub(b).angleTo(c.clone().sub(b)));
     angles.knee = ang(n.hip, n.knee, n.ank); angles.hip = ang(n.sh, n.hip, n.knee); angles.elbow = ang(n.sh, n.elb, n.hand); angles.back = 30 - 52 * B;
-    angles.phase = t < .03 ? 'Catch' : t < .38 ? 'Drive' : t < .43 ? 'Finish' : 'Recovery';
-    return { drive: t < .38, blades: [out['blade-1'], out.blade1] };
+    angles.phase = t < .03 ? 'Catch' : t < DRIVE - .02 ? 'Drive' : t < DRIVE + .04 ? 'Finish' : 'Recovery';
+    return { drive: t < DRIVE, blades: [out['blade-1'], out.blade1] };
   }
 
   let lastW = 0, lastH = 0;
