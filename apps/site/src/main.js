@@ -79,7 +79,8 @@ function render(st,mix,opts={}){
     g.strokeStyle=COL.knee;g.lineWidth=2*d;g.beginPath();S.knee.forEach((v,j)=>{const x=x0+j/N*(x1-x0),y=y1-(v-40)/150*(y1-y0);j?g.lineTo(x,y):g.moveTo(x,y)});g.stroke();g.fillStyle='#fff';g.fillRect(x0+i/N*(x1-x0)-d,y0,2*d,y1-y0);}
 }
 const simple=[...document.querySelectorAll('canvas[data-cam]')].filter(c=>c.id!='howCv').map(cv=>({...mkStage(cv),ch:+cv.dataset.cam,angles:cv.dataset.angles?cv.dataset.angles.split(','):[],trace:!!cv.dataset.trace}));
-const S3=createScene(document.getElementById('gl'),document.getElementById('ov'));let CUR=0,lock=0;
+// No WebGL (old phone, blocked GPU): keep the still photo of the scene and the chapter text.
+let S3;try{S3=createScene(document.getElementById('gl'),document.getElementById('ov'))}catch(e){document.getElementById('scene').classList.add('still');S3={frame(){},setShot(){},angles:{knee:0,hip:0,back:0,elbow:0,phase:''}}}let CUR=0,lock=0;
 const how={...mkStage(document.getElementById('howCv')),ch:0,angles:[],skel:0};
 const chaps=document.getElementById('chaps'),prog=document.getElementById('prog'),mch=document.getElementById('mchaps');
 CH.forEach((c,n)=>{const el=document.createElement('div');el.className='chap';el.innerHTML=`<span class="num">${String(n+1).padStart(2,'0')} / ${String(CH.length).padStart(2,'0')}</span>${c.big?`<h1 class="h1">${c.t}</h1>`:`<h2 class="${c.cls||''}">${c.t}</h2>`}<p>${c.p}</p>${c.cta?'<div style="pointer-events:auto"><a class="btn" href="#get">Download free</a></div>':''}`;chaps.append(el);prog.append(document.createElement('i'));

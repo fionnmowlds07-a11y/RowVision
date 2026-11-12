@@ -23,6 +23,9 @@ const R2D = 180 / Math.PI;
 const QS = new URLSearchParams(location.search);
 // &cam=x,y,z,fov,look sets a free camera (offset from the hips).
 const FIX_CAM = QS.has('cam') ? QS.get('cam').split(',') : null;
+// Quality: high for desktops, low for phones and small machines. &q=low|mid|high forces one.
+const QUALITY = { low: { dpr: 1.25, mirror: 512, shadow: 1024, glow: false, env: '1k' }, mid: { dpr: 1.5, mirror: 768, shadow: 2048, glow: true, env: '2k' }, high: { dpr: 1.75, mirror: 1024, shadow: 2048, glow: true, env: '2k' } };
+const pickQuality = () => QS.get('q') || (matchMedia('(max-width: 820px), (pointer: coarse)').matches || (navigator.hardwareConcurrency || 4) <= 4 ? 'low' : (navigator.hardwareConcurrency || 4) <= 8 ? 'mid' : 'high');
 const FIX_T = QS.has('t') && !isNaN(parseFloat(QS.get('t'))) ? parseFloat(QS.get('t')) : null, FIX_SHOT = QS.has('shot') ? parseInt(QS.get('shot')) : null;
 
 // Graphite "sculpture" body. The model's vertex colour marks the kit, which is a shade darker and glossier.
@@ -37,8 +40,10 @@ function athleteMaterial() {
 }
 
 export function createScene(canvas, overlay) {
+  if (!document.createElement('canvas').getContext('webgl2')) throw new Error('no WebGL 2');
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+  const Q = QUALITY[pickQuality()] || QUALITY.mid; let dpr = Math.min(devicePixelRatio, Q.dpr), glowOn = Q.glow;
+  renderer.setPixelRatio(dpr);
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = .55;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene();
@@ -47,19 +52,21 @@ export function createScene(canvas, overlay) {
   // Sky, distant shore and lighting come from a real 360° photo (Poly Haven, CC0).
   const ENV_ROT = 1.57; // turns the photo so the dawn sun sits off to the side of the hero shot
   const sun = new THREE.Vector3(.85, .14, -.5).normalize();
-  new RGBELoader().load('/env/lakeside_dawn_2k.hdr', tex => {
+  const setEnv = tex => {
     tex.mapping = THREE.EquirectangularReflectionMapping;
-    scene.background = tex; scene.environment = tex;
+    const old = scene.environment; scene.background = tex; scene.environment = tex; if (old && old !== tex) old.dispose();
     scene.backgroundRotation.y = scene.environmentRotation.y = ENV_ROT;
     scene.backgroundIntensity = .9; scene.environmentIntensity = .8;
-  });
+  };
+  // The small file lights the scene straight away; the sharper one replaces it on machines that can afford it.
+  new RGBELoader().load('/env/lakeside_dawn_1k.hdr', tex => { setEnv(tex); if (Q.env == '2k') new RGBELoader().load('/env/lakeside_dawn_2k.hdr', setEnv); });
   scene.background = new THREE.Color(0x8d8f94);
 
   const key = new THREE.DirectionalLight(0xffd2a0, 2.2); key.position.copy(sun).multiplyScalar(40); key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048); Object.assign(key.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 120 }); key.shadow.bias = -.0004;
+  key.shadow.mapSize.set(Q.shadow, Q.shadow); Object.assign(key.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 120 }); key.shadow.bias = -.0004;
   scene.add(key, key.target, new THREE.HemisphereLight(0xbfd3ff, 0x2a3326, .55));
 
-  const lake = createWater({ sun }), water = lake.mesh; scene.add(water);
+  const lake = createWater({ sun, mirror: Q.mirror }), water = lake.mesh; scene.add(water);
 
   // Lane buoys every 12.5 m on both sides of the lane.
   const buoys = new THREE.Group(); scene.add(buoys); const BP = 12.5;
@@ -104,16 +111,20 @@ export function createScene(canvas, overlay) {
   renderer.shadowMap.autoUpdate = false;
 
   // Camera chapters: offset from the rower's hips, what to look at, field of view.
+  // Positions and look-at points are measured from a fixed point on the boat (the middle of the slide), so the hull
+  // holds still in frame while the rower moves. `look` can be a joint name instead. `shift` slides the picture
+  // sideways (share of the width) to keep the rower clear of the chapter text on the left.
+  const ANCHOR = new THREE.Vector3(-.2, .3, 0);
   const SHOTS = [
-    { pos: [3.4, 0.95, 5.4], look: 'hip', fov: 32, drift: .25 },
-    { pos: [0.1, 0.75, 4.2], look: 'hip', fov: 34 },
-    { pos: [-0.4, 0.55, 1.6], look: 'knee', fov: 36 },
-    { pos: [0.6, 0.85, 1.8], look: 'hip', fov: 36 },
-    { pos: [-1.5, 1.25, 1.5], look: 'elb', fov: 38 },
-    { pos: [-2.2, 4.2, 3.2], look: 'hip', fov: 40 },
-    { pos: [-9, 2.4, 10], look: 'hip', fov: 30, drift: .35 },
+    { pos: [-3.6, .42, 3.1], at: [.1, .3, 0], fov: 30, shift: .2, drift: .2 },     // hero: low three-quarter from the stern quarter
+    { pos: [0, .5, 7.2], at: [0, .3, 0], fov: 21, shift: .12 },                    // side-on, the whole stroke
+    { pos: [-1.7, .5, 1.9], look: 'knee', fov: 32, shift: .12 },                   // legs
+    { pos: [.7, .75, 2.6], at: [.1, .38, 0], fov: 30, shift: .14 },                // hips and back
+    { pos: [1.9, 1.25, 1.25], look: 'hand', fov: 34, shift: .1 },                  // arms, over the shoulder
+    { pos: [-1.4, 8.6, 2.1], at: [-.2, 0, 0], fov: 38, shift: .1 },               // drone: the rigger reads as a V
+    { pos: [7.0, .65, .25], at: [0, .32, 0], fov: 22, shift: .2, drift: .12 },   // head-on from the bow line
   ];
-  let shot = FIX_SHOT ?? 0; const camPos = new THREE.Vector3(3.4, 0.95, 5.4), camLook = new THREE.Vector3(), tmp = new THREE.Vector3();
+  let shot = FIX_SHOT ?? 0; const camPos = new THREE.Vector3(-3.6, .6, 3.1), camLook = ANCHOR.clone(), tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(); let camShift = .14, slow = 0, frames = 0;
   let dist = 0, last = performance.now(), time = 0, prevDrive = false; const J = {}, angles = { knee: 0, hip: 0, back: 0, elbow: 0, phase: 'Catch' };
   const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
   const ang = (a, b, c) => R2D * a.clone().sub(b).angleTo(c.clone().sub(b));
@@ -154,7 +165,7 @@ export function createScene(canvas, overlay) {
   function resize() {
     const r = canvas.getBoundingClientRect(), w = Math.max(1, r.width), h = Math.max(1, r.height);
     if (w === lastW && h === lastH) return; lastW = w; lastH = h;
-    renderer.setSize(w, h, false); composer.setSize(w, h); glowComposer.setSize(Math.ceil(w / 2), Math.ceil(h / 2)); camera.aspect = w / h; camera.updateProjectionMatrix();
+    renderer.setSize(w, h, false); composer.setPixelRatio(dpr); composer.setSize(w, h); glowComposer.setPixelRatio(dpr); glowComposer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
     const d = Math.min(2, devicePixelRatio); overlay.width = w * d; overlay.height = h * d;
   }
   addEventListener('resize', resize); resize();
@@ -190,14 +201,25 @@ export function createScene(canvas, overlay) {
     for (let i = 0; i < SPL; i++) { if (slife[i] <= 0) { spos[i * 3 + 1] = -10; continue; } slife[i] -= dt; svel[i * 3 + 1] -= 9.8 * dt; spos[i * 3] += (svel[i * 3] - speed) * dt; spos[i * 3 + 1] = Math.max(-.02, spos[i * 3 + 1] + svel[i * 3 + 1] * dt); spos[i * 3 + 2] += svel[i * 3 + 2] * dt; }
     sg.attributes.position.needsUpdate = true;
     // Camera glides to the chapter's shot and keeps a slow drift so it never feels static.
-    const S = FIX_CAM ? { pos: FIX_CAM.slice(0, 3).map(Number), fov: +FIX_CAM[3] || 30, look: FIX_CAM[4] || 'hip' } : SHOTS[shot], target = J[S.look] || J.hip, k = reduce || FIX_T != null ? 1 : 1 - Math.pow(.0015, dt);
-    const drift = S.drift ? Math.sin(time * .15) * S.drift : Math.sin(time * .3) * .05;
-    tmp.set(S.pos[0] + drift * 4, S.pos[1], S.pos[2] - drift * 2).add(J.hip);
-    camPos.lerp(tmp, k); camLook.lerp(target, k); camera.fov += (S.fov - camera.fov) * k; camera.updateProjectionMatrix();
+    const S = FIX_CAM ? { pos: FIX_CAM.slice(0, 3).map(Number), fov: +FIX_CAM[3] || 30, look: FIX_CAM[4] || 'hip', shift: 0 } : SHOTS[shot];
+    const k = reduce || FIX_T != null ? 1 : 1 - Math.pow(.0015, dt), tall = Math.max(1, 1 / camera.aspect);
+    const drift = S.drift ? Math.sin(time * .15) * S.drift : Math.sin(time * .3) * .04;
+    const far = S.look ? 1 + (tall - 1) * .8 : Math.pow(tall, .8);       // on a tall phone screen, step back to keep the boat in
+    tmp.set(S.pos[0] + drift * 3, S.pos[1], S.pos[2] - drift * 1.5).multiplyScalar(far).add(ANCHOR);
+    if (S.look) tmp2.copy(J[S.look] || J.hip); else tmp2.set(...S.at).add(ANCHOR);
+    camPos.lerp(tmp, k); camLook.lerp(tmp2, S.look ? Math.min(1, k * 1.5) : k); camera.fov += (S.fov - camera.fov) * k;
+    camShift += ((camera.aspect > 1.2 ? S.shift || 0 : 0) - camShift) * k;
+    camera.setViewOffset(lastW, lastH, -camShift * lastW, 0, lastW, lastH); camera.updateProjectionMatrix();
     camera.position.copy(camPos); camera.lookAt(camLook);
+    // The hull settles by the stern as the rower comes forward, and lifts as the weight goes back to the bow.
+    boat.rotation.z = .0035 * (1 - 2 * s.L); boat.position.y = -.004 * (1 - s.L);
     key.target.position.copy(J.hip); key.position.copy(J.hip).add(sun.clone().multiplyScalar(40));
     renderer.shadowMap.needsUpdate = true;
-    glowComposer.render(); composer.render();
+    addGlow.enabled = glowOn; if (glowOn) glowComposer.render();
+    composer.render();
+    // If the machine cannot hold the frame rate, give up sharpness first, then the glow.
+    if (!reduce && FIX_T == null && ++frames > 60) { slow += dt > .024 ? 1 : -.5; slow = Math.max(0, slow);
+      if (slow > 90) { slow = 0; frames = 0; if (dpr > 1) { dpr = Math.max(1, dpr - .25); renderer.setPixelRatio(dpr); lastW = 0; } else glowOn = false; } }
     // 2D overlay: angle arcs fade in and out per chapter.
     g2.clearRect(0, 0, overlay.width, overlay.height);
     if (!J.ready) return;

@@ -100,6 +100,13 @@ export function buildBoat() {
   };
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
+  // Wet line: the bottom couple of centimetres of topside are darker and glossier, with an uneven edge.
+  white.onBeforeCompile = sh => {
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vHull;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvHull = position;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vHull;')
+      .replace('#include <color_fragment>', 'float wet = 1. - smoothstep(.012, .03, vHull.y + .006 * sin(vHull.x * 9.) + .003 * sin(vHull.x * 31.)); diffuseColor.rgb *= 1. - .3 * wet;')
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, .04, wet);');
+  };
   const g = hullGeometries();
   boat.add(shadow(new THREE.Mesh(g.sides, white)), shadow(new THREE.Mesh(g.deck, deckMat)));
   const ball = shadow(new THREE.Mesh(new THREE.SphereGeometry(.021, 16, 12), new THREE.MeshStandardMaterial({ color: 0xf6f6f2, roughness: .6 }))); ball.position.set(HALF + .012, deckY(HALF) - .015, 0); boat.add(ball);
