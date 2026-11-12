@@ -3,19 +3,21 @@
 // open carbon cockpit, back-mounted V wing rigger, and cleaver-bladed sculls.
 // Boat-local axes: +x towards the bow, y up (0 = waterline), z across.
 import * as THREE from 'three';
+import { PIN, INB, OUTB, PIN_LEFT_UP, SEAT_TOP, STRETCHER, HIP_CATCH, TRAVEL } from './rig.js';
 
 const HALF = 4.1;          // half length
-const BEAM = .155;          // half beam at the widest point
-const COCK = [-1.35, .45]; // cockpit opening, stern end to bow end
-export const PIN = { x: -.52, y: .36, z: .8 };
-export const INB = .88, OUTB = 2.0;
+const BEAM = .146;          // half beam at the widest point
+const COCK = [STRETCHER.heel.x - .31, HIP_CATCH + TRAVEL + .25]; // cockpit opening, stern end to bow end
+const SEAT_DECK = SEAT_TOP - .062, FOOTWELL = STRETCHER.heel.y - .012; // the slides sit on a raised deck; the feet sit low
+const wellEnd = HIP_CATCH - .16;
+const floorY = x => FOOTWELL + (SEAT_DECK - FOOTWELL) * smooth(wellEnd - .07, wellEnd, x);
 const GREEN = '#0f8a4c', GRIP = '#35d07f';
 
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 // Plan shape: widest just behind the cockpit, long fine ends, knife-edge tips.
 const halfBeam = x => { const u = x / HALF; const s = u > 0 ? Math.pow(1 - u, .9) * Math.pow(1 + u, .35) : Math.pow(1 + u, .9) * Math.pow(1 - u, .35); return BEAM * Math.min(1, s * 1.05) * smooth(-1, -.97, u) * (1 - smooth(.97, 1, u)) + .002; };
-const deckY = x => .035 + .085 * Math.pow(1 - Math.pow(x / HALF, 2), .7); // sheer: higher in the middle
-const keelY = x => -.22 * Math.pow(1 - Math.pow(x / HALF, 2), .45) - .03;   // slight rocker
+const deckY = x => .032 + .078 * Math.pow(1 - Math.pow(x / HALF, 2), .7); // sheer: about 11 cm of freeboard amidships
+const keelY = x => -.1 * Math.pow(1 - Math.pow(x / HALF, 2), .45) - .02;   // shallow round bottom with a slight rocker
 
 function canvasTex(w, h, draw, repeat) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...repeat); } return t; }
 
@@ -82,88 +84,125 @@ export function buildBoat() {
   const white = new THREE.MeshPhysicalMaterial({ color: 0xf4f4f1, roughness: .16, clearcoat: 1, clearcoatRoughness: .05 });
   const deckMat = new THREE.MeshPhysicalMaterial({ map: deckTexture(), roughness: .2, clearcoat: 1, clearcoatRoughness: .06 });
   const carbonMap = carbonTexture();
-  const carbon = new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: carbonMap, roughness: .35, metalness: .2, clearcoat: .8, clearcoatRoughness: .15 });
   const carbonPlain = new THREE.MeshPhysicalMaterial({ color: 0x16191b, roughness: .3, metalness: .25, clearcoat: .9, clearcoatRoughness: .12 });
+  const carbonWeave = new THREE.MeshPhysicalMaterial({ map: carbonMap, roughness: .4, metalness: .2, clearcoat: .6, side: THREE.DoubleSide });
   const alu = new THREE.MeshStandardMaterial({ color: 0xc8ccce, roughness: .25, metalness: .95 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0xdfe3e6, roughness: .18, metalness: 1 });
+  const plastic = new THREE.MeshStandardMaterial({ color: 0x1d2123, roughness: .55 });
   const shadow = m => { m.castShadow = true; m.receiveShadow = true; return m; };
+  const box = (w, h, d, mat, x = 0, y = 0, z = 0) => { const m = shadow(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat)); m.position.set(x, y, z); return m; };
+  // A straight strut from a to b with an oval section: `chord` wide, `thick` deep, thin side facing `up`.
+  const strut = (a, b, chord, thick, mat, up = new THREE.Vector3(0, 1, 0)) => {
+    const d = b.clone().sub(a), len = d.length(); d.normalize();
+    const zc = up.clone().addScaledVector(d, -up.dot(d)).normalize(), xc = d.clone().cross(zc);
+    const m = shadow(new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 20), mat)); m.scale.set(chord / 2, len, thick / 2);
+    m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(xc, d, zc)); m.position.copy(a).add(b).multiplyScalar(.5); return m;
+  };
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
   const g = hullGeometries();
   boat.add(shadow(new THREE.Mesh(g.sides, white)), shadow(new THREE.Mesh(g.deck, deckMat)));
+  const ball = shadow(new THREE.Mesh(new THREE.SphereGeometry(.021, 16, 12), new THREE.MeshStandardMaterial({ color: 0xf6f6f2, roughness: .6 }))); ball.position.set(HALF + .012, deckY(HALF) - .015, 0); boat.add(ball);
 
-  // Cockpit tub: floor and walls that follow the hull's own taper, so nothing pokes out of the sides.
-  const FLOOR = -.01, cxs = [];
-  for (let i = 0; i <= 40; i++) cxs.push(COCK[0] + (COCK[1] - COCK[0]) * i / 40);
+  // Cockpit tub: walls that follow the hull's own taper, a deep footwell and a raised deck for the slides.
+  const cxs = []; for (let i = 0; i <= 60; i++) cxs.push(COCK[0] + (COCK[1] - COCK[0]) * i / 60);
   const tub = [], tubIdx = [], push = (x, y, z) => { tub.push(x, y, z); return tub.length / 3 - 1; };
+  const wallIn = x => halfBeam(x) - .012;
   for (const sd of [-1, 1]) {
     let prev = null;
     for (const x of cxs) {
-      const w = halfBeam(x) - .014, top = deckY(x) - .004;
-      const cur = [push(x, top, sd * w), push(x, FLOOR, sd * w * .82)];
+      const cur = [push(x, deckY(x) - .002, sd * wallIn(x)), push(x, floorY(x), sd * wallIn(x) * .84)];
       if (prev) tubIdx.push(prev[0], cur[0], prev[1], cur[0], cur[1], prev[1]);
       prev = cur;
     }
   }
-  // floor and the two end bulkheads
-  const fl = []; for (const x of cxs) { const w = (halfBeam(x) - .014) * .82; fl.push(push(x, FLOOR, -w), push(x, FLOOR, w)); }
+  const fl = []; for (const x of cxs) { const w = wallIn(x) * .84; fl.push(push(x, floorY(x), -w), push(x, floorY(x), w)); }
   for (let i = 0; i < cxs.length - 1; i++) tubIdx.push(fl[2 * i], fl[2 * i + 2], fl[2 * i + 1], fl[2 * i + 2], fl[2 * i + 3], fl[2 * i + 1]);
-  for (const x of COCK) { const w = halfBeam(x) - .014, t = deckY(x) - .004, q = [push(x, t, -w), push(x, t, w), push(x, FLOOR, w * .82), push(x, FLOOR, -w * .82)]; tubIdx.push(q[0], q[1], q[2], q[0], q[2], q[3]); }
+  for (const x of COCK) { const w = wallIn(x), t = deckY(x) - .002, q = [push(x, t, -w), push(x, t, w), push(x, floorY(x), w * .84), push(x, floorY(x), -w * .84)]; tubIdx.push(q[0], q[1], q[2], q[0], q[2], q[3]); }
   const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.Float32BufferAttribute(tub, 3)); tg.setIndex(tubIdx); tg.computeVertexNormals();
   const tuv = []; for (let i = 0; i < tub.length / 3; i++) tuv.push(tub[i * 3] * 2, tub[i * 3 + 1] * 4 + tub[i * 3 + 2] * 4); tg.setAttribute('uv', new THREE.Float32BufferAttribute(tuv, 2));
-  boat.add(shadow(new THREE.Mesh(tg, new THREE.MeshPhysicalMaterial({ map: carbonMap, roughness: .4, metalness: .2, clearcoat: .6, side: THREE.DoubleSide }))));
-  // Slide rails and stretcher
-  for (const sd of [-1, 1]) { const rail = shadow(new THREE.Mesh(new THREE.BoxGeometry(.8, .012, .012), alu)); rail.position.set(-.3, .055, sd * .07); boat.add(rail); }
-  const stretcher = new THREE.Group(); stretcher.position.set(-1.12, FLOOR, 0); stretcher.rotation.z = -.8; boat.add(stretcher);
-  const plate = shadow(new THREE.Mesh(new THREE.BoxGeometry(.008, .15, .17), carbonPlain)); plate.position.y = .075; stretcher.add(plate);
+  boat.add(shadow(new THREE.Mesh(tg, carbonWeave)));
+  // Gunwale lip round the opening, and a V splash guard on the bow deck behind the rower.
   for (const sd of [-1, 1]) {
-    const bar = shadow(new THREE.Mesh(new THREE.BoxGeometry(.006, .15, .018), alu)); bar.position.set(.004, .075, sd * .095); stretcher.add(bar);
-    const shoe = shadow(new THREE.Mesh(new THREE.BoxGeometry(.035, .24, .075, 2, 4, 2), new THREE.MeshPhysicalMaterial({ color: 0x1a1d20, roughness: .55, clearcoat: .3 })));
-    shoe.position.set(.024, .1, sd * .045); stretcher.add(shoe);
+    const pts = cxs.filter((_, i) => i % 3 == 0).map(x => V(x, deckY(x) + .004, sd * (halfBeam(x) - .007)));
+    boat.add(shadow(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 60, .0065, 8), carbonPlain)));
+    const gx = COCK[1] + .02; boat.add(strut(V(gx, deckY(gx) + .012, sd * (halfBeam(gx) - .01)), V(gx + .2, deckY(gx + .2) + .014, 0), .006, .032, carbonPlain, V(0, 0, 1)));
   }
-  // Seat: carbon pan with two hip hollows
-  const seat = new THREE.Group(); boat.add(seat);
-  const pan = shadow(new THREE.Mesh(new THREE.BoxGeometry(.26, .025, .24), carbonPlain)); seat.add(pan);
-  for (const sd of [-1, 1]) { const hole = new THREE.Mesh(new THREE.CircleGeometry(.045, 24), new THREE.MeshBasicMaterial({ color: 0x050607 })); hole.rotation.x = -Math.PI / 2; hole.position.set(.02, .0135, sd * .055); hole.scale.set(1.3, 1, 1); seat.add(hole); }
+  for (const x of COCK) boat.add(strut(V(x, deckY(x) + .004, -halfBeam(x) + .007), V(x, deckY(x) + .004, halfBeam(x) - .007), .013, .013, carbonPlain));
 
-  // Back-mounted wing rigger: one swept carbon wing, a V seen from above.
-  const wingPath = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(PIN.x + .02, PIN.y - .07, -PIN.z + .02), new THREE.Vector3(-.12, .2, -.48), new THREE.Vector3(.3, .135, -.15),
-    new THREE.Vector3(.4, .13, 0), new THREE.Vector3(.3, .135, .15), new THREE.Vector3(-.12, .2, .48), new THREE.Vector3(PIN.x + .02, PIN.y - .07, PIN.z - .02)], false, 'centripetal');
-  const prof = new THREE.Shape(); prof.absellipse(0, 0, .016, .045, 0, Math.PI * 2);
-  const wing = shadow(new THREE.Mesh(new THREE.ExtrudeGeometry(prof, { steps: 160, extrudePath: wingPath, bevelEnabled: false }), carbonPlain)); boat.add(wing);
+  // Slides: two tracks on the seat deck, with end stops.
+  const tr0 = HIP_CATCH - .13, tr1 = HIP_CATCH + TRAVEL + .16;
   for (const sd of [-1, 1]) {
-    const pin = shadow(new THREE.Mesh(new THREE.CylinderGeometry(.008, .008, .16, 12), alu)); pin.position.set(PIN.x, PIN.y - .02, sd * PIN.z); boat.add(pin);
+    boat.add(box(tr1 - tr0, .014, .022, alu, (tr0 + tr1) / 2, SEAT_DECK + .007, sd * .088));
+    for (const x of [tr0, tr1]) boat.add(box(.012, .022, .026, plastic, x, SEAT_DECK + .012, sd * .088));
+  }
+  // Seat: a shaped carbon top with two cut-outs, on an undercarriage with four wheels.
+  const seat = new THREE.Group(); boat.add(seat);
+  { const sh = new THREE.Shape(); const w = .15, l = .135; sh.moveTo(-l, -w + .03); sh.quadraticCurveTo(-l, -w, -l + .03, -w); sh.lineTo(l - .04, -w); sh.quadraticCurveTo(l, -w, l, -w + .04);
+    sh.lineTo(l, w - .04); sh.quadraticCurveTo(l, w, l - .04, w); sh.lineTo(-l + .03, w); sh.quadraticCurveTo(-l, w, -l, w - .03); sh.closePath();
+    for (const sd of [-1, 1]) { const h = new THREE.Path(); h.absellipse(.02, sd * .058, .045, .03, 0, Math.PI * 2); sh.holes.push(h); }
+    const top = shadow(new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: .012, bevelEnabled: true, bevelThickness: .005, bevelSize: .005, bevelSegments: 2, curveSegments: 16 }), plastic));
+    top.rotation.x = Math.PI / 2; top.position.y = .012; seat.add(top);
+    seat.add(box(.2, .012, .2, plastic, 0, -.012, 0));
+    for (const sx of [-1, 1]) { seat.add(box(.012, .012, .2, alu, sx * .075, -.026, 0));
+      for (const sd of [-1, 1]) { const wh = shadow(new THREE.Mesh(new THREE.CylinderGeometry(.017, .017, .014, 16), plastic)); wh.rotation.x = Math.PI / 2; wh.position.set(sx * .075, -.03, sd * .088); seat.add(wh); } }
+  }
+
+  // Foot stretcher: an angled carbon plate low in the footwell, bottom towards the rower and the top leaning away
+  // to the stern, with the shoes fixed to it. In this group -x runs up the plate and +y points off it towards the rower.
+  const st = new THREE.Group(); st.position.set(STRETCHER.heel.x, STRETCHER.heel.y, 0); st.rotation.z = -STRETCHER.angle; boat.add(st);
+  const PL = .30, pw = wallIn(STRETCHER.heel.x - .1) * .84 - .004;
+  st.add(box(PL, .008, pw * 2, carbonPlain, -PL / 2 + .01, -.005, 0));
+  st.add(box(.02, .016, pw * 2, alu, -PL + .03, -.016, 0), box(.02, .016, pw * 2, alu, -.03, -.016, 0)); // cross rails behind the plate
+  const shoeMat = new THREE.MeshPhysicalMaterial({ color: 0x17191b, roughness: .5, clearcoat: .25, clearcoatRoughness: .4 });
+  const soleMat = new THREE.MeshStandardMaterial({ color: 0xe4e5e0, roughness: .6 });
+  const shoeShape = new THREE.Shape(); // side profile: x = -(distance from heel towards the toe), y = height off the plate
+  shoeShape.moveTo(.004, .012); shoeShape.lineTo(-.262, .012); shoeShape.quadraticCurveTo(-.292, .014, -.29, .04); shoeShape.quadraticCurveTo(-.286, .064, -.245, .07);
+  shoeShape.lineTo(-.15, .098); shoeShape.quadraticCurveTo(-.125, .108, -.105, .1); shoeShape.quadraticCurveTo(-.05, .078, -.012, .104); shoeShape.quadraticCurveTo(.02, .075, .004, .012);
+  const shoeGeo = new THREE.ExtrudeGeometry(shoeShape, { depth: .056, bevelEnabled: true, bevelThickness: .016, bevelSize: .012, bevelSegments: 4, curveSegments: 14 }); shoeGeo.translate(0, 0, -.028);
+  for (const sd of [-1, 1]) {
+    const shoe = shadow(new THREE.Mesh(shoeGeo, shoeMat)); shoe.position.z = sd * STRETCHER.footHalf; st.add(shoe);
+    st.add(box(.292, .012, .084, soleMat, -.142, .006, sd * STRETCHER.footHalf));
+    st.add(box(.05, .003, .094, plastic, -.19, .086, sd * STRETCHER.footHalf)); // strap across the forefoot
+  }
+
+  // Back-mounted wing rigger: two straight carbon arms from a foot on the bow deck out to the pins, a V from above.
+  const mx = COCK[1] + .07, my = deckY(mx) + .03;
+  boat.add(box(.11, .03, .2, carbonPlain, mx, my - .008, 0));
+  for (const sd of [-1, 1]) {
+    const sill = V(PIN.x + .012, PIN.y + sd * PIN_LEFT_UP - .052, sd * (PIN.z - .004)), shoulder = V(mx - .02, my, sd * .1);
+    boat.add(strut(shoulder, sill, .062, .02, carbonPlain));
+    boat.add(strut(V(mx, my, 0), shoulder, .07, .022, carbonPlain));
+    boat.add(box(.07, .012, .05, carbonPlain, PIN.x, sill.y, sd * PIN.z));
+    const pin = shadow(new THREE.Mesh(new THREE.CylinderGeometry(.0065, .0065, .14, 12), steel)); pin.position.set(PIN.x, sill.y + .07, sd * PIN.z); boat.add(pin);
+    const nut = shadow(new THREE.Mesh(new THREE.CylinderGeometry(.011, .011, .012, 6), steel)); nut.position.set(PIN.x, sill.y + .142, sd * PIN.z); boat.add(nut);
   }
 
   // Sculls: pivot at the pin; arm pitches the oar; blade group feathers.
   const shaftMat = new THREE.MeshPhysicalMaterial({ color: 0x111416, roughness: .28, metalness: .3, clearcoat: 1, clearcoatRoughness: .1 });
   const sleeveMat = new THREE.MeshStandardMaterial({ color: 0xe9eae4, roughness: .5 });
   const gripMat = new THREE.MeshStandardMaterial({ color: GRIP, roughness: .85 });
+  const gateMat = new THREE.MeshStandardMaterial({ color: 0x23282a, roughness: .45 });
   const bladeMat = new THREE.MeshPhysicalMaterial({ map: bladeTexture(), roughness: .25, clearcoat: 1, clearcoatRoughness: .08, side: THREE.DoubleSide });
   const bladeGeo = bladeGeometry();
   const along = (len, r1, r2, mat, z0) => { const m = shadow(new THREE.Mesh(new THREE.CylinderGeometry(r2, r1, len, 20), mat)); m.rotation.x = Math.PI / 2; m.position.z = z0 + len / 2; return m; };
   const oars = [-1, 1].map(sd => {
-    const pivot = new THREE.Group(); pivot.position.set(PIN.x, PIN.y, sd * PIN.z); boat.add(pivot);
+    const pivot = new THREE.Group(); pivot.position.set(PIN.x, PIN.y + sd * PIN_LEFT_UP, sd * PIN.z); boat.add(pivot);
     const arm = new THREE.Group(); pivot.add(arm);
     const inner = new THREE.Group(); inner.scale.z = sd; arm.add(inner); // build along +z, mirror for port
-    inner.add(along(INB - .12, .0175, .019, shaftMat, -INB + .12));     // inboard shaft
-    inner.add(along(.14, .021, .021, gripMat, -INB));                    // grip
-    inner.add(along(.32, .024, .024, sleeveMat, -.12));                  // sleeve through the gate
-    const collar = shadow(new THREE.Mesh(new THREE.CylinderGeometry(.034, .034, .03, 20), sleeveMat)); collar.rotation.x = Math.PI / 2; collar.position.z = -.09; inner.add(collar);
-    inner.add(along(OUTB - .5, .019, .014, shaftMat, .2));               // outboard shaft, tapering to the neck
+    inner.add(along(INB - .13, .0175, .019, shaftMat, -INB + .13));     // inboard shaft
+    inner.add(along(.135, .0175, .0175, gripMat, -INB));                 // grip
+    const cap = shadow(new THREE.Mesh(new THREE.SphereGeometry(.0175, 14, 10), gripMat)); cap.position.z = -INB; cap.scale.z = .5; inner.add(cap);
+    inner.add(along(.3, .0235, .0235, sleeveMat, -.11));                 // sleeve through the gate
+    const collar = shadow(new THREE.Mesh(new THREE.CylinderGeometry(.036, .036, .022, 24), sleeveMat)); collar.rotation.x = Math.PI / 2; collar.position.z = -.043; inner.add(collar);
+    inner.add(along(OUTB - .49, .019, .0135, shaftMat, .19));            // outboard shaft, tapering to the neck
     const blade = new THREE.Group(); blade.position.z = OUTB - .52; inner.add(blade);
     const face = shadow(new THREE.Mesh(bladeGeo, bladeMat)); face.rotation.y = -Math.PI / 2; blade.add(face);
     const spine = shadow(new THREE.Mesh(new THREE.BoxGeometry(.008, .014, .26), shaftMat)); spine.position.set(-.006, -.02, .13); blade.add(spine);
-    // gate (swivel) round the sleeve
-    const gate = shadow(new THREE.Mesh(new THREE.BoxGeometry(.06, .07, .05), new THREE.MeshStandardMaterial({ color: 0x2b2f31, roughness: .5 }))); pivot.add(gate);
+    // Oarlock: a swivel round the pin with a flat back face, a sill under the sleeve and a gate bar over it.
+    const lock = new THREE.Group(); pivot.add(lock);
+    lock.add(box(.014, .07, .058, gateMat, -.031, 0, 0), box(.07, .012, .058, gateMat, 0, -.03, 0), box(.076, .008, .016, steel, .004, .037, 0), box(.012, .07, .02, gateMat, .034, 0, 0));
     return { sd, pivot, arm, blade };
   });
-
-  // Sitting in the water: a soft dark contact shadow hugging the hull and a little bow wave.
-  const contact = canvasTex(1024, 64, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(.5, 'rgba(6,12,10,.55)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); const gx = g.createLinearGradient(0, 0, w, 0); gx.addColorStop(0, 'rgba(0,0,0,1)'); gx.addColorStop(.06, 'rgba(0,0,0,0)'); gx.addColorStop(.94, 'rgba(0,0,0,0)'); gx.addColorStop(1, 'rgba(0,0,0,1)'); g.globalCompositeOperation = 'destination-out'; g.fillStyle = gx; g.fillRect(0, 0, w, h); });
-  const cs = new THREE.Mesh(new THREE.PlaneGeometry(2 * HALF, .62), new THREE.MeshBasicMaterial({ map: contact, transparent: true, depthWrite: false, toneMapped: false }));
-  cs.rotation.x = -Math.PI / 2; cs.position.y = .004; cs.renderOrder = 2; boat.add(cs);
-  const wave = canvasTex(256, 128, (g, w, h) => { for (let i = 0; i < 3; i++) { g.strokeStyle = `rgba(255,255,255,${.5 - i * .14})`; g.lineWidth = 3 - i; g.beginPath(); g.moveTo(w, h / 2 - 6 - i * 10); g.quadraticCurveTo(w * .4, h / 2 - 22 - i * 14, 0, h / 2 - 40 - i * 18); g.moveTo(w, h / 2 + 6 + i * 10); g.quadraticCurveTo(w * .4, h / 2 + 22 + i * 14, 0, h / 2 + 40 + i * 18); g.stroke(); } });
-  const bw = new THREE.Mesh(new THREE.PlaneGeometry(1.4, .7), new THREE.MeshBasicMaterial({ map: wave, transparent: true, depthWrite: false, opacity: .8 }));
-  bw.rotation.x = -Math.PI / 2; bw.position.set(HALF - .9, .006, 0); bw.renderOrder = 3; boat.add(bw);
-  return { boat, seat, oars, carbon: carbonPlain, bowWave: bw };
+  return { boat, seat, oars, half: HALF, halfBeam, deckY };
 }
