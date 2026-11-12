@@ -15,7 +15,7 @@ const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a
 // Plan shape: widest just behind the cockpit, long fine ends, knife-edge tips.
 const halfBeam = x => { const u = x / HALF; const s = u > 0 ? Math.pow(1 - u, .9) * Math.pow(1 + u, .35) : Math.pow(1 + u, .9) * Math.pow(1 - u, .35); return BEAM * Math.min(1, s * 1.05) * smooth(-1, -.97, u) * (1 - smooth(.97, 1, u)) + .002; };
 const deckY = x => .035 + .085 * Math.pow(1 - Math.pow(x / HALF, 2), .7); // sheer: higher in the middle
-const keelY = x => -.13 * Math.pow(1 - Math.pow(x / HALF, 2), .45) - .005;   // slight rocker
+const keelY = x => -.22 * Math.pow(1 - Math.pow(x / HALF, 2), .45) - .03;   // slight rocker
 
 function canvasTex(w, h, draw, repeat) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...repeat); } return t; }
 
@@ -112,12 +112,12 @@ export function buildBoat() {
   boat.add(shadow(new THREE.Mesh(tg, new THREE.MeshPhysicalMaterial({ map: carbonMap, roughness: .4, metalness: .2, clearcoat: .6, side: THREE.DoubleSide }))));
   // Slide rails and stretcher
   for (const sd of [-1, 1]) { const rail = shadow(new THREE.Mesh(new THREE.BoxGeometry(.8, .012, .012), alu)); rail.position.set(-.3, .055, sd * .07); boat.add(rail); }
-  const stretcher = new THREE.Group(); stretcher.position.set(-1.1, FLOOR + .01, 0); stretcher.rotation.z = -.72; boat.add(stretcher);
-  const plate = shadow(new THREE.Mesh(new THREE.BoxGeometry(.01, .24, .18), alu)); plate.position.y = .12; stretcher.add(plate);
+  const stretcher = new THREE.Group(); stretcher.position.set(-1.12, FLOOR, 0); stretcher.rotation.z = -.8; boat.add(stretcher);
+  const plate = shadow(new THREE.Mesh(new THREE.BoxGeometry(.008, .15, .17), carbonPlain)); plate.position.y = .075; stretcher.add(plate);
   for (const sd of [-1, 1]) {
-    const bar = shadow(new THREE.Mesh(new THREE.BoxGeometry(.008, .24, .025), alu)); bar.position.set(.004, .12, sd * .1); stretcher.add(bar);
-    const shoe = shadow(new THREE.Mesh(new THREE.CapsuleGeometry(.045, .2, 6, 16), new THREE.MeshPhysicalMaterial({ color: 0x1f4fd1, roughness: .45, clearcoat: .4 })));
-    shoe.position.set(.04, .14, sd * .05); shoe.scale.set(.8, .95, .8); stretcher.add(shoe);
+    const bar = shadow(new THREE.Mesh(new THREE.BoxGeometry(.006, .15, .018), alu)); bar.position.set(.004, .075, sd * .095); stretcher.add(bar);
+    const shoe = shadow(new THREE.Mesh(new THREE.BoxGeometry(.035, .24, .075, 2, 4, 2), new THREE.MeshPhysicalMaterial({ color: 0x1a1d20, roughness: .55, clearcoat: .3 })));
+    shoe.position.set(.024, .1, sd * .045); stretcher.add(shoe);
   }
   // Seat: carbon pan with two hip hollows
   const seat = new THREE.Group(); boat.add(seat);
@@ -158,5 +158,12 @@ export function buildBoat() {
     return { sd, pivot, arm, blade };
   });
 
-  return { boat, seat, oars, carbon: carbonPlain };
+  // Sitting in the water: a soft dark contact shadow hugging the hull and a little bow wave.
+  const contact = canvasTex(1024, 64, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(.5, 'rgba(6,12,10,.55)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); const gx = g.createLinearGradient(0, 0, w, 0); gx.addColorStop(0, 'rgba(0,0,0,1)'); gx.addColorStop(.06, 'rgba(0,0,0,0)'); gx.addColorStop(.94, 'rgba(0,0,0,0)'); gx.addColorStop(1, 'rgba(0,0,0,1)'); g.globalCompositeOperation = 'destination-out'; g.fillStyle = gx; g.fillRect(0, 0, w, h); });
+  const cs = new THREE.Mesh(new THREE.PlaneGeometry(2 * HALF, .62), new THREE.MeshBasicMaterial({ map: contact, transparent: true, depthWrite: false, toneMapped: false }));
+  cs.rotation.x = -Math.PI / 2; cs.position.y = .004; cs.renderOrder = 2; boat.add(cs);
+  const wave = canvasTex(256, 128, (g, w, h) => { for (let i = 0; i < 3; i++) { g.strokeStyle = `rgba(255,255,255,${.5 - i * .14})`; g.lineWidth = 3 - i; g.beginPath(); g.moveTo(w, h / 2 - 6 - i * 10); g.quadraticCurveTo(w * .4, h / 2 - 22 - i * 14, 0, h / 2 - 40 - i * 18); g.moveTo(w, h / 2 + 6 + i * 10); g.quadraticCurveTo(w * .4, h / 2 + 22 + i * 14, 0, h / 2 + 40 + i * 18); g.stroke(); } });
+  const bw = new THREE.Mesh(new THREE.PlaneGeometry(1.4, .7), new THREE.MeshBasicMaterial({ map: wave, transparent: true, depthWrite: false, opacity: .8 }));
+  bw.rotation.x = -Math.PI / 2; bw.position.set(HALF - .9, .006, 0); bw.renderOrder = 3; boat.add(bw);
+  return { boat, seat, oars, carbon: carbonPlain, bowWave: bw };
 }
