@@ -1,113 +1,88 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-GB">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="RowVision analyses rowing technique from ordinary phone video. Knee, hip, back and arm angles through every stroke.">
-<meta name="theme-color" content="#070b09">
-<title>RowVision · See every stroke</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23070b09'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%2335d07f'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=DM+Sans:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="/src/style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RowVision. See your stroke from ordinary phone video</title>
+<meta name="description" content="RowVision reads your rowing from ordinary phone video and measures knees, hips, back and arms at every catch and finish. A desktop app for Windows and Linux.">
+<meta name="theme-color" content="#020403">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23020403'/%3E%3Cpath d='M9 22l6-5 3-8 6 4' fill='none' stroke='%234be38a' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='18' cy='9' r='2.6' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/src/site.css">
+<link rel="stylesheet" href="/src/film.css">
+<script>
+  // Words first: the page is readable before any of the film has loaded. If the film never starts, it goes back to an ordinary page.
+  (function (r) { r.classList.add('js'); if (matchMedia('(prefers-reduced-motion: reduce)').matches) return; r.classList.add('film-on'); setTimeout(function () { if (!r.dataset.ready) r.classList.remove('film-on'); }, 8000); })(document.documentElement);
+</script>
 </head>
 <body>
-<video id="src" class="src" muted playsinline loop autoplay preload="auto" src="/media/scull.mp4"></video>
-<div class="cursor" id="cur"></div>
-<nav class="g"><div class="in">
-  <a class="logo" href="#home"><i></i>RowVision</a>
-  <div class="links"><a href="#how">How it works</a><a href="#why">Why analyse</a><a href="#about">About</a><a href="#get">Download</a></div>
-  <a class="btn" href="#get">Download free</a>
-  <button class="menu" id="menuBtn">Menu</button>
-</div></nav>
-<div class="sheet" id="sheet"><button class="btn ghost" id="closeBtn">Close</button><a href="#home">Home</a><a href="#how">How it works</a><a href="#why">Why analyse</a><a href="#about">About</a><a href="#get">Download</a></div>
+<canvas id="bg" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+<a class="skip" href="#main">Skip to the page</a>
+<header class="nav">
+  <a class="mark" href="/">RowVision</a>
+  <nav aria-label="Main"><a class="wide" href="/how.html">How it works</a><a class="wide" href="/about.html">About</a><a class="get" href="/download.html">Download</a></nav>
+</header>
+<main id="main">
+<div class="film" id="film">
+  <div class="stage">
+    <div class="rig" id="rig"><div class="phone"><canvas id="cv" width="1280" height="720" role="img" aria-label="Phone video of a pair filmed from a launch. As you scroll, the rower in stroke seat is picked out and their joints are drawn over the picture"></canvas><div class="fan" id="fan" aria-hidden="true"></div></div><div class="laptop" id="laptop" aria-hidden="true"></div></div>
+    <div class="rig card" data-clip="single-a" aria-hidden="true"><div class="phone"><canvas width="640" height="360"></canvas></div></div>
+    <div class="rig card" data-clip="single-b" aria-hidden="true"><div class="phone"><canvas width="640" height="360"></canvas></div></div>
+    <div class="rig card" data-clip="bank" aria-hidden="true"><div class="phone"><canvas width="640" height="360"></canvas></div></div>
+    <canvas id="chart" aria-hidden="true"></canvas>
+    <div class="scrim" id="scrim"></div>
 
-<!-- HOME -->
-<main class="page" id="p-home">
-  <div class="scene" id="scene"><div class="pin">
-    <canvas id="gl"></canvas><canvas id="ov"></canvas>
-    <div class="readout" id="readout"><div><span>Knee</span><b class="c-knee" data-live3="knee">–</b></div><div><span>Hip</span><b class="c-hip" data-live3="hip">–</b></div><div><span>Back lean</span><b class="c-back" data-live3="back">–</b></div><div><span>Elbow</span><b class="c-elbow" data-live3="elbow">–</b></div><div><span>Phase</span><b class="hl" data-live3="phase">–</b></div></div>
-    <div class="prog" id="prog"></div>
-    <div id="chaps"></div><span class="hint" id="hint">SCROLL</span>
-  </div></div>
-  
+    <section class="beat hero" data-a="-1" data-b="1.1" data-still="pair|2">
+      <h1><span class="l1"><i>Film your outing.</i></span> <span class="l2"><i>See your stroke.</i></span></h1>
+      <div class="lede">
+        <p>Prop a phone in the launch and row. RowVision turns that video into knees, hips, back and arms, measured at every catch and finish.</p>
+        <a class="btn" href="/download.html">Download for Windows and Linux</a>
+        <small>Free. Installers coming soon.</small>
+      </div>
+    </section>
 
-  <div class="marq"><div>Catch <em>·</em> Drive <em>·</em> Finish <em>·</em> Recovery <em>·</em> Catch <em>·</em> Drive <em>·</em> Finish <em>·</em> Recovery <em>·</em>&nbsp;</div></div>
-  <section class="s g"><div class="in grid2">
-    <div class="rv"><p class="eyebrow">What a coach can't see from the launch</p><h2 class="h2">Your stroke, <span class="hl">measured</span>, not guessed.</h2></div>
-    <p class="lede rv">From a moving launch, a coach watches eight people at once for a few seconds each. RowVision follows you for the whole clip and shows the numbers behind what you felt.</p>
-  </div></section>
-  <section class="s g" style="padding-top:0"><div class="in cards">
-    <a class="card rv" href="#how"><span class="eyebrow">Film</span><h3 class="h3">Any phone, any launch</h3><p class="soft">Film side-on from the launch. Pick your boat, side and seat.</p><span class="arrow">How it works →</span></a>
-    <a class="card rv" href="#why"><span class="eyebrow">Read</span><h3 class="h3">Every joint, every stroke</h3><p class="soft">Angles at the catch and finish, against published targets.</p><span class="arrow">Why analyse →</span></a>
-    <a class="card rv" href="#get"><span class="eyebrow">Fix</span><h3 class="h3">One thing for next outing</h3><p class="soft">Runs on your own computer. Your footage never leaves it.</p><span class="arrow">Download →</span></a>
-  </div></section>
+    <section class="beat bl onvid" data-a="2.2" data-b="3.3"><h2>It starts as the video you already take.</h2><p>No sensors on the boat and nothing to wear. One phone, held in the launch.</p></section>
+    <section class="beat bl onvid" data-a="3.6" data-b="4.7" data-still="pair|4|box"><h2>Tap yourself once.</h2><p>Pick a clear frame, tap the rower who is you, and say which boat and which seat.</p></section>
+    <section class="beat bl onvid" data-a="5" data-b="6.1" data-still="pair|6.2|skel,zoom"><h2>Then it follows every joint.</h2><p>Shoulder, elbow, wrist, hip, knee and ankle, tracked through the whole clip.</p></section>
+
+    <section class="beat word onvid" data-a="6.4" data-b="7.7" data-still="pair|5.7|skel,zoom,knee"><h2>Legs.</h2><p>How far you compress at the catch, and when the legs go flat.</p><output class="big" id="nKnee" aria-hidden="true"></output></section>
+    <section class="beat word onvid" data-a="7.9" data-b="9.2" data-still="pair|6.6|skel,zoom,back"><h2>Back.</h2><p>How far you reach forward, and how far you lay back at the finish.</p><output class="big" id="nBack" aria-hidden="true"></output></section>
+    <section class="beat word onvid" data-a="9.4" data-b="10.5" data-still="pair|7.6|skel,zoom,elbow"><h2>Arms.</h2><p>When the elbows break. They should come in last.</p><output class="big" id="nElbow" aria-hidden="true"></output></section>
+
+    <section class="beat top" data-a="11.3" data-b="13.5" data-still="grid"><h2>Any boat, from a single to an eight.</h2><p>Bright days and flat grey ones. Every clip here is ordinary phone footage, and the lines are RowVision following one rower in each.</p></section>
+    <section class="beat bl onvid" data-a="14.7" data-b="15.9" data-still="astern|4"><h2>From the launch, the bank, or wherever the phone is.</h2><p>Side on is best. When the angle or the light makes a number shaky, the accuracy rating says so.</p></section>
+    <section class="beat bl onvid" data-a="16.5" data-b="17.4" data-still="far|3"><h2>Too far away to measure? It tells you.</h2><p>RowVision would rather say “film closer” than hand you a score it cannot stand behind.</p>
+      <div class="chip needs-js"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5M12 16.5v.5M4 20 12 4l8 16z"/></svg>Film closer. No score given.</div></section>
+
+    <section class="beat tl" data-a="18.2" data-b="20.4" data-still="fan"><h2>One drive, taken apart.</h2><p>Nine moments from the catch to the finish of a single stroke, lifted out of the video.</p>
+      <dl class="strip needs-js">
+        <div class="main"><dt>Knee at the catch</dt><dd id="tKnee"></dd></div>
+        <div><dt>Hip at the catch</dt><dd id="tHip"></dd></div>
+        <div><dt id="tLeanL">Layback at the finish</dt><dd id="tLean"></dd></div>
+        <div><dt>Elbow at the finish</dt><dd id="tElbow"></dd></div>
+      </dl></section>
+
+    <section class="beat tl" data-a="20.8" data-b="21.7" data-still="chart|0"><h2>Every stroke in the clip.</h2><p>Knee angle, from the first catch to the last. Round marks are catches, square marks are finishes.</p></section>
+    <section class="beat tl" data-a="21.9" data-b="22.8" data-still="chart|1"><h2>Stroke one, beside stroke <span id="nLast">eight</span>.</h2><p>Laid over each other, you can see where your stroke holds its shape and where it drifts.</p></section>
+
+    <section class="beat tl" data-a="23" data-b="24.4"><h2>Scored against targets you can change.</h2><p>The starting targets come from published rowing studies. Move the range, or choose what counts towards your score, in Settings.</p>
+      <div class="lanes needs-js">
+        <div class="lane"><span>Body forward at the catch</span><div class="track"><i class="band" style="left:52%;width:10%"></i><b id="mCatch"></b></div><output id="vCatch"></output></div>
+        <div class="lane"><span>Layback at the finish</span><div class="track"><i class="band" style="left:40%;width:10%"></i><b id="mFinish" class="sq"></b></div><output id="vFinish"></output></div>
+        <small>Bands are the starting targets: 26 to 31° forward at the catch, 20 to 25° of layback at the finish. Markers are measured from the clip.</small>
+      </div></section>
+
+    <section class="beat tl" data-a="24.6" data-b="25.6"><h2>Your video stays on your computer.</h2><p>RowVision is a desktop app for Windows and Linux. The analysis runs on your own machine.</p></section>
+
+    <section class="beat end" data-a="25.9" data-b="99"><h2>Film your next outing.</h2><p>Then find the one thing to fix before the one after.</p><a class="btn" href="/download.html">Download for Windows and Linux</a><small>Free. Installers coming soon.</small></section>
+  </div>
+</div>
+<nav class="rail" id="rail" aria-label="Chapters of this page"></nav>
 </main>
-
-<!-- HOW -->
-<main class="page" id="p-how">
-  <div class="hero g"><div class="in"><p class="eyebrow">How it works</p><h1 class="h1 split">Film. Pick your seat. <span class="hl">Read.</span></h1></div></div>
-  <section class="g" style="padding-bottom:120px"><div class="in steps">
-    <div>
-      <div class="step on" data-cam="1" data-angles="" data-skel="0"><span class="n">01</span><h2 class="h2" style="font-size:clamp(30px,3.6vw,48px)">Film from the launch</h2><p class="lede">Side-on is best. Hold the phone level and keep the crew in frame. Ordinary phone video is enough.</p></div>
-      <div class="step" data-cam="1" data-angles="" data-skel="0" data-box="1"><span class="n">02</span><h2 class="h2" style="font-size:clamp(30px,3.6vw,48px)">Say where you sit</h2><p class="lede">Choose boat, side and seat. RowVision finds every rower and locks on to you.</p></div>
-      <div class="step" data-cam="5" data-angles=""><span class="n">03</span><h2 class="h2" style="font-size:clamp(30px,3.6vw,48px)">Your joints, tracked</h2><p class="lede">A pose model marks 17 points on your body in every frame. The bright side is nearest the camera.</p></div>
-      <div class="step" data-cam="5" data-angles="knee,hip,back,elbow"><span class="n">04</span><h2 class="h2" style="font-size:clamp(30px,3.6vw,48px)">Angles and scores</h2><p class="lede">Knee, hip, back and arm angles at each catch and finish, scored against targets you can adjust. It tells you when the footage isn't good enough to trust.</p></div>
-    </div>
-    <div class="sticky"><div class="stage"><canvas id="howCv" data-cam="1" data-clip="scull"></canvas><span class="cap" id="howcap">Raw clip</span></div></div>
-  </div></section>
-</main>
-
-<!-- WHY -->
-<main class="page" id="p-why">
-  <div class="hero g"><div class="in"><p class="eyebrow">Why analyse your stroke</p><h1 class="h1 split">Feel lies. <span class="hl">Angles don't.</span></h1>
-    <p class="lede" style="margin-top:24px">You can't see yourself row. Video shows you, but by eye it's hard to judge whether your back opened before your legs finished, or whether your catch changed when you got tired.</p></div></div>
-  <section class="s g" style="padding-top:20px"><div class="in grid2">
-    <div class="rv"><p class="eyebrow">The sequence</p><h2 class="h2">Legs, then back, then <span class="c-elbow">arms.</span></h2><p class="lede" style="margin-top:20px">The drive hands power from <span class="c-knee">legs</span> to <span class="c-back">back</span> to <span class="c-elbow">arms</span>, in that order. Open the back too early and the legs push against nothing. These are the real curves from the sculling clip on the home page, stroke after stroke.</p></div>
-    <div class="chart rv"><canvas id="seqChart"></canvas><div class="legend"><span><i style="background:var(--knee)"></i>Knee</span><span><i style="background:var(--hip)"></i>Hip</span><span><i style="background:var(--back)"></i>Back lean</span><span><i style="background:var(--elbow)"></i>Elbow</span></div></div>
-  </div></section>
-  <section class="s g"><div class="in grid2">
-    <div class="stage rv"><canvas data-cam="2" data-angles="knee" data-trace="1"></canvas><span class="cap">Knee angle over the whole clip</span></div>
-    <div class="rv"><p class="eyebrow">Consistency</p><h2 class="h2">Stroke 1 should look like <span class="hl">stroke 30.</span></h2><p class="lede" style="margin-top:20px">Crews win by moving the same way every stroke. RowVision lays your strokes over each other, so drift at the catch shows up straight away.</p></div>
-  </div></section>
-  <section class="s g"><div class="in cards">
-    <div class="card rv"><b class="os c-knee">Catch</b><p class="soft">Shin and body angle when the blade goes in.</p></div>
-    <div class="card rv"><b class="os c-hip">Drive</b><p class="soft">Whether legs, back and arms come in in order.</p></div>
-    <div class="card rv"><b class="os c-back">Finish</b><p class="soft">Layback, and where the hands draw in.</p></div>
-    <div class="card rv"><b class="os c-elbow">Recovery</b><p class="soft">Hands away, body over, then the slide. No rushing.</p></div>
-  </div></section>
-</main>
-
-<!-- ABOUT -->
-<main class="page" id="p-about">
-  <div class="hero g"><div class="in"><p class="eyebrow">About</p><h1 class="h1 split">Hi, I'm <span class="hl">Fionn.</span></h1></div></div>
-  <section class="g" style="padding-bottom:40px"><div class="in grid2">
-    <div class="rv" style="display:grid;gap:18px">
-      <p class="lede" style="color:var(--ink)">I'm a rower and a first-year Immersive Software Engineering student at the University of Limerick, based in Cork.</p>
-      <p class="lede">I built RowVision because I wanted to see my own stroke. Coaches in the launch have eight people to watch and a few seconds each. I wanted the numbers: when my legs finished, when my back opened, whether my catch held up on the last piece.</p>
-      <p class="lede">So I wrote software that does it from the phone footage crews already take.</p>
-    </div>
-    <div class="stage rv"><canvas data-cam="1" data-angles="knee,back"></canvas><span class="cap">Me, sculling</span></div>
-  </div></section>
-  <section class="s g" style="padding-bottom:120px"><div class="in grid2">
-    <div class="rv"><p class="eyebrow">What RowVision is built with</p><div class="chips" style="margin-top:14px"><span>Python</span><span>OpenCV</span><span>ONNX Runtime</span><span>NumPy</span><span>TypeScript</span><span>React</span><span>Electron</span><span>Three.js</span></div></div>
-    <div class="rv" style="display:grid;gap:10px"><p class="eyebrow">Get in touch</p><div style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn ghost" href="https://fionnmowlds.website" target="_blank" rel="noopener">fionnmowlds.website</a><a class="btn ghost" href="https://www.linkedin.com/in/fionnmowlds/" target="_blank" rel="noopener">LinkedIn</a><a class="btn ghost" href="https://github.com/fionnmowlds07-a11y" target="_blank" rel="noopener">GitHub</a></div></div>
-  </div></section>
-</main>
-
-<!-- DOWNLOAD -->
-<main class="page" id="p-get">
-  <div class="hero g"><div class="in"><p class="eyebrow">Download</p><h1 class="h1 split">Get <span class="hl">RowVision.</span></h1><p class="lede" style="margin-top:20px">Free during the preview. Runs on Windows and Linux. Installers are on the way.</p></div></div>
-  <section class="g" style="padding-bottom:120px"><div class="in dl">
-    <div class="card rv"><span class="badge">Coming soon</span><span class="os">Windows</span><p class="soft">Windows 10 and 11, 64-bit</p><a class="btn" href="#get" aria-disabled="true">Download .exe</a></div>
-    <div class="card rv"><span class="badge">Coming soon</span><span class="os">Linux</span><p class="soft">AppImage, most 64-bit distros</p><a class="btn" href="#get" aria-disabled="true">Download AppImage</a></div>
-    <div class="card rv"><span class="badge">Later</span><span class="os">Android</span><p class="soft">Film and analyse on your phone</p><a class="btn ghost" href="#get" aria-disabled="true">Not yet</a></div>
-  </div></section>
-</main>
-
-<footer class="g"><div class="in"><span>RowVision · Rowing technique from phone video</span><span>Made in Cork by Fionn Mowlds</span></div></footer>
-<div class="mbar"><a class="btn" href="#get">Download free</a></div>
-<script type="module" src="/src/main.js"></script>
+<footer class="foot">
+  <p>RowVision gives coaching feedback, not medical advice.</p>
+  <nav aria-label="Footer"><a href="/">Home</a><a href="/how.html">How it works</a><a href="/about.html">About</a><a href="/download.html">Download</a></nav>
+</footer>
+<script type="module" src="/src/film.js"></script>
 </body>
 </html>

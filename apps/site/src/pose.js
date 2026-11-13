@@ -1,5 +1,5 @@
-// The owner's real sculling stroke, read from the pose file and turned into the things the mock-ups draw.
-// Nothing here is invented: every point is a measured joint, smoothed over a few frames.
+// Turns a pose file (17 joints a frame, as the pose model gives them) into what the site draws.
+// Nothing here is invented: every point is a tracked joint, smoothed over a few frames.
 // Shoulders and hips are the average of both sides, as in the engine. Knee, elbow and wrist come from the near side only:
 // averaging the two arms puts the elbow on the chest whenever the arms are apart on screen (sweep rowing, or any angle off side-on).
 
@@ -14,7 +14,7 @@ const deg = (a, b, c) => {
 };
 const tri = (arr, i, k, get) => { let x = 0, y = 0, n = 0; for (let d = -k; d <= k; d++) { const q = arr[i + d]; if (q) { const w = k + 1 - Math.abs(d), p = get(q); x += p[0] * w; y += p[1] * w; n += w; } } return [x / n, y / n]; };
 
-export async function loadPose(url = '/data/pose-scull.json', hz) {
+export async function loadPose(url, hz) {
   const P = await (await fetch(url)).json();
   // a frame where the rower was lost is filled in between the frames either side where they were found
   const ar = P.w / P.h, F = P.frames.map((f, i, all) => {
@@ -53,7 +53,7 @@ export async function loadPose(url = '/data/pose-scull.json', hz) {
   const val = (arr, t) => { t = Math.max(0, Math.min(N - 1.001, t)); const i = Math.floor(t); return arr[i] + (arr[i + 1] - arr[i]) * (t - i); };
   return {
     N, ar, w: P.w, h: P.h, facing, knee, hip, elbow, back, catches, finishes,
-    hz: hz || (P.start != null ? P.fps : 15),   // the first pose file was every 4th frame of a 60 fps clip
+    hz: hz || P.fps,
     frame: t => pick(S, t),      // as filmed: x and y in 0..1 of the frame
     body: t => pick(body, t),    // rower's frame: metres from the ankle, y up
     angle: (name, t) => val({ knee, hip, elbow, back }[name], t),

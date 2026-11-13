@@ -1,0 +1,104 @@
+/* The home page film.
+   Without script, or when reduced motion is asked for, the beats below are an ordinary page read top to bottom.
+   With script, html.film-on pins one stage and the scroll position drives everything in it. */
+#bg { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.grain { position: fixed; inset: 0; pointer-events: none; opacity: .5; mix-blend-mode: overlay;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1.4 -.25'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.lowq .grain { display: none; }
+.film { position: relative; }
+
+/* ---- read top to bottom ---- */
+.rig, #chart, .scrim, .rail { display: none; }
+.beat { padding: 9vh var(--pad); max-width: 60rem; }
+.beat h2 { font-size: clamp(34px, 4.4vw, 68px); max-width: 11em; }
+.beat p { max-width: 27em; margin-top: 18px; }
+.beat.hero { padding-top: 130px; }
+.beat.hero h1 { font-size: clamp(44px, 6.6vw, 104px); } .hero h1 span { display: block; } .hero .l2 { color: var(--hl); }
+.lede { margin-top: 28px; max-width: 25em; } .lede p { margin: 0 0 18px; } .lede small, .end small { display: block; margin-top: 10px; }
+.beat.end .btn { margin-top: 22px; }
+.beat output.big { display: none; }
+.still { display: block; width: 100%; max-width: 46rem; aspect-ratio: 16 / 9; border-radius: 12px; background: #000; margin-bottom: 28px; }
+.needs-js { display: none; } .js .needs-js { display: grid; } .js .chip.needs-js { display: inline-flex; }
+
+.chip { display: inline-flex; gap: 10px; align-items: center; background: var(--caution-bg); color: var(--caution); font-weight: 700; font-size: 17px; padding: 12px 18px; border-radius: 10px; margin-top: 24px; white-space: nowrap; }
+.strip { grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 32px; }
+.strip div { background: var(--panel); border-radius: 8px; padding: 16px 18px 14px; }
+.strip dt { font-size: 14px; font-weight: 500; color: var(--soft); }
+.strip dd { margin: 4px 0 0; font: 800 clamp(40px, 5vw, 72px)/1 Bricolage, sans-serif; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.strip .main { background: var(--hl); color: var(--ink); } .strip .main dt { color: #0b3a22; }
+.lanes { gap: 30px; margin-top: 36px; }
+.lane { display: grid; grid-template-columns: minmax(180px, 18vw) 1fr 5ch; gap: 24px; align-items: center; font-weight: 500; }
+.lane output { font: 800 clamp(30px, 3.4vw, 52px)/1 Bricolage, sans-serif; font-variant-numeric: tabular-nums; text-align: right; }
+.track { position: relative; height: 28px; border-radius: 14px; background: rgba(255, 255, 255, .1); }
+.band { position: absolute; top: 0; bottom: 0; background: rgba(127, 227, 173, .4); border: 2px solid #7fe3ad; border-radius: 6px; }
+.track b { position: absolute; top: 50%; left: 0; width: 22px; height: 22px; margin: -11px 0 0 -11px; background: #fff; border-radius: 50%; box-shadow: 0 2px 8px rgba(0, 0, 0, .5); }
+.track b.sq { border-radius: 4px; }
+.lanes small { max-width: 46em; }
+
+/* ---- the pinned film ---- */
+.film-on .stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; perspective: 1600px; }
+.film-on .rig { display: block; position: absolute; left: 50%; top: 50%; width: min(60vw, 108vh); transform: translate(-50%, -50%); transform-style: preserve-3d; will-change: transform, opacity; }
+.phone { position: relative; background: #000; border-radius: 4.2% / 8.4%; padding: 1.6% 5.2%; transform-style: preserve-3d; box-shadow: 0 0 0 1px rgba(255, 255, 255, .1), 0 50px 120px -30px rgba(75, 227, 138, .22), 0 30px 60px -20px #000; }
+.phone::before { content: ''; position: absolute; left: 2.3%; top: 50%; width: 1.1%; aspect-ratio: 1; border-radius: 50%; background: #16211b; transform: translateY(-50%); }
+.phone canvas { display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 1.2% / 2.2%; background: #000 center / cover no-repeat; }
+#cv { background-image: url('/media/pair-poster.jpg'); }
+.card { opacity: 0; }
+.fan { position: absolute; inset: 0; transform-style: preserve-3d; pointer-events: none; }
+.fan canvas { position: absolute; left: 12%; top: 3%; width: 76%; height: auto; aspect-ratio: 600 / 420; border-radius: 0; background: none; will-change: transform, opacity; opacity: 0; }
+/* the computer the video never leaves: a screen edge and a base drawn round the frame */
+.laptop { position: absolute; inset: -7% -5% -9%; border: 2px solid rgba(255, 255, 255, .34); border-radius: 18px 18px 6px 6px; opacity: 0; pointer-events: none; }
+.laptop::after { content: ''; position: absolute; left: -9%; right: -9%; top: calc(100% + 2px); height: 5%; border: 2px solid rgba(255, 255, 255, .34); border-top: 0; border-radius: 0 0 22px 22px; }
+.film-on #chart { display: block; position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
+.film-on .scrim { display: block; position: absolute; inset: 0; pointer-events: none; opacity: 0; background: linear-gradient(to top, rgba(0, 0, 0, .8), rgba(0, 0, 0, .25) 42%, transparent 62%), linear-gradient(to bottom, rgba(0, 0, 0, .45), transparent 16%); }
+
+.film-on .beat { position: absolute; inset: 0; max-width: none; padding: 0 var(--pad); pointer-events: none; opacity: 0; visibility: hidden; will-change: opacity, transform; }
+.film-on .beat a { pointer-events: auto; }
+.film-on .film { height: 2800vh; }
+.film-on .beat.hero { opacity: 1; visibility: visible; }
+.film-on .bl, .film-on .word, .film-on .end { display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 56px; }
+.film-on .end { align-items: flex-start; padding-bottom: 52px; } .film-on .end h2 { font-size: clamp(44px, 6.6vw, 104px); }
+.film-on .tl { padding-top: 104px; } .film-on .tl h2 { max-width: 8em; } .film-on .tl p { max-width: 22em; }
+.film-on .top { padding-top: 92px; text-align: center; } .film-on .top h2 { font-size: clamp(28px, 3.2vw, 50px); max-width: none; } .film-on .top p { margin: 12px auto 0; max-width: 34em; }
+.film-on .word h2 { font-size: clamp(72px, 13vw, 210px); letter-spacing: -.045em; line-height: .82; } .film-on .word p { max-width: 20em; }
+.film-on .beat output.big { display: block; position: absolute; right: var(--pad); bottom: 44px; font: 800 clamp(72px, 13vw, 210px)/.82 Bricolage, sans-serif; letter-spacing: -.04em; color: var(--hl); font-variant-numeric: tabular-nums; }
+.film-on .beat.hero { padding-top: 0; }
+.film-on .hero h1 span { position: absolute; white-space: nowrap; will-change: transform; }
+.film-on .hero .l1 { left: var(--pad); top: 92px; } .film-on .hero .l2 { right: var(--pad); bottom: 44px; }
+.film-on .lede { position: absolute; left: var(--pad); bottom: 44px; width: min(25vw, 360px); margin: 0; font-size: 16px; }
+.film-on .chip { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); margin: 0; box-shadow: 0 12px 32px -8px rgba(0, 0, 0, .6); }
+.film-on .strip { position: absolute; left: var(--pad); right: var(--pad); bottom: 40px; margin: 0; }
+.film-on .lanes { position: absolute; left: var(--pad); right: var(--pad); bottom: 9vh; margin: 0; }
+
+/* one authored entrance: the headline and the frame arrive together when the page opens */
+@media (prefers-reduced-motion: no-preference) {
+  .film-on .hero h1 i, .film-on .lede { animation: rise .9s cubic-bezier(.16, 1, .3, 1) both; }
+  .film-on .hero .l2 i { animation-delay: .12s; } .film-on .lede { animation-delay: .3s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(40px); filter: blur(8px); } }
+}
+.hero h1 i { font-style: normal; display: block; }
+
+/* chapters down the right edge: where you are in the film, and a way to jump */
+.film-on .rail { display: flex; position: fixed; right: 14px; top: 50%; transform: translateY(-50%); z-index: 15; flex-direction: column; gap: 2px; }
+.rail button { all: unset; cursor: pointer; display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 7px 4px; font-size: 13px; font-weight: 600; color: var(--text); }
+.rail button span { opacity: 0; transform: translateX(6px); transition: opacity .18s, transform .18s; text-shadow: 0 1px 8px #000; }
+.rail button::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, .35); transition: background .18s, transform .18s; }
+.rail button:hover span, .rail button:focus-visible span, .rail button[aria-current] span { opacity: 1; transform: none; }
+.rail button[aria-current]::after { background: var(--hl); transform: scale(1.5); }
+.rail button:focus-visible { outline: 2px solid var(--pale); outline-offset: 2px; border-radius: 6px; }
+
+@media (max-width: 760px) {
+  .strip { grid-template-columns: 1fr 1fr; gap: 8px; } .strip div { padding: 12px 14px 10px; } .strip dd { font-size: 40px; } .strip dt { font-size: 13px; }
+  .lane { grid-template-columns: 1fr auto; gap: 8px 12px; } .lane .track { grid-column: 1 / -1; grid-row: 2; } .lane output { font-size: 30px; }
+  .chip { font-size: 15px; }
+  .film-on .rig { width: 92vw; }
+  .film-on .rail { display: none; }
+  .film-on .hero h1 span { font-size: 10.8vw; } .film-on .hero .l1 { top: 96px; } .film-on .hero .l2 { top: calc(96px + 10.8vw); bottom: auto; right: auto; left: 18px; }
+  .film-on .lede { width: auto; right: 18px; bottom: 28px; }
+  .film-on .beat h2 { font-size: 34px; } .film-on .beat p { font-size: 15px; margin-top: 12px; }
+  .film-on .bl, .film-on .word, .film-on .end { padding-bottom: 32px; }
+  .film-on .tl, .film-on .top { padding-top: 92px; } .film-on .top { text-align: left; } .film-on .top h2 { font-size: 26px; } .film-on .top p { margin-left: 0; }
+  .film-on .word h2 { font-size: 24vw; } .film-on .beat output.big { bottom: auto; top: 96px; right: 18px; font-size: 20vw; }
+  .film-on .end h2 { font-size: 44px; }
+  .film-on .strip { bottom: 24px; } .film-on .lanes { bottom: 28px; gap: 20px; } .film-on .chip { top: 36%; }
+}
+@media (prefers-reduced-motion: reduce) { .rail button span, .rail button::after { transition: none; } }
