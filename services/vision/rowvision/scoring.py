@@ -1,6 +1,6 @@
 """Score measurements against technique targets, leaving out anything too unreliable to score."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 import numpy as np
@@ -11,6 +11,9 @@ MIN_STROKES = 3
 ANGLE_FALLOFF_DEG = 10.0
 ROUGH_GUIDE = "Shown as a rough guide. Knee angles depend on body proportions and are hard to measure."
 NEEDED_FOR_OVERALL = ("catch", "finish")
+SHOWN_ONLY = "Shown only. There is no published target for this yet, so it is not scored."
+ELBOW_GUIDE = "Shown as a rough guide. The arm is small in the picture, so this varies a lot."
+TOO_INCONSISTENT = "Too inconsistent from stroke to stroke to show."
 
 
 class Phase(StrEnum):
@@ -46,6 +49,21 @@ RULES = {
 }
 
 
+EXTRAS = {
+    "catch_elbow_deg": MetricRule(Phase.CATCH, "Arms at the catch", 0.0, 15.0, scored=False),
+    "arms_break": MetricRule(Phase.DRIVE, "When the arms start to bend", 0.0, 0.3, scored=False),
+    "body_swing_deg": MetricRule(Phase.DRIVE, "Body swing", 0.0, 12.0, scored=False),
+    "stroke_length": MetricRule(Phase.DRIVE, "Stroke length", 0.0, 0.3, scored=False),
+    "finish_elbow_deg": MetricRule(Phase.FINISH, "Elbow angle at the finish", 0.0, 25.0, scored=False),
+    "drive_s": MetricRule(Phase.RHYTHM, "Time on the drive", 0.0, 0.15, scored=False),
+    "recovery_s": MetricRule(Phase.RHYTHM, "Time on the recovery", 0.0, 0.25, scored=False),
+    "ratio": MetricRule(Phase.RHYTHM, "Recovery against drive", 0.0, 0.4, scored=False),
+    "rate_steadiness": MetricRule(Phase.RHYTHM, "Rate steadiness", 0.0, float("inf"), scored=False),
+}
+"""Measures that are shown and never scored, as none has a published target. Each is left out when
+it varies more than `max_spread` from stroke to stroke."""
+
+
 @dataclass(frozen=True)
 class MetricScore:
     name: str
@@ -66,6 +84,8 @@ class ScoreCard:
     """Only phases with at least one scored measure appear."""
     overall: float | None
     """Only given when the catch and finish were both scored, so easy measures cannot stand alone."""
+    extras: list[MetricScore] = field(default_factory=list)
+    """Measures that are shown and never scored."""
 
 
 def score_value(value: float, target: Target, falloff: float) -> float:
@@ -104,6 +124,18 @@ def _score_metric(
     )
 
 
+def _extra(name: str, summary: dict[str, float], spread: dict[str, float]) -> MetricScore:
+    rule = EXTRAS[name]
+    value = summary.get(name)
+    if value is None or not np.isfinite(value):
+        reason = "Could not be seen reliably in this video."
+        return MetricScore(name, rule.label, rule.phase, None, None, None, reason)
+    if spread.get(name, 0.0) > rule.max_spread:
+        return MetricScore(name, rule.label, rule.phase, None, None, None, TOO_INCONSISTENT)
+    reason = ELBOW_GUIDE if name == "finish_elbow_deg" else SHOWN_ONLY
+    return MetricScore(name, rule.label, rule.phase, value, None, None, reason)
+
+
 def score_stroke(
     summary: dict[str, float],
     spread: dict[str, float],
@@ -122,4 +154,5 @@ def score_stroke(
             phases[phase] = float(np.mean(scores))
     complete = all(Phase(name) in phases for name in NEEDED_FOR_OVERALL)
     overall = float(np.mean(list(phases.values()))) if complete else None
-    return ScoreCard(metrics, phases, overall)
+    extras = [_extra(name, summary, spread) for name in EXTRAS]
+    return ScoreCard(metrics, phases, overall, extras)

@@ -1,7 +1,17 @@
 import pytest
 
 from rowvision.reference import Target, load_targets
-from rowvision.scoring import ROUGH_GUIDE, Phase, score_stroke, score_value
+from rowvision.scoring import (
+    ELBOW_GUIDE,
+    EXTRAS,
+    ROUGH_GUIDE,
+    SHOWN_ONLY,
+    TOO_INCONSISTENT,
+    MetricScore,
+    Phase,
+    score_stroke,
+    score_value,
+)
 
 GOOD = {
     "catch_lean_deg": 28.0,
@@ -90,3 +100,41 @@ def test_no_overall_score_without_both_catch_and_finish(missing: str) -> None:
     result = card({key: value for key, value in GOOD.items() if key != missing})
     assert result.overall is None
     assert result.phases
+
+
+EXTRA = {"drive_s": 1.1, "recovery_s": 1.6, "ratio": 1.45, "body_swing_deg": 50.0, "finish_elbow_deg": 60.0}
+
+
+def extras(summary: dict[str, float], spread: dict[str, float] | None = None) -> dict[str, MetricScore]:
+    result = score_stroke({**GOOD, **summary}, spread or {}, 8, 24, load_targets())
+    return {metric.name: metric for metric in result.extras}
+
+
+def test_extra_measures_are_shown_and_never_scored() -> None:
+    shown = extras(EXTRA)
+    assert set(shown) == set(EXTRAS)
+    assert shown["ratio"].value == 1.45
+    assert all(metric.score is None and metric.target is None for metric in shown.values())
+    assert shown["drive_s"].reason == SHOWN_ONLY
+    assert shown["finish_elbow_deg"].reason == ELBOW_GUIDE
+
+
+def test_extra_measures_do_not_change_the_score() -> None:
+    plain = score_stroke(GOOD, {}, 8, 24, load_targets())
+    with_extras = score_stroke({**GOOD, **EXTRA}, {}, 8, 24, load_targets())
+    assert with_extras.overall == plain.overall
+    assert with_extras.phases == plain.phases
+    assert [metric.name for metric in with_extras.metrics] == [metric.name for metric in plain.metrics]
+
+
+def test_an_inconsistent_extra_measure_is_left_out() -> None:
+    shown = extras(EXTRA, {"body_swing_deg": 20.0, "ratio": 0.1})
+    assert shown["body_swing_deg"].value is None
+    assert shown["body_swing_deg"].reason == TOO_INCONSISTENT
+    assert shown["ratio"].value == 1.45
+
+
+def test_an_extra_measure_that_was_not_seen_has_no_value() -> None:
+    shown = extras({})
+    assert shown["stroke_length"].value is None
+    assert shown["stroke_length"].reason == "Could not be seen reliably in this video."

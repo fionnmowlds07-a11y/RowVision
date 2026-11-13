@@ -178,3 +178,27 @@ def test_each_frame_carries_the_view_it_was_corrected_by() -> None:
     views = np.array([0.0, 10.0, 20.0, 30.0])
     analysis = Analysis(30.0, 4, facing=-1, view_deg=10.0, rowers=[rower()], frame_views=views)
     assert analysis_json(analysis)["views"] == [0.0, 10.0, 20.0, 30.0]
+
+
+def test_shown_only_measures_and_fade_are_reported_apart_from_the_scored_ones() -> None:
+    person = rower()
+    summary = {"catch_lean_deg": 28.0, "ratio": 1.5}
+    person.spread = {"ratio": 0.1}
+    person.card = score_stroke(summary, person.spread, 8, 24, load_targets())
+    person.fade = {"catch_lean_deg": -2.5, "drive_s": float("nan")}
+    analysis = Analysis(30.0, 4, 1, True, 10.0, rowers=[person])
+    result = json.loads(json.dumps(analysis_json(analysis), allow_nan=False))["rower"]
+    names = [metric["name"] for metric in result["card"]["metrics"]]
+    assert "ratio" not in names
+    ratio = next(metric for metric in result["card"]["extras"] if metric["name"] == "ratio")
+    assert ratio == {
+        "name": "ratio",
+        "label": "Recovery against drive",
+        "phase": "rhythm",
+        "value": 1.5,
+        "spread": 0.1,
+        "target": None,
+        "score": None,
+        "reason": "Shown only. There is no published target for this yet, so it is not scored.",
+    }
+    assert result["fade"] == {"catch_lean_deg": -2.5, "drive_s": None}

@@ -18,7 +18,14 @@ from rowvision.boats import (
     overlap_frames,
     preview_frame,
 )
-from rowvision.metrics import StrokeMetrics, angle_series, per_stroke
+from rowvision.metrics import (
+    MEASURES,
+    StrokeMetrics,
+    angle_series,
+    fade,
+    per_stroke,
+    rate_steadiness,
+)
 from rowvision.pose import PoseBackend
 from rowvision.reference import load_targets
 from rowvision.reliability import Evidence, Rating, rate
@@ -89,6 +96,8 @@ class RowerResult:
     """Catch and finish timing against the rower being followed."""
     evidence: Evidence | None = None
     """What the accuracy rating was worked out from, kept so the rower can be measured again."""
+    fade: dict[str, float] = field(default_factory=dict)
+    """How each measure changes from the first half of the strokes to the second."""
 
 
 @dataclass(frozen=True)
@@ -259,17 +268,18 @@ def measure_rower(
 ) -> RowerResult:
     """Measure one rower's strokes from their joints, and score and rate the result."""
     timeline = shared if shared is not None else detect_strokes(reach_signal(points, facing), fps)
-    strokes = per_stroke(angle_series(points, facing, frame_views), timeline)
-    names = ("catch_lean_deg", "finish_lean_deg", "catch_knee_deg", "finish_knee_deg",
-             "finish_elbow_deg", "drive_share", "legs_lead")  # fmt: skip
+    strokes = per_stroke(angle_series(points, facing, frame_views), timeline, fps)
     summary: dict[str, float] = {}
     spread: dict[str, float] = {}
-    for name in names:
+    for name in MEASURES:
         values = np.array([getattr(stroke, name) for stroke in strokes], dtype=float)
         values = values[np.isfinite(values)]
         if len(values) and len(values) >= MIN_KNOWN_SHARE * len(strokes):
             summary[name] = float(np.median(values))
             spread[name] = float(np.subtract(*np.percentile(values, [75, 25])))
+    steadiness = rate_steadiness(strokes)
+    if np.isfinite(steadiness):
+        summary["rate_steadiness"] = steadiness
     card = score_stroke(summary, spread, len(strokes), timeline.rate_spm, load_targets())
     evidence = Evidence(
         trunk_px, view, spread.get("catch_lean_deg", 0.0), coverage, len(strokes), agreement
@@ -286,6 +296,7 @@ def measure_rower(
         card,
         rate(evidence),
         evidence=evidence,
+        fade=fade(strokes),
     )
 
 
