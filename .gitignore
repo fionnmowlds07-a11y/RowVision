@@ -49,3 +49,6 @@ next-env.d.ts
 # Installer builds, and the engine copied in to package
 apps/desktop/release/
 apps/desktop/engine/
+
+# Site footage and stills cut from it (see apps/site/pipeline/make_media.sh)
+apps/site/public/media/
