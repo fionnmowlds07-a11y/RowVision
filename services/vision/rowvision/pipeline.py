@@ -87,6 +87,8 @@ class RowerResult:
     rating: Rating
     timing: FollowTiming | None = None
     """Catch and finish timing against the rower being followed."""
+    evidence: Evidence | None = None
+    """What the accuracy rating was worked out from, kept so the rower can be measured again."""
 
 
 @dataclass(frozen=True)
@@ -241,7 +243,7 @@ def crew_timeline(
     return timeline if timeline.catches else None
 
 
-def _measure(
+def measure_rower(
     seat: int | None,
     points: FloatArray,
     scores: FloatArray,
@@ -255,6 +257,7 @@ def _measure(
     coverage: float,
     agreement: float | None = None,
 ) -> RowerResult:
+    """Measure one rower's strokes from their joints, and score and rate the result."""
     timeline = shared if shared is not None else detect_strokes(reach_signal(points, facing), fps)
     strokes = per_stroke(angle_series(points, facing, frame_views), timeline)
     names = ("catch_lean_deg", "finish_lean_deg", "catch_knee_deg", "finish_knee_deg",
@@ -282,6 +285,7 @@ def _measure(
         spread,
         card,
         rate(evidence),
+        evidence=evidence,
     )
 
 
@@ -424,7 +428,7 @@ def analyse(
         measured = np.isfinite(points[:, sk.LEFT_SHOULDER, 0])
         agreement = agreements.get(id(track))
         results.append(
-            _measure(
+            measure_rower(
                 seat,
                 points,
                 scores,
