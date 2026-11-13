@@ -1,71 +1,209 @@
-import { loadPose, progress, seg, ease, BONES, FAR_BONES } from './shared/pose.js';
+import { loadPose, progress, seg, ease, out, BONES } from './shared/pose.js';
 
 const $ = id => document.getElementById(id);
-const film = $('film'), cv = $('cv'), g = cv.getContext('2d'), rig = $('rig'), phone = $('phone'), fan = $('fan');
-const meta = await (await fetch('./private/meta.json')).json();
-const pose = await loadPose();
-const N = meta.frames.length, W = cv.width, H = cv.height;
-const imgs = meta.frames.map((_, n) => { const im = new Image(); im.src = `./private/c/${String(n).padStart(3, '0')}.jpg`; return im; });
-const finish = pose.finishes.find(f => f > meta.first && f < meta.first + N);
+const T = 27;                                   // length of the film, in screens
+const film = $('film'), cv = $('cv'), rig = $('rig'), fan = $('fan'), chart = $('chart');
+film.style.height = (T + 1) * 100 + 'vh';
 const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HL = '#4be38a', PALE = '#b6f2c9';
+const lerp = (a, b, u) => a + (b - a) * u, win = (x, a, b, f = .3) => Math.min(seg(x, a, a + f), 1 - seg(x, b - f, b));
 
-// The readout: measured at this stroke's catch and finish.
-$('tKnee').textContent = Math.round(pose.knee[meta.first]) + '°'; $('tHip').textContent = Math.round(pose.hip[meta.first]) + '°';
-$('tLean').textContent = Math.abs(Math.round(pose.back[finish])) + '°'; $('tLeanL').textContent = pose.back[finish] > 0 ? 'Body forward at the finish' : 'Layback at the finish';
-$('tElbow').textContent = Math.round(pose.elbow[finish]) + '°';
+// ---- clips: real phone footage, each with the pose RowVision's model reads from it ----
+const FILES = { pair: 'pair', a: 'single-a', b: 'single-b', pxl: 'pxl', astern: 'astern', far: 'far' };
+const CLIPS = {};
+await Promise.all(Object.entries(FILES).map(async ([k, name]) => {
+  const v = document.createElement('video'); v.muted = true; v.loop = true; v.playsInline = true; v.preload = 'auto'; v.src = `./private/clips/${name}.mp4`;
+  CLIPS[k] = { v, want: false, pose: k == 'astern' || k == 'far' ? null : await loadPose(`./private/pose/${name}.json`) };
+}));
+const D = CLIPS.pair, A = CLIPS.a;
+function use(k, at) {
+  const c = CLIPS[k], v = c.v; c.want = true;
+  if (at != null || still) { if (!v.paused) v.pause(); const t = at ?? 1; if (!v.seeking && Math.abs(v.currentTime - t) > .02) v.currentTime = t; }
+  else if (v.paused) v.play().catch(() => {});
+  return c;
+}
 
-// Nine moments of the drive, each on its own sheet, ready to fan out in depth.
+// ---- one frame of a clip onto a canvas, with whatever RowVision has drawn over it at this point in the story ----
+function arc(g, c, p, q, r, label, a, fs) {
+  const a1 = Math.atan2(p[1] - c[1], p[0] - c[0]), a2 = Math.atan2(q[1] - c[1], q[0] - c[0]); let d = a2 - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+  g.save(); g.globalAlpha = a; g.strokeStyle = '#fff'; g.fillStyle = 'rgba(75,227,138,.28)'; g.lineWidth = Math.max(2, r * .07);
+  g.beginPath(); g.moveTo(...c); g.arc(c[0], c[1], r, a1, a1 + d, d < 0); g.closePath(); g.fill(); g.stroke();
+  const am = a1 + d / 2, tx = c[0] + Math.cos(am) * (r + fs * 1.5), ty = c[1] + Math.sin(am) * (r + fs * 1.5);
+  g.font = `800 ${fs}px Bricolage`; g.textAlign = 'center'; g.textBaseline = 'middle'; const w = g.measureText(label).width + fs * .7;
+  g.fillStyle = '#04140b'; g.beginPath(); g.roundRect(tx - w / 2, ty - fs * .72, w, fs * 1.44, fs * .3); g.fill(); g.fillStyle = '#fff'; g.fillText(label, tx, ty + fs * .05); g.restore();
+}
+function draw(c, clip, o) {
+  const g = c.getContext('2d'), W = c.width, H = c.height, v = clip.v, pose = clip.pose, z = o.zoom || 1; let ox = 0, oy = 0, b = null, t = 0;
+  if (pose) {
+    t = Math.min(pose.N - 1.001, v.currentTime * pose.hz); b = pose.frame(t);
+    const k = Math.min(1, (z - 1) * 1.2), fx = W / 2 + ((b.hp[0] + b.sh[0]) / 2 * W - W / 2) * k, fy = H / 2 + (((b.sh[1] + b.an[1]) / 2 - .03) * H - H / 2) * k;
+    ox = Math.max(W - W * z, Math.min(0, W / 2 - fx * z)); oy = Math.max(H - H * z, Math.min(0, H / 2 - fy * z));
+  }
+  if (o.clear !== false) { g.fillStyle = '#000'; g.fillRect(0, 0, W, H); }
+  const al = o.alpha ?? 1;
+  if (al > 0 && v.readyState >= 2) { g.globalAlpha = al; g.filter = (o.sat ?? 1) < 1 || (o.bright ?? 1) < 1 ? `saturate(${o.sat ?? 1}) brightness(${o.bright ?? 1})` : 'none'; g.imageSmoothingQuality = 'high'; g.drawImage(v, ox, oy, W * z, H * z); g.filter = 'none'; g.globalAlpha = 1; }
+  if (!b) return;
+  const P = p => [ox + p[0] * W * z, oy + p[1] * H * z], J = Object.fromEntries(['sh', 'el', 'wr', 'hp', 'kn', 'an', 'hd'].map(k => [k, P(b[k])]));
+  const bl = Math.hypot(J.sh[0] - J.hp[0], J.sh[1] - J.hp[1]), mid = [(J.sh[0] + J.hp[0] + J.kn[0]) / 3, (J.sh[1] + J.hp[1] + J.kn[1]) / 3];
+  if (o.spot > 0) { const gr = g.createRadialGradient(mid[0], mid[1], bl * 1.2, mid[0], mid[1], bl * 4.5); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, `rgba(0,0,0,${o.spot})`); g.fillStyle = gr; g.fillRect(0, 0, W, H); }
+  if (o.ring > 0 && o.ring < 1) { g.save(); g.strokeStyle = '#fff'; g.lineWidth = 4 * (1 - o.ring) + 1; g.globalAlpha = 1 - o.ring; g.beginPath(); g.arc(...mid, bl * (.3 + out(o.ring) * 1.6), 0, 7); g.stroke(); g.globalAlpha = 1 - o.ring * o.ring; g.fillStyle = '#fff'; g.beginPath(); g.arc(...mid, bl * .14, 0, 7); g.fill(); g.restore(); }
+  if (o.box > 0) {
+    const xs = [J.sh, J.hp, J.kn, J.an, J.wr, J.hd].map(p => p[0]), ys = [J.sh, J.hp, J.kn, J.an, J.hd].map(p => p[1]), x0 = Math.min(...xs) - bl * .45, x1 = Math.max(...xs) + bl * .45, y0 = Math.min(...ys) - bl * .55, y1 = Math.max(...ys) + bl * .35, fs = Math.max(15, W * .017);
+    g.save(); g.globalAlpha = o.box; g.strokeStyle = HL; g.lineWidth = Math.max(2, W * .0028); g.beginPath(); g.roundRect(x0, y0, x1 - x0, y1 - y0, bl * .12); g.stroke();
+    g.font = `700 ${fs}px "DM Sans"`; const tw = g.measureText('You').width + fs; g.fillStyle = HL; g.beginPath(); g.roundRect(x0, y0 - fs * 1.9, tw, fs * 1.6, fs * .35); g.fill(); g.fillStyle = '#04140b'; g.textBaseline = 'middle'; g.fillText('You', x0 + fs * .5, y0 - fs * 1.08); g.restore();
+  }
+  const sk = o.skel || 0;
+  if (sk > .01) {
+    const lw = Math.max(W * .0028, bl * .05);
+    g.save(); g.lineCap = g.lineJoin = 'round'; g.shadowColor = 'rgba(0,0,0,.55)'; g.shadowBlur = lw * 2; g.strokeStyle = HL; g.lineWidth = lw;
+    BONES.forEach(([p, q], i) => { const u = seg(sk, i * .16, i * .16 + .36); if (!u) return; g.beginPath(); g.moveTo(...J[q]); g.lineTo(J[q][0] + (J[p][0] - J[q][0]) * u, J[q][1] + (J[p][1] - J[q][1]) * u); g.stroke(); });
+    g.shadowBlur = 0; ['an', 'kn', 'hp', 'sh', 'el', 'wr'].forEach((k, i) => { const u = seg(sk, i * .16 - .1, i * .16 + .1); if (!u) return; g.fillStyle = '#fff'; g.beginPath(); g.arc(...J[k], lw * 1.3 * u, 0, 7); g.fill(); });
+    g.restore();
+  }
+  const ar = o.arcs; if (!ar) return;
+  const i = Math.round(t), fs = Math.max(18, bl * .24);
+  if (ar.knee > .01) arc(g, J.kn, J.hp, J.an, bl * .42, Math.round(pose.knee[i]) + '°', ar.knee, fs);
+  if (ar.back > .01) { const up = [J.hp[0], J.hp[1] - bl * 1.15]; g.save(); g.globalAlpha = ar.back * .8; g.strokeStyle = '#fff'; g.setLineDash([bl * .06, bl * .06]); g.lineWidth = Math.max(2, bl * .02); g.beginPath(); g.moveTo(...J.hp); g.lineTo(...up); g.stroke(); g.restore(); arc(g, J.hp, up, J.sh, bl * .5, Math.abs(Math.round(pose.back[i])) + '°', ar.back, fs); }
+  if (ar.elbow > .01) arc(g, J.el, J.sh, J.wr, bl * .32, Math.round(pose.elbow[i]) + '°', ar.elbow, fs);
+}
+
+// ---- the drive taken apart: nine moments of one stroke, each on its own sheet ----
 const LAYERS = 9, sheets = [];
-for (let k = 0; k < LAYERS; k++) {
-  const c = document.createElement('canvas'); c.width = 1200; c.height = 840; const x = c.getContext('2d'), b = pose.body(meta.first + (finish - meta.first) * k / (LAYERS - 1));
-  const P = p => [250 + p[0] * 600, 700 - p[1] * 600], edge = k == 0 || k == LAYERS - 1;
-  x.lineCap = x.lineJoin = 'round'; x.strokeStyle = edge ? '#fff' : PALE; x.lineWidth = edge ? 9 : 5;
-  x.globalAlpha = 1; x.lineWidth = edge ? 9 : 5; BONES.forEach(([p, q]) => { x.beginPath(); x.moveTo(...P(b[p])); x.lineTo(...P(b[q])); x.stroke(); });
-  x.beginPath(); x.moveTo(...P(b.sh)); x.lineTo(...P(b.hd)); x.stroke(); x.beginPath(); x.arc(...P(b.hd), 60, 0, 7); x.stroke();
-  ['wr', 'el', 'sh', 'hp', 'kn', 'an'].forEach(j => { x.fillStyle = edge ? HL : '#0a3d27'; x.beginPath(); x.arc(...P(b[j]), edge ? 13 : 9, 0, 7); x.fill(); x.stroke(); });
-  fan.append(c); sheets.push(c);
+{
+  const p = A.pose, c0 = p.catches[1] ?? p.catches[0], fin = p.finishes.find(f => f > c0) ?? c0 + 20;
+  $('tKnee').textContent = Math.round(p.knee[c0]) + '°'; $('tHip').textContent = Math.round(p.hip[c0]) + '°'; $('tLean').textContent = Math.abs(Math.round(p.back[fin])) + '°'; $('tElbow').textContent = Math.round(p.elbow[fin]) + '°';
+  $('tLeanL').textContent = p.back[fin] > 0 ? 'Body forward at the finish' : 'Layback at the finish';
+  for (let k = 0; k < LAYERS; k++) {
+    const c = document.createElement('canvas'); c.width = 1200; c.height = 840; const x = c.getContext('2d'), b = p.body(c0 + (fin - c0) * k / (LAYERS - 1)), f = p.facing;
+    const Q = q => [(f < 0 ? 250 : 950) + q[0] * 600, 700 - q[1] * 600], edge = k == 0 || k == LAYERS - 1;
+    x.lineCap = x.lineJoin = 'round'; x.strokeStyle = edge ? '#fff' : PALE; x.lineWidth = edge ? 9 : 5;
+    BONES.forEach(([a, d]) => { x.beginPath(); x.moveTo(...Q(b[a])); x.lineTo(...Q(b[d])); x.stroke(); });
+    x.beginPath(); x.moveTo(...Q(b.sh)); x.lineTo(...Q(b.hd)); x.stroke(); x.beginPath(); x.arc(...Q(b.hd), 60, 0, 7); x.stroke();
+    ['wr', 'el', 'sh', 'hp', 'kn', 'an'].forEach(j => { x.fillStyle = edge ? HL : '#06281a'; x.beginPath(); x.arc(...Q(b[j]), edge ? 13 : 9, 0, 7); x.fill(); x.stroke(); });
+    fan.append(c); sheets.push(c);
+  }
 }
 
-function draw(n, zoom, fade, skel) {
-  const im = imgs[n], b = pose.frame(meta.first + n);
-  const cx = (b.hp[0] + b.kn[0]) / 2 * W, cy = (b.sh[1] + b.an[1]) / 2 * H - H * .04;
-  const fx = W / 2 + (cx - W / 2) * Math.min(1, (zoom - 1) * 1.2), fy = H / 2 + (cy - H / 2) * Math.min(1, (zoom - 1) * 1.2);
-  const ox = Math.max(W - W * zoom, Math.min(0, W / 2 - fx * zoom)), oy = Math.max(H - H * zoom, Math.min(0, H / 2 - fy * zoom));
-  g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
-  if (fade < 1 && im.complete && im.naturalWidth) { g.globalAlpha = 1 - fade; g.imageSmoothingQuality = 'high'; g.drawImage(im, ox, oy, W * zoom, H * zoom); g.globalAlpha = 1; }
-  if (skel < .01) return;
-  const P = p => [ox + p[0] * W * zoom, oy + p[1] * H * zoom], J = Object.fromEntries(['sh', 'el', 'wr', 'hp', 'kn', 'an', 'hd'].map(k => [k, P(b[k])]));
-  const lw = Math.max(3, zoom * 2.4);
-  g.save(); g.lineCap = g.lineJoin = 'round'; g.globalAlpha = skel * .4; g.strokeStyle = PALE; g.lineWidth = lw * .6; const Q = b.far.map(P);
-  FAR_BONES.forEach(([p, q]) => { g.beginPath(); g.moveTo(...Q[p]); g.lineTo(...Q[q]); g.stroke(); });
-  g.globalAlpha = skel; g.strokeStyle = HL; g.lineWidth = lw; BONES.forEach(([p, q]) => { g.beginPath(); g.moveTo(...J[p]); g.lineTo(...J[q]); g.stroke(); });
-  ['wr', 'el', 'sh', 'hp', 'kn', 'an'].forEach(k => { g.fillStyle = '#fff'; g.beginPath(); g.arc(...J[k], lw * 1.25, 0, 7); g.fill(); });
-  g.restore();
+// ---- every stroke in the clip as one line, then folded so the strokes lie over each other ----
+const CH = (() => { const p = A.pose, c = p.catches; return { p, c, i0: c[0], i1: c.at(-1), n: c.length - 1 }; })();
+$('nLast').textContent = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'][CH.n] ?? CH.n;
+function drawChart(reveal, fold) {
+  const d = Math.min(2, devicePixelRatio || 1), W = chart.clientWidth, H = chart.clientHeight; if (chart.width != W * d) { chart.width = W * d; chart.height = H * d; }
+  const g = chart.getContext('2d'); g.setTransform(d, 0, 0, d, 0, 0); g.clearRect(0, 0, W, H);
+  const pad = Math.max(18, Math.min(52, W * .034)), x0 = pad + 44, x1 = W - pad, y0 = H * (W > 760 ? .5 : .46), y1 = H * .9, { p, c, i0, i1, n } = CH;
+  const Y = v => y1 - (v - 30) / 155 * (y1 - y0);
+  g.font = '500 13px "DM Sans"'; g.textBaseline = 'middle'; g.textAlign = 'right';
+  [60, 120, 180].forEach(v => { g.strokeStyle = 'rgba(255,255,255,.12)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x0, Y(v)); g.lineTo(x1, Y(v)); g.stroke(); g.fillStyle = '#c4e4d2'; g.fillText(v + '°', x0 - 10, Y(v)); });
+  const X = (j, k) => lerp(x0 + (j - i0) / (i1 - i0) * (x1 - x0), x0 + (j - c[k]) / (c[k + 1] - c[k]) * (x1 - x0), fold);
+  const lim = i0 + reveal * (i1 - i0);
+  for (let k = 0; k < n; k++) {
+    const first = k == 0, last = k == n - 1;
+    g.strokeStyle = first ? '#fff' : last ? HL : PALE; g.globalAlpha = first || last ? 1 : lerp(1, .4, fold); g.lineWidth = first || last ? 3.5 : 2.5; g.lineJoin = 'round';
+    g.beginPath(); let any = 0; for (let j = c[k]; j <= c[k + 1] && j <= lim; j++) { any++ ? g.lineTo(X(j, k), Y(p.knee[j])) : g.moveTo(X(j, k), Y(p.knee[j])); } g.stroke();
+    g.fillStyle = g.strokeStyle;
+    if (c[k] <= lim) { g.beginPath(); g.arc(X(c[k], k), Y(p.knee[c[k]]), 6, 0, 7); g.fill(); }
+    const f = p.finishes[k]; if (f != null && f <= lim) g.fillRect(X(f, k) - 5.5, Y(p.knee[f]) - 5.5, 11, 11);
+  }
+  g.globalAlpha = 1;
 }
+// measured lean at the catches and finishes of that clip, for the target lanes
+const mean = a => a.reduce((s, v) => s + v, 0) / (a.length || 1);
+const LEAN = { c: Math.max(0, Math.min(50, mean(CH.c.map(i => CH.p.back[i])))), f: Math.max(0, Math.min(50, mean(CH.p.finishes.map(i => -CH.p.back[i])))) };
 
-const s1 = $('s1'), s2 = $('s2'), s3 = $('s3'), l1 = s1.querySelector('.l1'), l2 = s1.querySelector('.l2');
+// ---- the water behind everything: slow bands of light with fine chart lines, tinted to where you are in the story ----
+const BG = (() => {
+  const c = $('bg'), gl = c.getContext('webgl', { antialias: false, alpha: false }); if (!gl) return null;
+  gl.getExtension('OES_standard_derivatives');
+  const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); return o; }, pr = gl.createProgram();
+  gl.attachShader(pr, sh(gl.VERTEX_SHADER, 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }'));
+  gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, `precision highp float; uniform vec2 r; uniform float t, lines; uniform vec3 a, b;
+    float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
+    float fbm(vec2 p){ float s = 0., w = .5; for (int i = 0; i < 4; i++) { s += w * n(p); p = p * 2.03 + 7.1; w *= .5; } return s; }
+    void main(){ vec2 uv = gl_FragCoord.xy / r, p = vec2(uv.x * r.x / r.y, uv.y);
+      float far = 1. + uv.y * 2.2;                                     // the water is seen low, so ripples tighten towards the top
+      vec2 q = vec2(p.x * 1.1 + t * .012, p.y * 3.4 * far - t * .03);
+      float f = fbm(q + fbm(q * .6 + t * .015) * 1.4);
+      float glint = smoothstep(.5, .78, f);
+      vec3 c = mix(a, b, glint * .75 + uv.y * .22);
+      float iso = abs(fract(f * 11.) - .5) / (fwidth(f) * 11. + 1e-4);
+      c += b * (1. - smoothstep(0., 1.3, iso)) * .22 * lines;
+      c *= 1. - .55 * pow(length(uv - .5) * 1.25, 2.2);
+      c += (h(gl_FragCoord.xy + t) - .5) * .018;
+      gl_FragColor = vec4(c, 1.); }`.replace('precision highp float;', '#extension GL_OES_standard_derivatives : enable\nprecision highp float;')));
+  gl.linkProgram(pr); gl.useProgram(pr);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  const U = n => gl.getUniformLocation(pr, n), hex = s => [1, 3, 5].map(i => parseInt(s.slice(i, i + 2), 16) / 255);
+  const STOPS = [[0, '#06281a', '#17704a', .7], [10, '#06281a', '#17704a', .7], [11.5, '#041c13', '#0f5035', .8], [17.6, '#041c13', '#0f5035', .8], [18.6, '#010806', '#0a3323', 1], [22.8, '#010806', '#0a3323', 1], [24, '#04180f', '#11573a', .8], [26, '#0a3d27', '#22895a', .6]].map(s => [s[0], hex(s[1]), hex(s[2]), s[3]]);
+  return (x, time) => {
+    const d = Math.min(1.5, devicePixelRatio || 1), w = Math.round(c.clientWidth * d * .6), hh = Math.round(c.clientHeight * d * .6); if (c.width != w || c.height != hh) { c.width = w; c.height = hh; gl.viewport(0, 0, w, hh); }
+    let i = 0; while (i < STOPS.length - 2 && x > STOPS[i + 1][0]) i++; const s0 = STOPS[i], s1 = STOPS[i + 1], u = seg(x, s0[0], s1[0]);
+    gl.uniform2f(U('r'), w, hh); gl.uniform1f(U('t'), time); gl.uniform1f(U('lines'), lerp(s0[3], s1[3], u));
+    gl.uniform3fv(U('a'), s0[1].map((v, k) => lerp(v, s1[1][k], u))); gl.uniform3fv(U('b'), s0[2].map((v, k) => lerp(v, s1[2][k], u)));
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  };
+})();
+
+// ---- the film ----
+const scenes = [...document.querySelectorAll('.scene')].map(el => ({ el, a: +el.dataset.a, b: +el.dataset.b }));
+const cards = [...document.querySelectorAll('.card')].map(el => ({ el, c: el.querySelector('canvas'), clip: CLIPS[el.dataset.clip] }));
+const l1 = document.querySelector('.l1'), l2 = document.querySelector('.l2'), lede = document.querySelector('.lede');
+const stroke = (() => { const c = D.pose.catches, k = Math.max(0, Math.floor(c.length / 2) - 1); return [c[k], c[k + 1] ?? c[k] + 60]; })();
 let clock = 0, last = performance.now();
+
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now; if (!still) clock += dt;
-  const p = progress(film), small = innerWidth <= 760;
-  const push = ease(seg(p, .1, .36)), tilt = ease(seg(p, .46, .7)), spread = ease(seg(p, .52, .76));
-  const n = still ? 4 : Math.floor(clock * 24) % N;
-  draw(n, 1 + push * (small ? 2.4 : 1.25), seg(p, .3, .47), Math.min(seg(p, .16, .28), 1 - seg(p, .46, .54)));
+  const x = progress(film) * T, W = innerWidth, H = innerHeight, small = W <= 760, vw = W / 100, vh = H / 100;
+  BG?.(x, clock);
 
-  // Push in until the screen fills the window, then tip the frame back and let the stroke fan out of it.
-  const fill = small ? 1.04 : Math.max(innerWidth / (rig.offsetWidth * .896), innerHeight / (rig.offsetWidth * .896 * 9 / 16)) * 1.02;
-  const s = 1 + (fill - 1) * push - (fill - (small ? .92 : .8)) * tilt;
-  const tx = small ? 0 : tilt * 11, ty = small ? tilt * 2 : tilt * 1;
-  rig.style.transform = `translate(-50%, -50%) translate(${tx}vw, ${ty - (1 - push) * (small ? 2 : 0)}vh) scale(${s}) rotateX(${tilt * 12}deg) rotateY(${tilt * -36}deg)`;
-  phone.style.boxShadow = tilt > .02 || push < .5 ? '' : 'none';
-  sheets.forEach((c, k) => { c.style.opacity = seg(p, .48, .56) * (.35 + .65 * (k == 0 || k == LAYERS - 1 ? 1 : .75)); c.style.transform = `translateZ(${4 + spread * k * (small ? 36 : 54)}px)`; });
+  // what the main screen shows
+  const scrub = x >= 6.3 && x < 10.5, dz = ease(seg(x, 4.6, 6)) - ease(seg(x, 10.5, 11.3)), grade = seg(x, 4.8, 5.6) - seg(x, 10.5, 11.2);
+  const m = ease(seg(x, 10.7, 11.8)) - ease(seg(x, 13.6, 14.5));
+  if (x < 14.5) draw(cv, use('pair', scrub ? lerp(stroke[0], stroke[1], seg(x, 6.3, 10.5)) / D.pose.hz : null), {
+    zoom: 1 + dz * (small ? 2.6 : 1.5) + m * .8, bright: 1 - .4 * grade, sat: 1 - .55 * grade, ring: seg(x, 3.5, 3.95), box: Math.min(seg(x, 3.85, 4.1), 1 - seg(x, 4.8, 5.1)), spot: Math.min(seg(x, 3.6, 4.2), 1 - seg(x, 5, 5.6)) * .6,
+    skel: seg(x, 4.9, 5.8), arcs: { knee: win(x, 6.4, 7.8), back: win(x, 7.9, 9.3), elbow: win(x, 9.4, 10.6) },
+  });
+  if (x > 13.9 && x < 16.5) draw(cv, use('astern'), { alpha: seg(x, 13.9, 14.4), clear: false });
+  if (x > 16 && x < 18) draw(cv, use('far'), { alpha: seg(x, 16, 16.4), clear: false });
+  if (x > 17.4 && x < 21) draw(cv, use('a'), { alpha: seg(x, 17.4, 17.9) * (1 - seg(x, 18, 18.7)), clear: x > 17.9, zoom: 1 + ease(seg(x, 17.6, 18.6)) * (small ? 2.6 : 1.8), skel: Math.min(seg(x, 17.8, 18.4), 1 - seg(x, 18.7, 19.1)), sat: 1 - seg(x, 17.9, 18.4) * .6 });
+  if (x >= 21) draw(cv, use('pair'), { skel: 1, zoom: 1.7 });
+  const i = Math.min(D.pose.N - 1, Math.round(D.v.currentTime * D.pose.hz));
+  $('nKnee').textContent = Math.round(D.pose.knee[i]) + '°'; $('nBack').textContent = Math.abs(Math.round(D.pose.back[i])) + '°'; $('nElbow').textContent = Math.round(D.pose.elbow[i]) + '°';
 
-  l1.style.transform = `translateX(${-ease(seg(p, .04, .2)) * 70}vw)`; l2.style.transform = `translateX(${ease(seg(p, .04, .2)) * 70}vw)`;
-  s1.style.opacity = 1 - seg(p, .08, .18); s2.style.opacity = Math.min(seg(p, .26, .34), 1 - seg(p, .44, .5)); s3.style.opacity = seg(p, .7, .8);
-  [s1, s2, s3].forEach(x => x.style.visibility = +x.style.opacity ? 'visible' : 'hidden');
+  // where the main screen is: phone, full window, one of four, tipped back, phone again
+  const rw = rig.offsetWidth, fill = small ? 1.04 : Math.max(W / (rw * .896), H / (rw * .896 * 9 / 16)) * 1.02;
+  const push = ease(seg(x, 1.2, 2.8)), back = x < 22, tilt = back ? ease(seg(x, 18.5, 19.6)) : 0, spread = back ? ease(seg(x, 18.9, 20)) : 0, end = ease(seg(x, 24.9, 25.9));
+  const tileS = (small ? W * .6 : 36 * vw) / rw, slot = k => small ? [0, (k - 1.5) * 128 + 76] : [(k % 2 ? 19.5 : -19.5) * vw, (k < 2 ? -6 : 26) * vh];
+  const drift = (x - 12.6) * -1.4 * vh;
+  let s = lerp(lerp(1 + (fill - 1) * push, tileS, m), small ? .92 : .8, tilt), tx = slot(0)[0] * m + (small ? 0 : tilt * 11 * vw), ty = (slot(0)[1] + drift * .5) * m + tilt * 1.5 * vh;
+  if (!back) { s = small ? 1 : .86; tx = small ? 0 : 17 * vw; ty = small ? -10 * vh : -11 * vh; }
+  rig.style.transform = `translate(-50%, -50%) translate(${tx}px, ${ty}px) scale(${s}) rotateX(${tilt * 12}deg) rotateY(${tilt * -36}deg)`;
+  rig.style.opacity = back ? 1 - seg(x, 20.3, 20.8) : end;
+  sheets.forEach((c, k) => { c.style.opacity = back ? seg(x, 18.6, 19) * (k == 0 || k == LAYERS - 1 ? 1 : .8) : 0; c.style.transform = `translateZ(${4 + spread * k * (small ? 36 : 54)}px)`; });
+
+  // the other three clips fly in beside it, then leave
+  cards.forEach((cd, k) => {
+    const e = out(seg(x, 10.8 + k * .18, 11.9 + k * .18)), l = ease(seg(x, 13.4 + k * .12, 14.3 + k * .12)), on = e > 0 && l < 1;
+    cd.el.style.opacity = on ? Math.min(1, e * 3) * (1 - l) : 0; if (!on) return;
+    const sl = slot(k + 1), from = small ? [[W, 0], [-W, 0], [W, 0]][k] : [[70 * vw, -20 * vh], [-70 * vw, 50 * vh], [70 * vw, 60 * vh]][k];
+    cd.el.style.transform = `translate(-50%, -50%) translate(${sl[0] + from[0] * (1 - e) + from[0] * .6 * l}px, ${sl[1] + from[1] * (1 - e) + drift * (.5 + (k + 1) * .35) * (small ? 0 : 1) - l * 20 * vh}px) scale(${tileS * (1 - l * .2)}) rotate(${(1 - e) * (k % 2 ? -8 : 8)}deg)`;
+    draw(cd.c, use(cd.el.dataset.clip), { skel: 1, zoom: 1.8 });
+  });
+
+  // words
+  scenes.forEach(sc => { const o = win(x, sc.a, sc.b), inn = seg(x, sc.a, sc.a + .3), ou = seg(x, sc.b - .3, sc.b); sc.el.style.opacity = o; sc.el.style.visibility = o > 0 ? 'visible' : 'hidden'; sc.el.style.transform = `translateY(${(1 - out(inn)) * 34 - ou * 34}px)`; });
+  const h = ease(seg(x, .3, 1.1)); l1.style.transform = `translateX(${-h * 70}vw)`; l2.style.transform = `translateX(${h * 70}vw)`; lede.style.opacity = 1 - seg(x, .2, .6);
+  $('scrim').style.opacity = small ? 0 : Math.max(Math.min(seg(x, 2, 2.6), 1 - seg(x, 10.6, 11)), Math.min(seg(x, 14.3, 14.7), 1 - seg(x, 17.9, 18.3)));
+  $('chip').style.opacity = win(x, 16.5, 17.5, .2);
+  $('strip').style.opacity = win(x, 19.6, 20.5);
+
+  const ca = win(x, 20.7, 22.9); chart.style.opacity = ca; if (ca > 0) drawChart(seg(x, 20.9, 21.7), ease(seg(x, 21.8, 22.5)));
+  const la = win(x, 23.1, 24.4), go = out(seg(x, 23.3, 24)); $('lanes').style.opacity = la;
+  $('mCatch').style.left = LEAN.c * go * 2 + '%'; $('mFinish').style.left = LEAN.f * go * 2 + '%'; $('vCatch').textContent = Math.round(LEAN.c * go) + '°'; $('vFinish').textContent = Math.round(LEAN.f * go) + '°';
+
+  for (const c of Object.values(CLIPS)) { if (!c.want && !c.v.paused) c.v.pause(); c.want = false; }
   requestAnimationFrame(frame);
 }
-await Promise.all(imgs.slice(0, 4).map(im => im.decode().catch(() => {})));
+await Promise.race([new Promise(r => D.v.addEventListener('loadeddata', r, { once: true })), new Promise(r => setTimeout(r, 4000))]);
 await document.fonts.ready;
 requestAnimationFrame(frame); document.documentElement.dataset.ready = '1';

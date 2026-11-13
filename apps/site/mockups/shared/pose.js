@@ -13,9 +13,10 @@ const deg = (a, b, c) => {
 };
 const tri = (arr, i, k, get) => { let x = 0, y = 0, n = 0; for (let d = -k; d <= k; d++) { const q = arr[i + d]; if (q) { const w = k + 1 - Math.abs(d), p = get(q); x += p[0] * w; y += p[1] * w; n += w; } } return [x / n, y / n]; };
 
-export async function loadPose(url = '/data/pose-scull.json') {
+export async function loadPose(url = '/data/pose-scull.json', hz) {
   const P = await (await fetch(url)).json();
-  const ar = P.w / P.h, F = P.frames;
+  // a frame where the rower was lost borrows the nearest frame where they were found
+  const ar = P.w / P.h, F = P.frames.map((f, i, all) => { for (let d = 0; !f && d < all.length; d++) f = all[i - d] || all[i + d]; return f; });
   let tL = 0, tR = 0; F.forEach(f => { L.forEach(i => tL += f[i][2]); R.forEach(i => tR += f[i][2]); });
   const near = tL >= tR ? L : R, far = tL >= tR ? R : L;
   const mid = (f, a, b) => [(f[a][0] + f[b][0]) / 2, (f[a][1] + f[b][1]) / 2];
@@ -47,7 +48,8 @@ export async function loadPose(url = '/data/pose-scull.json') {
   const pick = (arr, t) => { t = Math.max(0, Math.min(N - 1.001, t)); const i = Math.floor(t), u = t - i, A = arr[i], B = arr[i + 1], o = { far: A.far.map((p, k) => lerp(p, B.far[k], u)) }; KEYS.forEach(k => o[k] = lerp(A[k], B[k], u)); return o; };
   const val = (arr, t) => { t = Math.max(0, Math.min(N - 1.001, t)); const i = Math.floor(t); return arr[i] + (arr[i + 1] - arr[i]) * (t - i); };
   return {
-    N, ar, w: P.w, h: P.h, hz: 15, facing, knee, hip, elbow, back, catches, finishes,
+    N, ar, w: P.w, h: P.h, facing, knee, hip, elbow, back, catches, finishes,
+    hz: hz || (P.start != null ? P.fps : 15),   // the first pose file was every 4th frame of a 60 fps clip
     frame: t => pick(S, t),      // as filmed: x and y in 0..1 of the frame
     body: t => pick(body, t),    // rower's frame: metres from the ankle, y up
     angle: (name, t) => val({ knee, hip, elbow, back }[name], t),
