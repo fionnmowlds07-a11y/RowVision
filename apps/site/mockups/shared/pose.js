@@ -16,10 +16,14 @@ const tri = (arr, i, k, get) => { let x = 0, y = 0, n = 0; for (let d = -k; d <=
 
 export async function loadPose(url = '/data/pose-scull.json', hz) {
   const P = await (await fetch(url)).json();
-  // a frame where the rower was lost borrows the nearest frame where they were found
-  const ar = P.w / P.h, F = P.frames.map((f, i, all) => { for (let d = 0; !f && d < all.length; d++) f = all[i - d] || all[i + d]; return f; });
-  let tL = 0, tR = 0; F.forEach(f => { L.forEach(i => tL += f[i][2]); R.forEach(i => tR += f[i][2]); });
-  const near = tL >= tR ? L : R, far = tL >= tR ? R : L;
+  // a frame where the rower was lost is filled in between the frames either side where they were found
+  const ar = P.w / P.h, F = P.frames.map((f, i, all) => {
+    if (f) return f; let a = i, b = i; while (a >= 0 && !all[a]) a--; while (b < all.length && !all[b]) b++;
+    if (a < 0 || b >= all.length) return all[a < 0 ? b : a]; const u = (i - a) / (b - a); return all[a].map((p, k) => [p[0] + (all[b][k][0] - p[0]) * u, p[1] + (all[b][k][1] - p[1]) * u, Math.min(p[2], all[b][k][2])]);
+  });
+  // The near side follows from the way the rower faces, as in the engine: facing right shows their right side.
+  const facing = Math.sign(F.reduce((s, f) => s + f[15][0] + f[16][0] - f[11][0] - f[12][0], 0)) || 1;
+  const near = facing > 0 ? R : L, far = facing > 0 ? L : R;
   const mid = (f, a, b) => [(f[a][0] + f[b][0]) / 2, (f[a][1] + f[b][1]) / 2];
   // As filmed: x and y as shares of the frame's width and height, y down.
   const raw = F.map(f => ({
@@ -29,7 +33,6 @@ export async function loadPose(url = '/data/pose-scull.json', hz) {
   const S = raw.map((_, i) => { const o = { far: raw[i].far.map((__, k) => tri(raw, i, 3, q => q.far[k])) }; KEYS.forEach(k => o[k] = tri(raw, i, 3, q => q[k])); return o; });
   const sc = p => [p[0] * ar, p[1]];
   const knee = S.map(b => deg(sc(b.hp), sc(b.kn), sc(b.an))), hip = S.map(b => deg(sc(b.sh), sc(b.hp), sc(b.kn))), elbow = S.map(b => deg(sc(b.sh), sc(b.el), sc(b.wr)));
-  const facing = Math.sign(S.reduce((s, b) => s + b.an[0] - b.hp[0], 0)) || 1;
   const back = S.map(b => Math.atan2((b.sh[0] - b.hp[0]) * facing * ar, b.hp[1] - b.sh[1]) * 180 / Math.PI);
 
   // The rower's own frame: feet stay on the stretcher, so the ankle is the fixed point. Metres, y up.
