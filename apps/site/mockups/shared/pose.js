@@ -1,6 +1,7 @@
 // The owner's real sculling stroke, read from the pose file and turned into the things the mock-ups draw.
 // Nothing here is invented: every point is a measured joint, smoothed over a few frames.
-// Angle maths and near-side choice match the engine (arms, shoulders, hips averaged; knee from the near leg).
+// Shoulders and hips are the average of both sides, as in the engine. Knee, elbow and wrist come from the near side only:
+// averaging the two arms puts the elbow on the chest whenever the arms are apart on screen (sweep rowing, or any angle off side-on).
 
 const L = [5, 7, 9, 11, 13, 15], R = [6, 8, 10, 12, 14, 16];
 export const BONES = [['wr', 'el'], ['el', 'sh'], ['sh', 'hp'], ['hp', 'kn'], ['kn', 'an']];
@@ -22,7 +23,7 @@ export async function loadPose(url = '/data/pose-scull.json', hz) {
   const mid = (f, a, b) => [(f[a][0] + f[b][0]) / 2, (f[a][1] + f[b][1]) / 2];
   // As filmed: x and y as shares of the frame's width and height, y down.
   const raw = F.map(f => ({
-    sh: mid(f, 5, 6), el: mid(f, 7, 8), wr: mid(f, 9, 10), hp: mid(f, 11, 12), kn: f[near[4]].slice(0, 2), an: f[near[5]].slice(0, 2),
+    sh: mid(f, 5, 6), el: f[near[1]].slice(0, 2), wr: f[near[2]].slice(0, 2), hp: mid(f, 11, 12), kn: f[near[4]].slice(0, 2), an: f[near[5]].slice(0, 2),
     hd: [(f[0][0] + f[3][0] + f[4][0]) / 3, (f[0][1] + f[3][1] + f[4][1]) / 3], far: far.map(i => f[i].slice(0, 2)),
   }));
   const S = raw.map((_, i) => { const o = { far: raw[i].far.map((__, k) => tri(raw, i, 3, q => q.far[k])) }; KEYS.forEach(k => o[k] = tri(raw, i, 3, q => q[k])); return o; });
