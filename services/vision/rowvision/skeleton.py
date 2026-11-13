@@ -28,10 +28,6 @@ def shoulders(points: FloatArray) -> FloatArray:
     return midpoint(points, LEFT_SHOULDER, RIGHT_SHOULDER)
 
 
-def elbows(points: FloatArray) -> FloatArray:
-    return midpoint(points, LEFT_ELBOW, RIGHT_ELBOW)
-
-
 def wrists(points: FloatArray) -> FloatArray:
     return midpoint(points, LEFT_WRIST, RIGHT_WRIST)
 
@@ -56,5 +52,23 @@ def near_leg(points: FloatArray, facing: int) -> tuple[FloatArray, FloatArray, F
     The far leg is mostly hidden behind the body and the boat, so the pose model often loses it.
     """
     left = facing < 0
-    hip, knee, ankle = (LEFT_HIP, LEFT_KNEE, LEFT_ANKLE) if left else (RIGHT_HIP, RIGHT_KNEE, RIGHT_ANKLE)
+    hip, knee, ankle = (
+        (LEFT_HIP, LEFT_KNEE, LEFT_ANKLE) if left else (RIGHT_HIP, RIGHT_KNEE, RIGHT_ANKLE)
+    )
     return points[..., hip, :], points[..., knee, :], points[..., ankle, :]
+
+
+def near_arm(points: FloatArray, facing: int) -> tuple[FloatArray, FloatArray, FloatArray]:
+    """Return the shoulder, elbow and wrist of the arm nearest the camera.
+
+    The near side is chosen as it is for `near_leg`. The two arms only overlap in the picture when a
+    sculler is filmed exactly side-on. In a sweep boat, or from any other angle, they sit apart, and
+    the midpoint of the two elbows lands on the chest instead of on either arm.
+    """
+    left = facing < 0
+    shoulder, elbow, wrist = (
+        (LEFT_SHOULDER, LEFT_ELBOW, LEFT_WRIST)
+        if left
+        else (RIGHT_SHOULDER, RIGHT_ELBOW, RIGHT_WRIST)
+    )
+    return points[..., shoulder, :], points[..., elbow, :], points[..., wrist, :]

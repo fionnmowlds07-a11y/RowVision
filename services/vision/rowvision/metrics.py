@@ -81,7 +81,9 @@ def angle_series(points: FloatArray, facing: int, view_deg: float | FloatArray) 
     return AngleSeries(
         trunk_lean=lean_from_vertical(hip, shoulder, facing),
         knee=np.where(legs_believable(side_on, facing), knee, np.nan),
-        elbow=joint_angle(shoulder, sk.elbows(side_on), sk.wrists(side_on)),
+        # The elbow is read from the near arm alone, for the same reason. The midpoint of two arms that
+        # sit apart in the picture is a point on neither of them.
+        elbow=joint_angle(*sk.near_arm(side_on, facing)),
     )
 
 
