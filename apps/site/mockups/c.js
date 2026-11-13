@@ -6,6 +6,10 @@ const film = $('film'), cv = $('cv'), rig = $('rig'), fan = $('fan'), chart = $(
 film.style.height = (T + 1) * 100 + 'vh';
 const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HL = '#4be38a', PALE = '#b6f2c9';
+// Three looks to choose between, picked with ?look= in the address: black, pale or ambient. Without it, the first green one.
+const LOOK = new URLSearchParams(location.search).get('look') || 'green', light = LOOK == 'pale';
+document.documentElement.dataset.look = LOOK;
+const INK = light ? '#04140b' : '#fff', ACC = light ? '#0b7a4b' : HL, QUIET = light ? '#3d5a4a' : '#c4e4d2', MID = light ? '#6f9a82' : PALE;
 const lerp = (a, b, u) => a + (b - a) * u, win = (x, a, b, f = .3) => Math.min(seg(x, a, a + f), 1 - seg(x, b - f, b));
 
 // ---- clips: real phone footage, each with the pose RowVision's model reads from it ----
@@ -99,12 +103,12 @@ function drawChart(reveal, fold) {
   const pad = Math.max(18, Math.min(52, W * .034)), x0 = pad + 44, x1 = W - pad, y0 = H * (W > 760 ? .5 : .46), y1 = H * .9, { p, c, i0, i1, n } = CH;
   const Y = v => y1 - (v - 30) / 155 * (y1 - y0);
   g.font = '500 13px "DM Sans"'; g.textBaseline = 'middle'; g.textAlign = 'right';
-  [60, 120, 180].forEach(v => { g.strokeStyle = 'rgba(255,255,255,.12)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x0, Y(v)); g.lineTo(x1, Y(v)); g.stroke(); g.fillStyle = '#c4e4d2'; g.fillText(v + '°', x0 - 10, Y(v)); });
+  [60, 120, 180].forEach(v => { g.strokeStyle = light ? 'rgba(4,20,11,.14)' : 'rgba(255,255,255,.12)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x0, Y(v)); g.lineTo(x1, Y(v)); g.stroke(); g.fillStyle = QUIET; g.fillText(v + '°', x0 - 10, Y(v)); });
   const X = (j, k) => lerp(x0 + (j - i0) / (i1 - i0) * (x1 - x0), x0 + (j - c[k]) / (c[k + 1] - c[k]) * (x1 - x0), fold);
   const lim = i0 + reveal * (i1 - i0);
   for (let k = 0; k < n; k++) {
     const first = k == 0, last = k == n - 1;
-    g.strokeStyle = first ? '#fff' : last ? HL : PALE; g.globalAlpha = first || last ? 1 : lerp(1, .4, fold); g.lineWidth = first || last ? 3.5 : 2.5; g.lineJoin = 'round';
+    g.strokeStyle = first ? INK : last ? ACC : MID; g.globalAlpha = first || last ? 1 : lerp(1, .4, fold); g.lineWidth = first || last ? 3.5 : 2.5; g.lineJoin = 'round';
     g.beginPath(); let any = 0; for (let j = c[k]; j <= c[k + 1] && j <= lim; j++) { any++ ? g.lineTo(X(j, k), Y(p.knee[j])) : g.moveTo(X(j, k), Y(p.knee[j])); } g.stroke();
     g.fillStyle = g.strokeStyle;
     if (c[k] <= lim) { g.beginPath(); g.arc(X(c[k], k), Y(p.knee[c[k]]), 6, 0, 7); g.fill(); }
@@ -122,7 +126,7 @@ const BG = (() => {
   gl.getExtension('OES_standard_derivatives');
   const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); return o; }, pr = gl.createProgram();
   gl.attachShader(pr, sh(gl.VERTEX_SHADER, 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }'));
-  gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, `precision highp float; uniform vec2 r; uniform float t, lines; uniform vec3 a, b;
+  gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, `precision highp float; uniform vec2 r; uniform float t, lines, vig; uniform vec3 a, b;
     float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
     float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
     float fbm(vec2 p){ float s = 0., w = .5; for (int i = 0; i < 4; i++) { s += w * n(p); p = p * 2.03 + 7.1; w *= .5; } return s; }
@@ -134,21 +138,31 @@ const BG = (() => {
       vec3 c = mix(a, b, glint * .75 + uv.y * .22);
       float iso = abs(fract(f * 11.) - .5) / (fwidth(f) * 11. + 1e-4);
       c += b * (1. - smoothstep(0., 1.3, iso)) * .22 * lines;
-      c *= 1. - .55 * pow(length(uv - .5) * 1.25, 2.2);
+      c *= 1. - vig * pow(length(uv - .5) * 1.25, 2.2);
       c += (h(gl_FragCoord.xy + t) - .5) * .018;
       gl_FragColor = vec4(c, 1.); }`.replace('precision highp float;', '#extension GL_OES_standard_derivatives : enable\nprecision highp float;')));
   gl.linkProgram(pr); gl.useProgram(pr);
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
   const U = n => gl.getUniformLocation(pr, n), hex = s => [1, 3, 5].map(i => parseInt(s.slice(i, i + 2), 16) / 255);
-  const STOPS = [[0, '#06281a', '#17704a', .7], [10, '#06281a', '#17704a', .7], [11.5, '#041c13', '#0f5035', .8], [17.6, '#041c13', '#0f5035', .8], [18.6, '#010806', '#0a3323', 1], [22.8, '#010806', '#0a3323', 1], [24, '#04180f', '#11573a', .8], [26, '#0a3d27', '#22895a', .6]].map(s => [s[0], hex(s[1]), hex(s[2]), s[3]]);
+  const STOPS = ({
+    green: [[0, '#06281a', '#17704a', .7], [10, '#06281a', '#17704a', .7], [11.5, '#041c13', '#0f5035', .8], [17.6, '#041c13', '#0f5035', .8], [18.6, '#010806', '#0a3323', 1], [22.8, '#010806', '#0a3323', 1], [24, '#04180f', '#11573a', .8], [26, '#0a3d27', '#22895a', .6]],
+    // black water: almost no colour in the ground, so the footage and the green lines are the only colour on the page
+    black: [[0, '#020403', '#0d1f17', .5], [17.6, '#020403', '#0d1f17', .5], [18.6, '#000000', '#0a1812', .9], [24, '#000000', '#0a1812', .9], [26, '#030605', '#12301f', .5]],
+    // first light: pale water and dark ink
+    pale: [[0, '#dfeae2', '#f6faf6', -.2], [17.6, '#dfeae2', '#f6faf6', -.2], [18.6, '#d3e2d8', '#eef5ef', -.3], [24, '#d3e2d8', '#eef5ef', -.3], [26, '#dfeae2', '#f6faf6', -.2]],
+    ambient: [[0, '#000000', '#000000', 0], [26, '#000000', '#000000', 0]],
+  }[LOOK] || []).map(s => [s[0], hex(s[1]), hex(s[2]), s[3]]);
   return (x, time) => {
     const d = Math.min(1.5, devicePixelRatio || 1), w = Math.round(c.clientWidth * d * .6), hh = Math.round(c.clientHeight * d * .6); if (c.width != w || c.height != hh) { c.width = w; c.height = hh; gl.viewport(0, 0, w, hh); }
     let i = 0; while (i < STOPS.length - 2 && x > STOPS[i + 1][0]) i++; const s0 = STOPS[i], s1 = STOPS[i + 1], u = seg(x, s0[0], s1[0]);
-    gl.uniform2f(U('r'), w, hh); gl.uniform1f(U('t'), time); gl.uniform1f(U('lines'), lerp(s0[3], s1[3], u));
+    gl.uniform1f(U('vig'), light ? .12 : .55); gl.uniform2f(U('r'), w, hh); gl.uniform1f(U('t'), time); gl.uniform1f(U('lines'), lerp(s0[3], s1[3], u));
     gl.uniform3fv(U('a'), s0[1].map((v, k) => lerp(v, s1[1][k], u))); gl.uniform3fv(U('b'), s0[2].map((v, k) => lerp(v, s1[2][k], u)));
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   };
 })();
+
+// ambient look: the ground is the footage itself, blown up and blurred, so each clip brings its own colour
+const amb = document.getElementById('amb'), ag = amb.getContext('2d');
 
 // ---- the film ----
 const scenes = [...document.querySelectorAll('.scene')].map(el => ({ el, a: +el.dataset.a, b: +el.dataset.b }));
@@ -224,6 +238,7 @@ function frame(now) {
   const la = win(x, 23.1, 24.4), go = out(seg(x, 23.3, 24)); $('lanes').style.opacity = la;
   $('mCatch').style.left = LEAN.c * go * 2 + '%'; $('mFinish').style.left = LEAN.f * go * 2 + '%'; $('vCatch').textContent = Math.round(LEAN.c * go) + '°'; $('vFinish').textContent = Math.round(LEAN.f * go) + '°';
 
+  if (LOOK == 'ambient') ag.drawImage(cv, 0, 0, amb.width, amb.height);
   for (const c of Object.values(CLIPS)) { if (!c.want && !c.v.paused) c.v.pause(); c.want = false; }
   requestAnimationFrame(frame);
 }
