@@ -9,7 +9,7 @@ from rowvision.metrics import StrokeMetrics, angle_series
 from rowvision.pipeline import FILM_CLOSER, Analysis, BoatChoice, RowerResult
 from rowvision.reference import Target
 from rowvision.reliability import Rating
-from rowvision.scoring import ScoreCard
+from rowvision.scoring import MetricScore, ScoreCard
 from rowvision.skeleton import FloatArray
 from rowvision.timing import FollowTiming
 
@@ -60,23 +60,25 @@ def _target(target: Target | None) -> dict[str, Any] | None:
     }
 
 
+def _metric(metric: MetricScore, spread: dict[str, float]) -> dict[str, Any]:
+    return {
+        "name": metric.name,
+        "label": metric.label,
+        "phase": metric.phase.value,
+        "value": _optional(metric.value),
+        "spread": _optional(spread.get(metric.name)),
+        "target": _target(metric.target),
+        "score": _optional(metric.score),
+        "reason": metric.reason,
+    }
+
+
 def _card(card: ScoreCard, spread: dict[str, float]) -> dict[str, Any]:
     return {
         "overall": _optional(card.overall),
         "phases": {phase.value: _finite(score) for phase, score in card.phases.items()},
-        "metrics": [
-            {
-                "name": metric.name,
-                "label": metric.label,
-                "phase": metric.phase.value,
-                "value": _optional(metric.value),
-                "spread": _optional(spread.get(metric.name)),
-                "target": _target(metric.target),
-                "score": _optional(metric.score),
-                "reason": metric.reason,
-            }
-            for metric in card.metrics
-        ],
+        "metrics": [_metric(metric, spread) for metric in card.metrics],
+        "extras": [_metric(metric, spread) for metric in card.extras],
     }
 
 
@@ -147,6 +149,7 @@ def rower_json(
         "card": _card(rower.card, rower.spread),
         "rating": _rating(rower.rating),
         "evidence": _evidence(rower),
+        "fade": {name: _finite(change) for name, change in getattr(rower, "fade", {}).items()},
     }
 
 

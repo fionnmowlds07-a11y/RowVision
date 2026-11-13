@@ -17,6 +17,10 @@ MIN_SHIN_TO_THIGH, MAX_SHIN_TO_THIGH = 0.5, 1.7
 CATCH_KNEE_RANGE = (30.0, 115.0)
 FINISH_KNEE_RANGE = (130.0, 185.0)
 """What a body can do at each moment. Values outside are misplaced joints, not poor technique."""
+CATCH_ELBOW_RANGE = (130.0, 185.0)
+FINISH_ELBOW_RANGE = (20.0, 110.0)
+"""The hands are at the body at the finish, which no arm can do without bending well past a right
+angle. On small rowers the pose model often leaves the arm straight, and that is not believed."""
 MAX_STROKE_PERIODS = 1.6
 CATCH_LEAN_FRAMES_BEFORE = 3
 """The marked catch sits up to a few frames after the blade goes in, and one frame's lean is noisy,
@@ -27,6 +31,13 @@ position. Their median was steadier than one frame for the elbow on real clips. 
 body angle or the knee, which are still read on the finish frame alone."""
 
 
+MAX_LENGTH_VIEW_DEG = 45.0
+"""Stroke length is a distance along the boat, which the camera angle shrinks. From here on the
+correction is capped, so the length would read short."""
+MIN_STROKES_FOR_FADE = 6
+MIN_STROKES_PER_HALF = 3
+
+
 @dataclass(frozen=True)
 class AngleSeries:
     """Per-frame angles in degrees, corrected for camera view."""
@@ -34,6 +45,8 @@ class AngleSeries:
     trunk_lean: FloatArray
     knee: FloatArray
     elbow: FloatArray
+    reach: FloatArray | None = None
+    """How far the hands are ahead of the knees along the boat, in trunk lengths."""
 
 
 @dataclass(frozen=True)
@@ -50,6 +63,25 @@ class StrokeMetrics:
     """Share of the stroke cycle spent on the drive."""
     legs_lead: float
     """How far the legs lead the trunk off the catch, as a share of the drive. Positive is legs first."""
+    drive_s: float = float("nan")
+    recovery_s: float = float("nan")
+    ratio: float = float("nan")
+    """Recovery time over drive time. 2 means the recovery takes twice as long as the drive."""
+    body_swing_deg: float = float("nan")
+    """How far the body swings, from its forward lean at the catch to its layback at the finish."""
+    catch_elbow_deg: float = float("nan")
+    arms_break: float = float("nan")
+    """How far through the drive the arms start to bend, as a share of the drive."""
+    stroke_length: float = float("nan")
+    """How far the hands travel along the boat from catch to finish, in trunk lengths."""
+
+
+MEASURES = tuple(
+    name
+    for name, kind in StrokeMetrics.__annotations__.items()
+    if kind is float
+)
+"""Every per-stroke measure, in the order they are defined."""
 
 
 def legs_believable(side_on: FloatArray, facing: int) -> NDArray[np.bool_]:
@@ -71,7 +103,7 @@ def legs_believable(side_on: FloatArray, facing: int) -> NDArray[np.bool_]:
 
 def _within(value: float, limits: tuple[float, float]) -> float:
     """Return the value if a body could reach it, or NaN if it could not."""
-    return value if limits[0] <= value <= limits[1] else float("nan")
+    return float(value) if limits[0] <= value <= limits[1] else float("nan")
 
 
 def angle_series(points: FloatArray, facing: int, view_deg: float | FloatArray) -> AngleSeries:
@@ -88,7 +120,21 @@ def angle_series(points: FloatArray, facing: int, view_deg: float | FloatArray) 
         # The elbow is read from the near arm alone, for the same reason. The midpoint of two arms that
         # sit apart in the picture is a point on neither of them.
         elbow=joint_angle(*sk.near_arm(side_on, facing)),
+        reach=_reach(side_on, facing, view_deg),
     )
+
+
+def _reach(side_on: FloatArray, facing: int, view_deg: float | FloatArray) -> FloatArray:
+    """Return the hands' distance ahead of the knees, which stay close to fixed in the boat.
+
+    This is measured on the corrected, side-on points, unlike the signal strokes are timed from, so
+    that a length means the same from one camera angle to the next.
+    """
+    trunk = np.linalg.norm(sk.shoulders(side_on) - sk.hips(side_on), axis=-1)
+    scale = np.nanmedian(trunk) if np.isfinite(trunk).any() else np.nan
+    with np.errstate(invalid="ignore"):
+        reach = (sk.wrists(side_on)[:, 0] - sk.knees(side_on)[:, 0]) * facing / scale
+    return np.where(np.abs(np.asarray(view_deg, dtype=float)) < MAX_LENGTH_VIEW_DEG, reach, np.nan)
 
 
 def _onset(values: FloatArray) -> int | None:
@@ -134,8 +180,24 @@ def _finish_elbow(values: FloatArray, finish: int) -> float:
     return float(np.nanmedian(window))
 
 
-def per_stroke(angles: AngleSeries, timeline: StrokeTimeline) -> list[StrokeMetrics]:
-    """Measure each complete stroke: a catch, the finish after it, and the next catch."""
+def _arms_break(elbow: FloatArray, catch: int, finish: int) -> float:
+    bend = _onset(elbow[catch : finish + 1])
+    return float("nan") if bend is None else bend / (finish - catch)
+
+
+def _stroke_length(reach: FloatArray | None, catch: int, finish: int) -> float:
+    if reach is None:
+        return float("nan")
+    return _catch_lean(reach, catch) - _finish_elbow(reach, finish)
+
+
+def per_stroke(
+    angles: AngleSeries, timeline: StrokeTimeline, fps: float = float("nan")
+) -> list[StrokeMetrics]:
+    """Measure each complete stroke: a catch, the finish after it, and the next catch.
+
+    Without a frame rate the times in seconds are left out.
+    """
     results = []
     for catch, next_catch in zip(timeline.catches, timeline.catches[1:]):
         finishes = [frame for frame in timeline.finishes if catch < frame < next_catch]
@@ -143,18 +205,60 @@ def per_stroke(angles: AngleSeries, timeline: StrokeTimeline) -> list[StrokeMetr
         if not finishes or too_long:
             continue
         finish = finishes[0]
+        catch_lean = _catch_lean(angles.trunk_lean, catch)
+        finish_lean = float(angles.trunk_lean[finish])
+        catch_elbow = _within(_catch_lean(angles.elbow, catch), CATCH_ELBOW_RANGE)
+        finish_elbow = _within(_finish_elbow(angles.elbow, finish), FINISH_ELBOW_RANGE)
+        arms_seen = np.isfinite(catch_elbow) and np.isfinite(finish_elbow)
         results.append(
             StrokeMetrics(
                 catch_frame=catch,
                 finish_frame=finish,
                 next_catch_frame=next_catch,
-                catch_lean_deg=_catch_lean(angles.trunk_lean, catch),
-                finish_lean_deg=float(angles.trunk_lean[finish]),
+                catch_lean_deg=catch_lean,
+                finish_lean_deg=finish_lean,
                 catch_knee_deg=_catch_knee(angles.knee, catch),
                 finish_knee_deg=_within(float(angles.knee[finish]), FINISH_KNEE_RANGE),
-                finish_elbow_deg=_finish_elbow(angles.elbow, finish),
+                finish_elbow_deg=finish_elbow,
                 drive_share=(finish - catch) / (next_catch - catch),
                 legs_lead=_legs_lead(angles, catch, finish),
+                drive_s=(finish - catch) / fps,
+                recovery_s=(next_catch - finish) / fps,
+                ratio=(next_catch - finish) / (finish - catch),
+                body_swing_deg=catch_lean - finish_lean,
+                catch_elbow_deg=catch_elbow,
+                arms_break=_arms_break(angles.elbow, catch, finish) if arms_seen else float("nan"),
+                stroke_length=_stroke_length(angles.reach, catch, finish),
             )
         )
     return results
+
+
+def rate_steadiness(strokes: list[StrokeMetrics]) -> float:
+    """Return how much the time for one stroke varies, as a percentage of the usual time.
+
+    Needs three strokes, as two cannot show a spread.
+    """
+    lengths = np.array([stroke.next_catch_frame - stroke.catch_frame for stroke in strokes], dtype=float)
+    if len(lengths) < MIN_STROKES_PER_HALF:
+        return float("nan")
+    return float(100 * np.std(lengths, ddof=1) / np.mean(lengths))
+
+
+def fade(strokes: list[StrokeMetrics]) -> dict[str, float]:
+    """Return how each measure changes from the first half of the clip to the second.
+
+    Each figure is the second half's median minus the first half's. A short clip gives none, as a
+    half needs enough strokes for its median to mean something.
+    """
+    if len(strokes) < MIN_STROKES_FOR_FADE:
+        return {}
+    middle = len(strokes) // 2
+    changes: dict[str, float] = {}
+    for name in MEASURES:
+        early = np.array([getattr(stroke, name) for stroke in strokes[:middle]], dtype=float)
+        late = np.array([getattr(stroke, name) for stroke in strokes[middle:]], dtype=float)
+        early, late = early[np.isfinite(early)], late[np.isfinite(late)]
+        if min(len(early), len(late)) >= MIN_STROKES_PER_HALF:
+            changes[name] = float(np.median(late) - np.median(early))
+    return changes

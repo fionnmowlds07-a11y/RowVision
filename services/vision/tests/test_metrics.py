@@ -1,8 +1,18 @@
+from itertools import pairwise
+
 import numpy as np
 import pytest
 
 from rowvision import skeleton as sk
-from rowvision.metrics import AngleSeries, angle_series, legs_believable, per_stroke
+from rowvision.metrics import (
+    AngleSeries,
+    StrokeMetrics,
+    angle_series,
+    fade,
+    legs_believable,
+    per_stroke,
+    rate_steadiness,
+)
 from rowvision.strokes import StrokeTimeline, detect_strokes, reach_signal
 from rowvision.synthetic import SyntheticClip, generate
 
@@ -224,3 +234,97 @@ def test_the_finish_elbow_ignores_missing_frames() -> None:
     assert per_stroke(angles, TIMELINE)[0].finish_elbow_deg == pytest.approx(70.0)
     gone = joint_series("elbow", dict.fromkeys(range(58, 63), np.nan), rest=60.0)
     assert np.isnan(per_stroke(gone, TIMELINE)[0].finish_elbow_deg)
+
+
+def test_times_and_ratio_come_from_the_frame_rate() -> None:
+    angles = joint_series("knee", {}, rest=90.0)
+    stroke = per_stroke(angles, TIMELINE, 30.0)[0]
+    assert stroke.drive_s == pytest.approx(1.0)
+    assert stroke.recovery_s == pytest.approx(1.0)
+    assert stroke.ratio == pytest.approx(1.0)
+    uneven = per_stroke(angles, StrokeTimeline([30, 90], [50], 30.0, 1.0, 60.0), 30.0)[0]
+    assert uneven.ratio == pytest.approx(2.0)
+    assert np.isnan(per_stroke(angles, TIMELINE)[0].drive_s)
+
+
+def test_new_measures_match_the_generated_rower() -> None:
+    clip = generate(strokes=6)
+    strokes = per_stroke(angle_series(clip.points, clip.facing, 0), true_timeline(clip), clip.fps)
+    assert len(strokes) >= 4
+    for stroke in strokes:
+        swing = clip.trunk_lean_deg[stroke.catch_frame] - clip.trunk_lean_deg[stroke.finish_frame]
+        assert stroke.body_swing_deg == pytest.approx(swing, abs=3)
+        assert stroke.catch_elbow_deg > 150
+        assert stroke.finish_elbow_deg < stroke.catch_elbow_deg
+        assert 0 < stroke.arms_break < 1
+        assert stroke.stroke_length > 0.5
+        assert stroke.drive_s + stroke.recovery_s == pytest.approx(60 / clip.rate_spm, abs=0.1)
+
+
+def test_stroke_length_is_the_same_from_an_angle() -> None:
+    def length(view: float) -> float:
+        clip = generate(strokes=5, view_deg=view)
+        strokes = per_stroke(angle_series(clip.points, clip.facing, view), true_timeline(clip), clip.fps)
+        return float(np.median([stroke.stroke_length for stroke in strokes]))
+
+    assert length(30) == pytest.approx(length(0), rel=0.05)
+
+
+def test_stroke_length_is_not_given_far_from_side_on() -> None:
+    clip = generate(strokes=5, view_deg=50)
+    strokes = per_stroke(angle_series(clip.points, clip.facing, 50), true_timeline(clip), clip.fps)
+    assert all(np.isnan(stroke.stroke_length) for stroke in strokes)
+    assert all(np.isfinite(stroke.body_swing_deg) for stroke in strokes)
+
+
+def test_arms_that_bend_late_read_later_than_arms_that_bend_early() -> None:
+    late = np.concatenate([np.full(40, 170.0), np.linspace(170, 60, 21), np.full(59, 170.0)])
+    early = np.concatenate([np.full(30, 170.0), np.linspace(170, 60, 11), np.full(20, 60.0), np.full(59, 170.0)])
+    flat = np.full(120, 20.0)
+    read = [
+        per_stroke(AngleSeries(flat, flat, elbow), TIMELINE)[0].arms_break for elbow in (early, late)
+    ]
+    assert read[0] < 0.2
+    assert read[1] > 0.4
+
+
+def strokes_lasting(frames: list[int]) -> list[StrokeMetrics]:
+    nan = float("nan")
+    starts = np.concatenate([[0], np.cumsum(frames)])
+    return [
+        StrokeMetrics(int(a), int(a) + 10, int(b), 20.0 + index, -20.0, nan, nan, nan, 0.4, nan)
+        for index, (a, b) in enumerate(pairwise(starts))
+    ]
+
+
+def test_rate_steadiness_is_zero_for_even_strokes_and_grows_with_uneven_ones() -> None:
+    assert rate_steadiness(strokes_lasting([60, 60, 60, 60])) == pytest.approx(0)
+    assert rate_steadiness(strokes_lasting([54, 66, 54, 66])) == pytest.approx(11.5, abs=0.1)
+    assert np.isnan(rate_steadiness(strokes_lasting([60, 60])))
+
+
+def test_fade_is_the_change_from_the_first_half_to_the_second() -> None:
+    changes = fade(strokes_lasting([60] * 6))
+    assert changes["catch_lean_deg"] == pytest.approx(3.0)
+    assert changes["finish_lean_deg"] == pytest.approx(0.0)
+    assert "catch_knee_deg" not in changes
+
+
+def test_a_short_clip_gives_no_fade() -> None:
+    assert fade(strokes_lasting([60] * 5)) == {}
+
+
+def test_a_straight_arm_at_the_finish_is_not_believed() -> None:
+    angles = joint_series("elbow", {}, rest=150.0)
+    stroke = per_stroke(angles, TIMELINE)[0]
+    assert np.isnan(stroke.finish_elbow_deg)
+    assert stroke.catch_elbow_deg == pytest.approx(150.0)
+    assert np.isnan(stroke.arms_break)
+
+
+def test_an_arm_folded_at_the_catch_is_not_believed() -> None:
+    angles = joint_series("elbow", {}, rest=60.0)
+    stroke = per_stroke(angles, TIMELINE)[0]
+    assert np.isnan(stroke.catch_elbow_deg)
+    assert stroke.finish_elbow_deg == pytest.approx(60.0)
+    assert np.isnan(stroke.arms_break)
