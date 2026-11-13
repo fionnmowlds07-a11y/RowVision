@@ -82,3 +82,19 @@ Touch targets are at least 44px.
 ## Icons
 
 Inline SVG, 2.5px rounded stroke, drawn in one set.
+
+## Marketing site
+
+`apps/site` is a Persuade surface and has its own look, chosen by the owner from mock-ups on 2026-11-13. It shares the app's type and highlight green, and nothing else is assumed to carry over.
+
+**World: black water.** A near-black ground (`#020403`) with slow bands of light and fine chart lines moving across it like water before sunrise. Real phone footage is the only colour on the page, and green (`#4be38a`) is kept for what RowVision draws: joints, angle arcs, chart lines and the primary action. The ground goes fully black behind the data stages.
+
+**The film.** The home page is one pinned stage driven by scroll. Footage sits in a phone-shaped frame, pushes in to fill the window, is picked apart into joints and angles, and tips back into depth. Scrolling is always the browser's own. Reduced motion and no-script visitors get the same words as an ordinary page.
+
+**Type.** Bricolage Grotesque 800 for headings, up to 210px for the single words Legs, Back and Arms. DM Sans for everything else.
+
+**Rules.**
+- Every number on screen is measured from the clip on screen. No invented scores, results or quotes.
+- Catches are round marks and finishes are square, as in the app.
+- Cautions use the app's caution colours (`#fff1d6` on `#6b4700`).
+- Footage never goes in the repository, and no clip goes public without the owner's say.
