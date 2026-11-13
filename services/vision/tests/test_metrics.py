@@ -186,3 +186,41 @@ def test_catch_lean_ignores_missing_frames() -> None:
     angles = lean_series({27: np.nan, 28: np.nan, 29: 25.0, 30: 25.0})
     strokes = per_stroke(angles, StrokeTimeline([30, 90], [60], 30.0, 1.0, 60.0))
     assert strokes[0].catch_lean_deg == pytest.approx(25.0)
+
+
+TIMELINE = StrokeTimeline([30, 90], [60], 30.0, 1.0, 60.0)
+
+
+def joint_series(name: str, values: dict[int, float], rest: float, frames: int = 120) -> AngleSeries:
+    series = np.full(frames, rest)
+    for frame, value in values.items():
+        series[frame] = value
+    flat = np.full(frames, 20.0)
+    return AngleSeries(**{"trunk_lean": flat, "knee": flat, "elbow": flat, name: series})
+
+
+def test_the_catch_knee_is_the_most_bent_in_the_run_up() -> None:
+    angles = joint_series("knee", {27: 70.0, 28: 55.0, 29: 58.0, 30: 64.0}, rest=120.0)
+    assert per_stroke(angles, TIMELINE)[0].catch_knee_deg == pytest.approx(55.0)
+
+
+def test_the_catch_knee_looks_no_further_back_than_the_run_up() -> None:
+    angles = joint_series("knee", {26: 40.0, 30: 64.0}, rest=100.0)
+    assert per_stroke(angles, TIMELINE)[0].catch_knee_deg == pytest.approx(64.0)
+
+
+def test_an_impossible_knee_in_the_run_up_is_not_taken_as_the_catch_knee() -> None:
+    angles = joint_series("knee", {28: 5.0, 29: np.nan, 30: 64.0}, rest=100.0)
+    assert per_stroke(angles, TIMELINE)[0].catch_knee_deg == pytest.approx(64.0)
+
+
+def test_one_bad_frame_at_the_finish_does_not_set_the_elbow() -> None:
+    angles = joint_series("elbow", {60: 170.0}, rest=60.0)
+    assert per_stroke(angles, TIMELINE)[0].finish_elbow_deg == pytest.approx(60.0)
+
+
+def test_the_finish_elbow_ignores_missing_frames() -> None:
+    angles = joint_series("elbow", {58: np.nan, 59: np.nan, 60: 70.0, 61: np.nan, 62: np.nan}, rest=60.0)
+    assert per_stroke(angles, TIMELINE)[0].finish_elbow_deg == pytest.approx(70.0)
+    gone = joint_series("elbow", dict.fromkeys(range(58, 63), np.nan), rest=60.0)
+    assert np.isnan(per_stroke(gone, TIMELINE)[0].finish_elbow_deg)
