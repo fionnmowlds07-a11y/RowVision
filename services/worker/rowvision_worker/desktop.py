@@ -3,6 +3,9 @@
 The app starts this program with the path of a job file. Everything is kept in the clip's own
 folder, so nothing here touches the database or storage. Progress goes to stdout as one JSON
 object per line. Sending "cancel", or closing stdin, stops the analysis at the next frame.
+
+`--remeasure FOLDER` measures a finished clip again from its saved joints, and `--version` says
+which version of the measuring code this is.
 """
 
 import argparse
@@ -17,12 +20,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TextIO
 
+from rowvision.remeasure import NoSkeleton, remeasure
+from rowvision.version import code_version
+
 from rowvision_worker import media, models
 from rowvision_worker.engine import Cancelled, Done, Engine, NeedsTap, Setup, Tap, Video, make_engine
 from rowvision_worker.results import headline, split_report
 
 FAILED_MESSAGE = "We couldn't analyse this clip. Try another clip, or send it to us."
 MODELS_FAILED_MESSAGE = "We couldn't get the measuring models. Check your internet connection and try again."
+NO_SKELETON_MESSAGE = (
+    "This clip can't be measured again, as its video was removed. Its scores are unchanged."
+)
 PROGRESS_STEP = 0.01
 """Smallest change in progress worth telling the app about."""
 BELOW_NORMAL_PRIORITY = 0x00004000
@@ -142,6 +151,24 @@ def save(folder: Path, done: Done, send: Send) -> None:
     send({"event": "done", "version": done.version, "accuracy": accuracy, "band": band, "overall": overall})
 
 
+def measure_again(folder: Path, send: Send) -> int:
+    """Measure a finished clip again from its saved joints, which takes seconds, not minutes."""
+    try:
+        summary = json.loads((folder / "summary.json").read_text())
+        saved = folder / "frames.json"
+        frames = json.loads(saved.read_text()) if saved.exists() else {}
+        report = remeasure(summary, frames)
+    except NoSkeleton:
+        send({"event": "failed", "message": NO_SKELETON_MESSAGE})
+        return FAILED
+    except Exception:  # noqa: BLE001 - the app needs a message, not a traceback
+        log.exception("could not measure again")
+        send({"event": "failed", "message": FAILED_MESSAGE})
+        return FAILED
+    save(folder, Done(report, code_version()), send)
+    return FINISHED
+
+
 def watch_input(stream: TextIO, stop: threading.Event) -> None:
     """Stop on "cancel", or when the app goes away and stdin closes."""
     for line in stream:
@@ -195,6 +222,12 @@ def main(argv: list[str] | None = None) -> int:
     if arguments_given[:1] == ["--models"]:
         logging.basicConfig(level=logging.INFO, stream=sys.stderr)
         return models_main(arguments_given[1:])
+    if arguments_given[:1] == ["--version"]:
+        send_line({"event": "version", "version": code_version()})
+        return FINISHED
+    if arguments_given[:1] == ["--remeasure"] and len(arguments_given) == 2:
+        logging.basicConfig(level=logging.INFO, stream=sys.stderr)
+        return measure_again(Path(arguments_given[1]), send_line)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("job", type=Path, help="Path of the job file")
     arguments = parser.parse_args(argv)

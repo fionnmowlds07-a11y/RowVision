@@ -6,7 +6,7 @@ from pathlib import Path
 
 import rowvision
 
-RESULT_VERSION = 3
+RESULT_VERSION = 4
 """Raise this when the saved JSON changes shape."""
 
 
