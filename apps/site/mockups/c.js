@@ -34,14 +34,20 @@ function arc(g, c, p, q, r, label, a, fs) {
 }
 function draw(c, clip, o) {
   const g = c.getContext('2d'), W = c.width, H = c.height, v = clip.v, pose = clip.pose, z = o.zoom || 1; let ox = 0, oy = 0, b = null, t = 0;
+  const src = o.img || v;
+  if (!o.img && v.readyState < 2 && o.clear !== false) return;      // not ready: hold the last picture, never flash black
   if (pose) {
-    t = Math.min(pose.N - 1.001, v.currentTime * pose.hz); b = pose.frame(t);
+    t = Math.min(pose.N - 1.001, o.t ?? v.currentTime * pose.hz); b = pose.frame(t);
     const k = Math.min(1, (z - 1) * 1.2), fx = W / 2 + ((b.hp[0] + b.sh[0]) / 2 * W - W / 2) * k, fy = H / 2 + (((b.sh[1] + b.an[1]) / 2 - .03) * H - H / 2) * k;
     ox = Math.max(W - W * z, Math.min(0, W / 2 - fx * z)); oy = Math.max(H - H * z, Math.min(0, H / 2 - fy * z));
   }
   if (o.clear !== false) { g.fillStyle = '#000'; g.fillRect(0, 0, W, H); }
   const al = o.alpha ?? 1;
-  if (al > 0 && v.readyState >= 2) { g.globalAlpha = al; g.filter = (o.sat ?? 1) < 1 || (o.bright ?? 1) < 1 ? `saturate(${o.sat ?? 1}) brightness(${o.bright ?? 1})` : 'none'; g.imageSmoothingQuality = 'high'; g.drawImage(v, ox, oy, W * z, H * z); g.filter = 'none'; g.globalAlpha = 1; }
+  if (al > 0 && (o.img || v.readyState >= 2)) {
+    g.globalAlpha = al; g.filter = (o.sat ?? 1) < 1 || (o.bright ?? 1) < 1 ? `saturate(${o.sat ?? 1}) brightness(${o.bright ?? 1})` : 'none'; g.imageSmoothingQuality = 'high'; g.drawImage(src, ox, oy, W * z, H * z);
+    if (o.img2 && o.mix > 0) { g.globalAlpha = al * o.mix; g.drawImage(o.img2, ox, oy, W * z, H * z); }      // blend towards the next frame, so scrubbing glides
+    g.filter = 'none'; g.globalAlpha = 1;
+  }
   if (!b) return;
   const P = p => [ox + p[0] * W * z, oy + p[1] * H * z], J = Object.fromEntries(['sh', 'el', 'wr', 'hp', 'kn', 'an', 'hd'].map(k => [k, P(b[k])]));
   const bl = Math.hypot(J.sh[0] - J.hp[0], J.sh[1] - J.hp[1]), mid = [(J.sh[0] + J.hp[0] + J.kn[0]) / 3, (J.sh[1] + J.hp[1] + J.kn[1]) / 3];
@@ -149,25 +155,42 @@ const scenes = [...document.querySelectorAll('.scene')].map(el => ({ el, a: +el.
 const cards = [...document.querySelectorAll('.card')].map(el => ({ el, c: el.querySelector('canvas'), clip: CLIPS[el.dataset.clip] }));
 const l1 = document.querySelector('.l1'), l2 = document.querySelector('.l2'), lede = document.querySelector('.lede');
 const stroke = (() => { const c = D.pose.catches, k = Math.max(0, Math.floor(c.length / 2) - 1); return [c[k], c[k + 1] ?? c[k] + 60]; })();
-let clock = 0, last = performance.now();
+// The stroke you scrub through is decoded once into still frames, so scrolling never waits on the video to seek.
+const SCRUB = { frames: [], n: stroke[1] - stroke[0] + 1, cur: 0, on: false, fade: 0, snap: document.createElement('canvas') };
+SCRUB.snap.width = cv.width; SCRUB.snap.height = cv.height;
+(async () => {
+  const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = D.v.src;
+  await new Promise(r => v.addEventListener('loadeddata', r, { once: true }));
+  for (let k = 0; k < SCRUB.n; k++) { v.currentTime = (stroke[0] + k + .5) / D.pose.hz; await new Promise(r => v.addEventListener('seeked', r, { once: true })); SCRUB.frames[k] = await createImageBitmap(v); }
+  document.documentElement.dataset.scrub = '1';
+})();
+const got = k => { for (let d = 0; d < SCRUB.n; d++) { if (SCRUB.frames[k - d]) return SCRUB.frames[k - d]; if (SCRUB.frames[k + d]) return SCRUB.frames[k + d]; } return null; };
+let clock = 0, last = performance.now(), xs = null;
 
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now; if (!still) clock += dt;
-  const x = progress(film) * T, W = innerWidth, H = innerHeight, small = W <= 760, vw = W / 100, vh = H / 100;
+  const xr = progress(film) * T; xs = still || xs == null ? xr : xs + (xr - xs) * Math.min(1, dt * 9);      // glide to where the scroll is, so a wheel click is not a jump
+  const x = Math.abs(xr - xs) < .0005 ? xr : xs, W = innerWidth, H = innerHeight, small = W <= 760, vw = W / 100, vh = H / 100;
   BG?.(x, clock);
 
   // what the main screen shows
   const scrub = x >= 6.3 && x < 10.5, dz = ease(seg(x, 4.6, 6)) - ease(seg(x, 10.5, 11.3)), grade = seg(x, 4.8, 5.6) - seg(x, 10.5, 11.2);
   const m = ease(seg(x, 10.7, 11.8)) - ease(seg(x, 13.6, 14.5));
-  if (x < 14.5) draw(cv, use('pair', scrub ? lerp(stroke[0], stroke[1], seg(x, 6.3, 10.5)) / D.pose.hz : null), {
+  const sf = seg(x, 6.3, 10.5) * (SCRUB.n - 1), s0 = Math.min(SCRUB.n - 1, Math.floor(sf)), simg = scrub ? got(s0) : null;
+  if (scrub && !SCRUB.on) { SCRUB.snap.getContext('2d').drawImage(cv, 0, 0); SCRUB.fade = 1; }      // going in: keep the last moving frame to dissolve from
+  SCRUB.on = scrub; SCRUB.fade = Math.max(0, SCRUB.fade - dt * 3.5);
+  const poseT = scrub ? stroke[0] + sf : null;
+  if (x < 14.5) draw(cv, use('pair', scrub ? (x < 8.4 ? stroke[0] : stroke[1]) / D.pose.hz : null), {
+    img: simg, img2: simg && got(Math.min(SCRUB.n - 1, s0 + 1)), mix: sf - s0, t: simg ? poseT : undefined,
     zoom: 1 + dz * (small ? 2.6 : 1.5) + m * .8, bright: 1 - .4 * grade, sat: 1 - .55 * grade, ring: seg(x, 3.5, 3.95), box: Math.min(seg(x, 3.85, 4.1), 1 - seg(x, 4.8, 5.1)), spot: Math.min(seg(x, 3.6, 4.2), 1 - seg(x, 5, 5.6)) * .6,
     skel: seg(x, 4.9, 5.8), arcs: { knee: win(x, 6.4, 7.8), back: win(x, 7.9, 9.3), elbow: win(x, 9.4, 10.6) },
   });
+  if (scrub && SCRUB.fade > 0) { const g = cv.getContext('2d'); g.globalAlpha = SCRUB.fade; g.drawImage(SCRUB.snap, 0, 0); g.globalAlpha = 1; }
   if (x > 13.9 && x < 16.5) draw(cv, use('astern'), { alpha: seg(x, 13.9, 14.4), clear: false });
   if (x > 16 && x < 18) draw(cv, use('far'), { alpha: seg(x, 16, 16.4), clear: false });
   if (x > 17.4 && x < 21) draw(cv, use('a'), { alpha: seg(x, 17.4, 17.9) * (1 - seg(x, 18, 18.7)), clear: x > 17.9, zoom: 1 + ease(seg(x, 17.6, 18.6)) * (small ? 2.6 : 1.8), skel: Math.min(seg(x, 17.8, 18.4), 1 - seg(x, 18.7, 19.1)), sat: 1 - seg(x, 17.9, 18.4) * .6 });
   if (x >= 21) draw(cv, use('pair'), { skel: 1, zoom: 1.7 });
-  const i = Math.min(D.pose.N - 1, Math.round(D.v.currentTime * D.pose.hz));
+  const i = Math.min(D.pose.N - 1, Math.round(poseT ?? D.v.currentTime * D.pose.hz));
   $('nKnee').textContent = Math.round(D.pose.knee[i]) + '°'; $('nBack').textContent = Math.abs(Math.round(D.pose.back[i])) + '°'; $('nElbow').textContent = Math.round(D.pose.elbow[i]) + '°';
 
   // where the main screen is: phone, full window, one of four, tipped back, phone again
