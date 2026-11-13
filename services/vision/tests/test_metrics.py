@@ -113,6 +113,28 @@ def test_the_near_leg_is_the_one_the_rower_faces_away_from() -> None:
     assert sk.near_leg(points, -1)[1][0, 0] == 1
 
 
+def test_the_far_arm_does_not_move_the_elbow_angle() -> None:
+    clip = generate()
+    near, far = (sk.RIGHT_ELBOW, sk.LEFT_ELBOW) if clip.facing > 0 else (sk.LEFT_ELBOW, sk.RIGHT_ELBOW)
+    trunk = np.linalg.norm(sk.shoulders(clip.points) - sk.hips(clip.points), axis=-1)
+    steady = angle_series(clip.points, clip.facing, 0).elbow
+    apart = clip.points.copy()
+    apart[40:60, far, 0] += 0.4 * trunk[40:60]  # as in a sweep boat, where the arms sit apart
+    assert np.allclose(angle_series(apart, clip.facing, 0).elbow, steady, equal_nan=True)
+    # The same shift of the near elbow does change it.
+    apart = clip.points.copy()
+    apart[40:60, near, 0] += 0.4 * trunk[40:60]
+    assert not np.allclose(angle_series(apart, clip.facing, 0).elbow, steady, equal_nan=True)
+
+
+def test_the_near_arm_is_on_the_same_side_as_the_near_leg() -> None:
+    points = np.zeros((1, 17, 2))
+    points[0, sk.LEFT_ELBOW] = (1, 1)
+    points[0, sk.RIGHT_ELBOW] = (2, 2)
+    assert sk.near_arm(points, 1)[1][0, 0] == 2  # facing right shows the right side
+    assert sk.near_arm(points, -1)[1][0, 0] == 1
+
+
 def test_an_impossible_leg_gives_no_knee_angle() -> None:
     clip = generate()
     points = misplaced_ankle(clip, slice(40, 60))
