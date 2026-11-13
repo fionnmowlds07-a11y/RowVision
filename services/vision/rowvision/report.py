@@ -103,6 +103,18 @@ def _timing(timing: FollowTiming | None) -> dict[str, Any] | None:
     }
 
 
+def _evidence(rower: RowerResult) -> dict[str, Any] | None:
+    """Return what cannot be worked out again from the joints alone."""
+    evidence = getattr(rower, "evidence", None)
+    if evidence is None:
+        return None
+    return {
+        "trunk_px": _finite(evidence.trunk_px),
+        "coverage": _finite(evidence.coverage),
+        "agreement": _optional(evidence.crew_agreement),
+    }
+
+
 def _series(values: FloatArray) -> list[float | None]:
     return [round(float(value), 1) if np.isfinite(value) else None for value in values]
 
@@ -114,7 +126,7 @@ def _stroke(stroke: StrokeMetrics) -> dict[str, Any]:
     }
 
 
-def _rower(
+def rower_json(
     rower: RowerResult, frames: int, facing: int, view_deg: float | FloatArray
 ) -> dict[str, Any]:
     catches, finishes = stroke_markers(rower.strokes, frames)
@@ -134,13 +146,14 @@ def _rower(
         "timing": _timing(rower.timing),
         "card": _card(rower.card, rower.spread),
         "rating": _rating(rower.rating),
+        "evidence": _evidence(rower),
     }
 
 
 def analysis_json(analysis: Analysis) -> dict[str, Any]:
     views = analysis.frame_views
     rower = (
-        _rower(
+        rower_json(
             analysis.rowers[0],
             analysis.frames,
             analysis.facing,

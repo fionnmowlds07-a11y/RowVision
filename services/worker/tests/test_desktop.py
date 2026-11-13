@@ -162,3 +162,47 @@ def test_a_bad_job_file_fails_cleanly(text: str, tmp_path: Path, capsys: pytest.
 def test_every_line_sent_is_json(capsys: pytest.CaptureFixture[str]) -> None:
     desktop.send_line({"event": "stage", "stage": "Finding boats", "progress": 0.5})
     assert json.loads(capsys.readouterr().out)["progress"] == 0.5
+
+
+def finished(folder: Path, copies: list[Path]) -> None:
+    desktop.run(job_in(folder), FakeEngine(), lambda event: None, lambda: False)
+
+
+def test_measuring_again_rewrites_the_result_with_the_current_version(
+    tmp_path: Path, copies: list[Path]
+) -> None:
+    finished(tmp_path, copies)
+    events: list[dict[str, Any]] = []
+    assert desktop.measure_again(tmp_path, events.append) == desktop.FINISHED
+    summary = json.loads((tmp_path / "summary.json").read_text())
+    assert summary["version"] == desktop.code_version() != "fake"
+    assert summary["rower"]["catches"] == [30, 112, 194]
+    assert "poses" not in summary["rower"]
+    assert len(json.loads((tmp_path / "frames.json").read_text())["poses"]) == 240
+    assert events == [{"event": "done", "version": summary["version"], "accuracy": 76.0, "band": "Good", "overall": None}]
+
+
+def test_a_clip_with_its_video_removed_cannot_be_measured_again(tmp_path: Path, copies: list[Path]) -> None:
+    finished(tmp_path, copies)
+    (tmp_path / "frames.json").unlink()
+    before = (tmp_path / "summary.json").read_text()
+    events: list[dict[str, Any]] = []
+    assert desktop.measure_again(tmp_path, events.append) == desktop.FAILED
+    assert events == [{"event": "failed", "message": desktop.NO_SKELETON_MESSAGE}]
+    assert (tmp_path / "summary.json").read_text() == before
+
+
+def test_measuring_again_with_no_result_fails_cleanly(tmp_path: Path) -> None:
+    events: list[dict[str, Any]] = []
+    assert desktop.measure_again(tmp_path, events.append) == desktop.FAILED
+    assert events == [{"event": "failed", "message": desktop.FAILED_MESSAGE}]
+
+
+def test_the_program_measures_again_and_tells_its_version(
+    tmp_path: Path, copies: list[Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    finished(tmp_path, copies)
+    assert desktop.main(["--version"]) == desktop.FINISHED
+    assert json.loads(capsys.readouterr().out) == {"event": "version", "version": desktop.code_version()}
+    assert desktop.main(["--remeasure", str(tmp_path)]) == desktop.FINISHED
+    assert json.loads(capsys.readouterr().out)["event"] == "done"
