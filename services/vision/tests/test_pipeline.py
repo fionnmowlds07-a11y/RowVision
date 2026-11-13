@@ -289,3 +289,26 @@ def test_an_analysis_keeps_the_view_for_every_frame() -> None:
     assert result.frame_views is not None
     assert len(result.frame_views) == result.frames
     assert np.isfinite(result.frame_views).all()
+
+
+def frames_read(request: Request) -> list[int]:
+    backend = FakeBackend(4)
+    reads: list[int] = []
+
+    def read(index: int) -> int:
+        reads.append(index)
+        return index
+
+    analyse(read, len(backend.points), FPS, request, backend)
+    return reads
+
+
+def test_a_rower_and_the_rower_they_follow_are_read_in_one_pass() -> None:
+    alone = frames_read(Request(boat_seats=4, seat=4))
+    following = frames_read(Request(boat_seats=4, seat=2, side="stroke"))
+    assert len(following) == len(alone)
+
+
+def test_a_whole_crew_is_read_in_one_pass() -> None:
+    alone = frames_read(Request(boat_seats=4, seat=4))
+    assert len(frames_read(Request(boat_seats=4, scope=Scope.CREW))) == len(alone)
