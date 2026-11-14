@@ -99,10 +99,32 @@ export function overallGap(strokes: number, phases: Record<string, unknown>, min
 
 const isShare = (name: string) => name === "drive_share" || name === "legs_lead";
 
+const isSeconds = (name: string) => name === "drive_s" || name === "recovery_s";
+
 export function formatValue(name: string, value: number | null | undefined) {
   if (value === null || value === undefined) return "not measured";
   if (isShare(name)) return `${Math.round(value * 100)}%`;
+  if (isSeconds(name)) return `${value.toFixed(2)} s`;
+  if (name === "ratio") return `${value.toFixed(1)} to 1`;
+  if (name === "rate_steadiness") return `within ${Math.max(Math.round(value), 1)}%`;
+  if (name === "arms_break") return `${Math.round(value * 100)}% through the drive`;
+  if (name === "stroke_length") return `${value.toFixed(1)} trunk lengths`;
   return `${Math.round(Math.abs(value))}°${leanWord(name, value)}`;
+}
+
+/** A change in a measure between two halves of a clip or two clips, in the measure's own units. */
+export function formatChange(name: string, change: number | null | undefined) {
+  if (change === null || change === undefined) return "not measured";
+  const size = Math.abs(change);
+  const word = change > 0 ? "more" : "less";
+  if (isSeconds(name)) return size < 0.005 ? "same" : `${size.toFixed(2)} s ${word}`;
+  if (name === "ratio" || name === "stroke_length") return size < 0.05 ? "same" : `${size.toFixed(1)} ${word}`;
+  if (isShare(name) || name === "arms_break") return Math.round(size * 100) === 0 ? "same" : `${Math.round(size * 100)}% ${word}`;
+  if (name === "rate_steadiness") return Math.round(size) === 0 ? "same" : `${Math.round(size)}% ${word}`;
+  // Layback is stored as a negative lean, so a bigger layback is a smaller number.
+  const degrees = Math.round(size);
+  if (degrees === 0) return "same";
+  return `${degrees}° ${name === "finish_lean_deg" ? (change < 0 ? "more" : "less") : word}`;
 }
 
 function leanWord(name: string, value: number) {

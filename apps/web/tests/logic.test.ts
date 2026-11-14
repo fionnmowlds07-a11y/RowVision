@@ -14,6 +14,7 @@ import {
   clampView,
   clipTime,
   evidenceFrames,
+  formatChange,
   formatTarget,
   formatValue,
   labelSpot,
@@ -117,6 +118,35 @@ test("values read in rowing terms", () => {
   assert.equal(formatValue("catch_knee_deg", 50.2), "50°");
   assert.equal(formatValue("drive_share", 0.42), "42%");
   assert.equal(formatValue("catch_knee_deg", null), "not measured");
+});
+
+test("the shown-only measures read in their own units", () => {
+  assert.equal(formatValue("drive_s", 1.112), "1.11 s");
+  assert.equal(formatValue("ratio", 1.42), "1.4 to 1");
+  assert.equal(formatValue("rate_steadiness", 2.4), "within 2%");
+  assert.equal(formatValue("rate_steadiness", 0.2), "within 1%");
+  assert.equal(formatValue("arms_break", 0.64), "64% through the drive");
+  assert.equal(formatValue("stroke_length", 1.99), "2.0 trunk lengths");
+  assert.equal(formatValue("body_swing_deg", 52.1), "52°");
+  assert.equal(formatValue("catch_elbow_deg", 169.7), "170°");
+});
+
+test("a change reads as more, less or the same", () => {
+  assert.equal(formatChange("catch_lean_deg", -3.2), "3° less");
+  assert.equal(formatChange("body_swing_deg", 4.6), "5° more");
+  assert.equal(formatChange("catch_lean_deg", 0.3), "same");
+  assert.equal(formatChange("drive_s", 0.04), "0.04 s more");
+  assert.equal(formatChange("drive_s", 0.001), "same");
+  assert.equal(formatChange("ratio", -0.21), "0.2 less");
+  assert.equal(formatChange("drive_share", 0.03), "3% more");
+  assert.equal(formatChange("rate_steadiness", 1.6), "2% more");
+  assert.equal(formatChange("stroke_length", 0.01), "same");
+  assert.equal(formatChange("catch_lean_deg", null), "not measured");
+});
+
+test("more layback is a more negative lean", () => {
+  assert.equal(formatChange("finish_lean_deg", -4), "4° more");
+  assert.equal(formatChange("finish_lean_deg", 4), "4° less");
 });
 
 test("targets read in rowing terms", () => {
