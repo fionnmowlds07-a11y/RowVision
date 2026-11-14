@@ -12,6 +12,7 @@ from rowvision.pipeline import (
     analyse,
     correction_views,
 )
+from rowvision.report import analysis_json
 from rowvision.shots import ShotKind
 from rowvision.skeleton import FloatArray
 from rowvision.tracking import Track
@@ -312,3 +313,42 @@ def test_a_rower_and_the_rower_they_follow_are_read_in_one_pass() -> None:
 def test_a_whole_crew_is_read_in_one_pass() -> None:
     alone = frames_read(Request(boat_seats=4, seat=4))
     assert len(frames_read(Request(boat_seats=4, scope=Scope.CREW))) == len(alone)
+
+
+def test_a_crew_result_knows_the_athletes_own_seat() -> None:
+    result = run(FakeBackend(4), Request(boat_seats=4, scope=Scope.CREW, seat=2, side="bow"))
+    assert result.own_seat == 2
+    assert run(FakeBackend(4), Request(boat_seats=4, seat=2)).own_seat is None
+
+
+def test_each_seat_of_a_sweep_crew_is_timed_against_who_it_follows() -> None:
+    result = run(FakeBackend(4), Request(boat_seats=4, scope=Scope.CREW, seat=2, side="bow"))
+    followed = {rower.seat: rower.timing.leader_seat if rower.timing else None for rower in result.rowers}
+    # Seat 2 is bow side, so seats 2 and 4 are bow side and follow 3. Seats 1 and 3 are stroke side.
+    assert followed == {1: 4, 2: 3, 3: 4, 4: None}
+
+
+def test_every_sculler_is_timed_against_stroke() -> None:
+    result = run(FakeBackend(4), Request(boat_seats=4, scope=Scope.CREW, seat=2))
+    followed = {rower.seat: rower.timing.leader_seat if rower.timing else None for rower in result.rowers}
+    assert followed == {1: 4, 2: 4, 3: 4, 4: None}
+
+
+def test_a_crew_report_lists_every_seat_and_puts_the_athlete_first() -> None:
+    result = run(FakeBackend(4), Request(boat_seats=4, scope=Scope.CREW, seat=3))
+    report = analysis_json(result)
+    assert report["rower"]["seat"] == 3
+    assert [seat["seat"] for seat in report["crew"]] == [1, 2, 3, 4]
+    summary = report["crew_summary"]
+    assert [seat["seat"] for seat in summary["seats"]] == [1, 2, 3, 4]
+    assert summary["seats"][0]["leader_seat"] == 4
+    assert summary["seats"][3]["catch_ms"] is None
+    assert 0 <= summary["catch_lean_range_deg"] < 10
+    assert summary["finish_lean_range_deg"] is not None
+
+
+def test_a_single_rower_report_has_no_crew() -> None:
+    report = analysis_json(run(FakeBackend(4), Request(boat_seats=4, seat=3)))
+    assert report["rower"]["seat"] == 3
+    assert report["crew"] is None
+    assert report["crew_summary"] is None

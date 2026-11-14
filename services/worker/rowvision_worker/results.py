@@ -2,6 +2,8 @@
 
 from typing import Any
 
+PER_FRAME = ("poses", "angles")
+
 
 def split_report(report: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     """Return the summary and the frame data. Joint positions must only be in the frame data."""
@@ -9,9 +11,15 @@ def split_report(report: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]
     frames: dict[str, Any] = {"views": report.get("views")}
     rower = report.get("rower")
     if rower is not None:
-        summary["rower"] = {k: v for k, v in rower.items() if k not in ("poses", "angles")}
+        summary["rower"] = {k: v for k, v in rower.items() if k not in PER_FRAME}
         frames["poses"] = rower.get("poses")
         frames["angles"] = rower.get("angles")
+    crew = report.get("crew")
+    if crew:
+        summary["crew"] = [{k: v for k, v in seat.items() if k not in PER_FRAME} for seat in crew]
+        frames["crew"] = {
+            str(seat["seat"]): {"poses": seat.get("poses"), "angles": seat.get("angles")} for seat in crew
+        }
     return summary, frames
 
 

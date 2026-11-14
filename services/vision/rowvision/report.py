@@ -155,18 +155,58 @@ def rower_json(
     }
 
 
+def _value(rower: dict[str, Any], name: str) -> float | None:
+    found = next((m for m in rower["card"]["metrics"] if m["name"] == name), None)
+    return None if found is None else found["value"]
+
+
+def _range(values: list[float | None]) -> float | None:
+    """Return the gap between the highest and lowest value, which needs two seats."""
+    known = [value for value in values if value is not None]
+    return float(max(known) - min(known)) if len(known) >= 2 else None
+
+
+def crew_summary(crew: list[dict[str, Any]]) -> dict[str, Any]:
+    """Return each seat's headline figures side by side, and how well the crew matches.
+
+    The match is the gap in degrees between the seats furthest apart, for the body angle at the
+    catch and at the finish.
+    """
+    seats = [
+        {
+            "seat": rower["seat"],
+            "overall": rower["card"]["overall"],
+            "band": rower["rating"]["band"],
+            "catch_lean_deg": _value(rower, "catch_lean_deg"),
+            "finish_lean_deg": _value(rower, "finish_lean_deg"),
+            "leader_seat": rower["timing"]["leader_seat"] if rower["timing"] else None,
+            "catch_ms": rower["timing"]["catch_ms"] if rower["timing"] else None,
+            "finish_ms": rower["timing"]["finish_ms"] if rower["timing"] else None,
+        }
+        for rower in crew
+    ]
+    return {
+        "seats": seats,
+        "catch_lean_range_deg": _range([seat["catch_lean_deg"] for seat in seats]),
+        "finish_lean_range_deg": _range([seat["finish_lean_deg"] for seat in seats]),
+    }
+
+
+def own_rower(crew: list[dict[str, Any]], own_seat: int | None) -> dict[str, Any] | None:
+    """Return the athlete's own entry, or the first when their seat was not measured."""
+    if not crew:
+        return None
+    return next((rower for rower in crew if rower["seat"] == own_seat), crew[0])
+
+
 def analysis_json(analysis: Analysis) -> dict[str, Any]:
+    """Return the report. `rower` is the athlete. `crew` lists every seat when all were measured."""
     views = analysis.frame_views
-    rower = (
-        rower_json(
-            analysis.rowers[0],
-            analysis.frames,
-            analysis.facing,
-            analysis.view_deg if views is None else views,
-        )
-        if analysis.rowers
-        else None
-    )
+    view = analysis.view_deg if views is None else views
+    rowers = [
+        rower_json(rower, analysis.frames, analysis.facing, view) for rower in analysis.rowers
+    ]
+    whole_crew = getattr(analysis, "own_seat", None) is not None or len(rowers) > 1
     return {
         "fps": analysis.fps,
         "frames": analysis.frames,
@@ -179,7 +219,9 @@ def analysis_json(analysis: Analysis) -> dict[str, Any]:
             for shot in analysis.shots
         ],
         "facing": analysis.facing,
-        "rower": rower,
+        "rower": own_rower(rowers, analysis.own_seat),
+        "crew": rowers if whole_crew else None,
+        "crew_summary": crew_summary(rowers) if whole_crew else None,
     }
 
 

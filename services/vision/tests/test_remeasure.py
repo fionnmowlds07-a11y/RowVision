@@ -134,3 +134,34 @@ def test_a_rower_with_no_follow_timing_has_none() -> None:
     summary["rower"]["timing"] = None
     assert remeasure(summary, frames)["rower"]["timing"] is None
     assert isinstance(FollowTiming(4, None, None, None, None, 0), FollowTiming)
+
+
+def saved_crew() -> tuple[dict[str, Any], dict[str, Any]]:
+    """Return a whole-crew result as the app keeps it, with each seat's joints in the frame data."""
+    summary, frames = saved()
+    seats = []
+    kept: dict[str, Any] = {}
+    for seat in (1, 2):
+        seats.append({**summary["rower"], "seat": seat})
+        kept[str(seat)] = {"poses": frames["poses"], "angles": None}
+    summary["rower"] = seats[1]
+    summary["crew"] = seats
+    summary["crew_summary"] = {"seats": [], "catch_lean_range_deg": 99.0, "finish_lean_range_deg": None}
+    return summary, {**frames, "crew": kept}
+
+
+def test_every_seat_of_a_crew_is_measured_again() -> None:
+    summary, frames = saved_crew()
+    again = remeasure(summary, frames)
+    assert [seat["seat"] for seat in again["crew"]] == [1, 2]
+    assert again["rower"]["seat"] == 2
+    assert all(len(seat["poses"]) == summary["frames"] for seat in again["crew"])
+    assert again["crew_summary"]["catch_lean_range_deg"] == pytest.approx(0.0)
+    assert [seat["seat"] for seat in again["crew_summary"]["seats"]] == [1, 2]
+
+
+def test_a_crew_with_a_seat_missing_its_joints_cannot_be_measured_again() -> None:
+    summary, frames = saved_crew()
+    del frames["crew"]["1"]
+    with pytest.raises(NoSkeleton):
+        remeasure(summary, frames)
