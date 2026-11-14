@@ -21,6 +21,10 @@ MAX_STROKE_PERIODS = 1.6
 CATCH_LEAN_FRAMES_BEFORE = 3
 """The marked catch sits up to a few frames after the blade goes in, and one frame's lean is noisy,
 so catch lean is the median of the catch frame and the frames just before it."""
+FINISH_FRAMES_EITHER_SIDE = 2
+"""The arms are close to still around the finish, so the frames either side of it show the same
+position. Their median was steadier than one frame for the elbow on real clips. It was not for the
+body angle or the knee, which are still read on the finish frame alone."""
 
 
 @dataclass(frozen=True)
@@ -112,6 +116,24 @@ def _catch_lean(trunk_lean: FloatArray, catch: int) -> float:
     return float(np.nanmedian(window))
 
 
+def _catch_knee(knee: FloatArray, catch: int) -> float:
+    """Return the knee at its most bent as the rower arrives at the catch.
+
+    The marked catch is a frame or two after the legs reach the front, by which time they have
+    started to open. The smallest angle a body could make in the run-up is the one coaches mean.
+    """
+    window = knee[max(catch - CATCH_LEAN_FRAMES_BEFORE, 0) : catch + 1]
+    possible = window[(window >= CATCH_KNEE_RANGE[0]) & (window <= CATCH_KNEE_RANGE[1])]
+    return float(possible.min()) if len(possible) else float("nan")
+
+
+def _finish_elbow(values: FloatArray, finish: int) -> float:
+    window = values[max(finish - FINISH_FRAMES_EITHER_SIDE, 0) : finish + FINISH_FRAMES_EITHER_SIDE + 1]
+    if not np.isfinite(window).any():
+        return float("nan")
+    return float(np.nanmedian(window))
+
+
 def per_stroke(angles: AngleSeries, timeline: StrokeTimeline) -> list[StrokeMetrics]:
     """Measure each complete stroke: a catch, the finish after it, and the next catch."""
     results = []
@@ -128,9 +150,9 @@ def per_stroke(angles: AngleSeries, timeline: StrokeTimeline) -> list[StrokeMetr
                 next_catch_frame=next_catch,
                 catch_lean_deg=_catch_lean(angles.trunk_lean, catch),
                 finish_lean_deg=float(angles.trunk_lean[finish]),
-                catch_knee_deg=_within(float(angles.knee[catch]), CATCH_KNEE_RANGE),
+                catch_knee_deg=_catch_knee(angles.knee, catch),
                 finish_knee_deg=_within(float(angles.knee[finish]), FINISH_KNEE_RANGE),
-                finish_elbow_deg=float(angles.elbow[finish]),
+                finish_elbow_deg=_finish_elbow(angles.elbow, finish),
                 drive_share=(finish - catch) / (next_catch - catch),
                 legs_lead=_legs_lead(angles, catch, finish),
             )
