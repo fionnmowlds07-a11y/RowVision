@@ -127,6 +127,17 @@ test("the library lists the clips from their folders, newest first", async () =>
   await expect(space).toContainText(/free/);
 });
 
+test("clips from an older version are marked, and one button measures them all again", async () => {
+  const older = page.getByRole("region", { name: "Older clips" });
+  await expect(older).toContainText(/\d clips? (was|were) measured with an older version of RowVision\./);
+  await expect(page.getByRole("row").nth(1)).toContainText("Older version");
+  await older.getByRole("button", { name: "Measure all again" }).click();
+  await expect(older).toHaveCount(0);
+  await expect(page.getByText("Older version")).toHaveCount(0);
+  // The scores are still there afterwards.
+  await expect(page.getByRole("row").nth(1)).toContainText("84");
+});
+
 test("the viewer shows exactly the frame it says, stepping either way", async () => {
   await page.getByRole("row", { name: /2- seat 2/ }).getByRole("link").click();
   const viewer = page.getByRole("region", { name: "Frame viewer" });
