@@ -20,6 +20,7 @@ from rowvision.boats import (
 )
 from rowvision.metrics import (
     MEASURES,
+    AngleSeries,
     StrokeMetrics,
     angle_series,
     fade,
@@ -27,8 +28,8 @@ from rowvision.metrics import (
     rate_steadiness,
 )
 from rowvision.pose import PoseBackend
-from rowvision.reference import load_targets
-from rowvision.reliability import Evidence, Rating, rate
+from rowvision.reference import Targets, load_targets
+from rowvision.reliability import Calibration, Evidence, Rating, load_calibration, rate
 from rowvision.scoring import ScoreCard, score_stroke
 from rowvision.seats import assign_seats, track_at
 from rowvision.shots import Shot, ShotKind, split_shots
@@ -98,6 +99,8 @@ class RowerResult:
     """What the accuracy rating was worked out from, kept so the rower can be measured again."""
     fade: dict[str, float] = field(default_factory=dict)
     """How each measure changes from the first half of the strokes to the second."""
+    angles: AngleSeries | None = None
+    """The angle on every frame, kept so the report need not work them out again."""
 
 
 @dataclass(frozen=True)
@@ -202,17 +205,26 @@ def _boxes_for(track: Track, frames: int) -> FloatArray:
 
 
 def _fine_pass(
-    read: FrameReader, frames: int, track: Track, backend: PoseBackend
-) -> tuple[FloatArray, FloatArray]:
-    boxes = _boxes_for(track, frames)
-    points = np.full((frames, sk.JOINT_COUNT, 2), np.nan)
-    scores = np.zeros((frames, sk.JOINT_COUNT))
+    read: FrameReader, frames: int, tracks: list[Track], backend: PoseBackend
+) -> list[tuple[FloatArray, FloatArray]]:
+    """Find the joints of every given person on every frame, reading each frame once.
+
+    Reading and decoding a frame costs about as much as finding one person's joints, so a rower and
+    the rower they follow are found together.
+    """
+    boxes = [_boxes_for(track, frames) for track in tracks]
+    points = [np.full((frames, sk.JOINT_COUNT, 2), np.nan) for _ in tracks]
+    scores = [np.zeros((frames, sk.JOINT_COUNT)) for _ in tracks]
     for index in range(frames):
-        if np.isfinite(boxes[index]).all():
-            found, confidence = backend.estimate(read(index), boxes[index : index + 1])
-            if len(found):
-                points[index], scores[index] = found[0], confidence[0]
-    return points, scores
+        wanted = [person for person, box in enumerate(boxes) if np.isfinite(box[index]).all()]
+        if not wanted:
+            continue
+        found, confidence = backend.estimate(
+            read(index), np.stack([boxes[person][index] for person in wanted])
+        )
+        for person, joints, score in zip(wanted, found, confidence, strict=False):
+            points[person][index], scores[person][index] = joints, score
+    return list(zip(points, scores, strict=True))
 
 
 def correction_views(views: FloatArray, clip_view: float) -> FloatArray:
@@ -265,10 +277,17 @@ def measure_rower(
     trunk_px: float,
     coverage: float,
     agreement: float | None = None,
+    targets: Targets | None = None,
+    calibration: Calibration | None = None,
 ) -> RowerResult:
-    """Measure one rower's strokes from their joints, and score and rate the result."""
+    """Measure one rower's strokes from their joints, and score and rate the result.
+
+    Targets and calibration are read from their files unless given, which saves reading them again
+    for each rower of a crew.
+    """
     timeline = shared if shared is not None else detect_strokes(reach_signal(points, facing), fps)
-    strokes = per_stroke(angle_series(points, facing, frame_views), timeline, fps)
+    angles = angle_series(points, facing, frame_views)
+    strokes = per_stroke(angles, timeline, fps)
     summary: dict[str, float] = {}
     spread: dict[str, float] = {}
     for name in MEASURES:
@@ -280,7 +299,9 @@ def measure_rower(
     steadiness = rate_steadiness(strokes)
     if np.isfinite(steadiness):
         summary["rate_steadiness"] = steadiness
-    card = score_stroke(summary, spread, len(strokes), timeline.rate_spm, load_targets())
+    card = score_stroke(
+        summary, spread, len(strokes), timeline.rate_spm, targets if targets is not None else load_targets()
+    )
     evidence = Evidence(
         trunk_px, view, spread.get("catch_lean_deg", 0.0), coverage, len(strokes), agreement
     )
@@ -294,9 +315,10 @@ def measure_rower(
         summary,
         spread,
         card,
-        rate(evidence),
+        rate(evidence, calibration),
         evidence=evidence,
         fade=fade(strokes),
+        angles=angles,
     )
 
 
@@ -424,44 +446,49 @@ def analyse(
     shared = crew_timeline(rowers, assignment.facing, frames, fps)
     agreements = dict(zip(map(id, rowers), crew_agreement(rowers), strict=True))
     in_view = boat.seen()[np.minimum(np.arange(frames) // COARSE_STEP, coarse_frames - 1)]
-    fine: dict[int | None, FloatArray] = {}
 
-    def measured_points(seat: int | None, track: Track) -> tuple[FloatArray, FloatArray]:
-        points, scores = _fine_pass(read, frames, track, backend)
+    leaders: dict[int | None, int] = {}
+    for seat, _ in targets:
+        leader = None if seat is None else leader_seat(seat, request.boat_seats, request.side)
+        if leader is not None and leader in assignment.seats:
+            leaders[seat] = leader
+    wanted = dict(targets)
+    for leader in leaders.values():
+        wanted.setdefault(leader, assignment.seats[leader])
+    fine: dict[int | None, tuple[FloatArray, FloatArray]] = {}
+    for seat, (points, scores) in zip(
+        wanted, _fine_pass(read, frames, list(wanted.values()), backend), strict=True
+    ):
         points[dropped] = np.nan
         scores[dropped] = 0
-        fine[seat] = points
-        return points, scores
+        fine[seat] = points, scores
 
+    targets_file, calibration = load_targets(), load_calibration()
     results = []
     for seat, track in targets:
-        points, scores = measured_points(seat, track)
+        points, scores = fine[seat]
         measured = np.isfinite(points[:, sk.LEFT_SHOULDER, 0])
         agreement = agreements.get(id(track))
-        results.append(
-            measure_rower(
-                seat,
-                points,
-                scores,
-                assignment.facing,
-                view,
-                frame_views,
-                fps,
-                shared,
-                trunk_px=track.trunk(),
-                coverage=float(measured[in_view].mean()) if in_view.any() else 0.0,
-                agreement=None if agreement is None or np.isnan(agreement) else agreement,
-            )
+        rower = measure_rower(
+            seat,
+            points,
+            scores,
+            assignment.facing,
+            view,
+            frame_views,
+            fps,
+            shared,
+            trunk_px=track.trunk(),
+            coverage=float(measured[in_view].mean()) if in_view.any() else 0.0,
+            agreement=None if agreement is None or np.isnan(agreement) else agreement,
+            targets=targets_file,
+            calibration=calibration,
         )
-
-    for index, rower in enumerate(results):
-        leader = None if rower.seat is None else leader_seat(rower.seat, request.boat_seats, request.side)
-        if leader is None or leader not in assignment.seats:
-            continue
-        if leader not in fine:
-            measured_points(leader, assignment.seats[leader])
-        timing = follow_timing(rower.points, fine[leader], leader, assignment.facing, fps)
-        results[index] = replace(rower, timing=timing)
+        if seat in leaders:
+            leader = leaders[seat]
+            timing = follow_timing(points, fine[leader][0], leader, assignment.facing, fps)
+            rower = replace(rower, timing=timing)
+        results.append(rower)
 
     if results and not any(rower.strokes for rower in results):
         warnings.append(
