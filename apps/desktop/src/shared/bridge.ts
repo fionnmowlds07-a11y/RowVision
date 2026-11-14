@@ -14,6 +14,8 @@ export type ClipSetup = {
   seat?: number;
   note?: string;
   filmed_at?: string;
+  /** "crew" when every seat was asked for. */
+  scope?: string;
 };
 
 /** What the add page hands over. The video stays where it is and is read from there. */
@@ -25,7 +27,11 @@ export type AddRequest = {
   /** Length is null when the page could not play the video, so the first 60 seconds are used. */
   section: { start: number; length: number | null };
   tap: { t: number; x: number; y: number } | null;
+  /** "crew" measures every seat, which takes about as many times longer as there are seats. */
+  scope: Scope;
 };
+
+export type Scope = "seat" | "crew";
 
 /** Where a clip is in analysis, read from the files in its folder. */
 export type ClipState = "waiting" | "running" | "needs_tap" | "stopped" | "failed" | "done";

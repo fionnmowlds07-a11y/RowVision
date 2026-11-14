@@ -39,7 +39,8 @@ export async function readClip(library: string, id: string, targets: TargetChoic
   const setup = asSetup(raw);
   // The desktop engine adds its version to the summary it writes.
   const saved = (await readJson(path.join(folder, "summary.json"))) as (Summary & { version?: string }) | null;
-  const summary = saved?.rower ? { ...saved, rower: rescore(saved.rower, targets) } : saved;
+  const crew = saved?.crew?.map((seat) => rescore(seat, targets));
+  const summary = saved?.rower ? { ...saved, rower: rescore(saved.rower, targets), ...(crew ? { crew } : {}) } : saved;
   const rower = summary?.rower ?? null;
   const marked = (await readJson(path.join(folder, STATE_FILE))) as { state?: unknown; message?: unknown } | null;
   const pause = (await readJson(path.join(folder, PAUSE_FILE))) as { seconds?: unknown } | null;
@@ -85,6 +86,7 @@ function asSetup(value: unknown): ClipSetup {
   if (typeof raw.boat_class === "string") setup.boat_class = raw.boat_class;
   if (typeof raw.side === "string") setup.side = raw.side;
   if (typeof raw.seat === "number") setup.seat = raw.seat;
+  if (raw.scope === "crew") setup.scope = "crew";
   if (typeof raw.note === "string") setup.note = raw.note;
   if (typeof raw.filmed_at === "string") setup.filmed_at = raw.filmed_at;
   return setup;

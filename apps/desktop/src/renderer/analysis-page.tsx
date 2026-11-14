@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { tapPoint } from "@/lib/clip-checks";
 import { clipUrl, type ClipDetail, type ClipItem } from "../shared/bridge";
-import { STAGES, stageIndex } from "../shared/stages";
+import { CREW_STAGE, STAGES, stageIndex } from "../shared/stages";
 import { shortDate, setupLine } from "./format";
 import { minutesText, useAnalysis } from "./use-analysis";
 import styles from "./analysis.module.css";
@@ -122,7 +122,7 @@ export function AnalysisPage({ id }: { id: string }) {
                   <span className={styles.dot} aria-hidden="true">
                     {done ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5 9-10" /></svg> : null}
                   </span>
-                  {item.name}
+                  {item.engine === "Measuring your rower" && (mine?.stage === CREW_STAGE || clip?.setup.scope === "crew") ? CREW_STAGE : item.name}
                 </li>
               );
             })}

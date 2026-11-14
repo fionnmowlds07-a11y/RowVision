@@ -3,19 +3,22 @@ import { createWriteStream, promises as fs } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import { SECTION_SECONDS } from "../../../web/lib/clip-checks";
+import { BOAT_SEATS } from "../../../web/lib/setup";
 import type { Analysis, Running } from "../shared/bridge";
-import { STAGES } from "../shared/stages";
+import { STAGES, canonical } from "../shared/stages";
 import { PAUSE_FILE, listClips, markClip, readJson, writeJson } from "./library";
 
 /** A first guess before this computer has finished a clip: about 10 minutes for 30 seconds. */
 export const FIRST_SPEED = 20;
 const STOP_GRACE_MS = 15_000;
+/** Finding the boats is done once, so each extra seat adds about this share of one rower's time. A first guess. */
+export const CREW_SEAT_SHARE = 0.6;
 export const UNEXPECTED = "Analysis stopped unexpectedly. Start again to try once more.";
 export const MOVED = "The video can't be found. Has it been moved or deleted?";
 
 /** How far through the whole run the engine is, never going backwards. */
 export function overallProgress(stage: string, progress: number | null, before: number): number {
-  const known = STAGES.find((item) => item.engine === stage);
+  const known = STAGES.find((item) => item.engine === canonical(stage));
   if (!known) return before;
   const share = progress === null ? 0 : Math.min(Math.max(progress, 0), 1);
   return Math.max(before, known.from + (known.to - known.from) * share);
@@ -32,6 +35,12 @@ type Clip = Record<string, unknown>;
 /** How many seconds of video the engine will look at. */
 export function clipSeconds(clip: Clip): number {
   return typeof clip.section_length === "number" ? clip.section_length : SECTION_SECONDS;
+}
+
+/** How much work a clip is, in seconds of video for one rower. A whole crew is most of the work again for each seat. */
+export function clipWork(clip: Clip): number {
+  const seats = clip.scope === "crew" && typeof clip.boat_class === "string" ? BOAT_SEATS[clip.boat_class] ?? 1 : 1;
+  return clipSeconds(clip) * (1 + CREW_SEAT_SHARE * (seats - 1));
 }
 
 /** The engine's own folder goes first on the path, so the ffmpeg and ffprobe packed beside it are the ones it finds. */
@@ -55,6 +64,7 @@ export function jobFor(folder: string, clip: Clip, kind: string): Record<string,
     tap: clip.tap ?? null,
     engine: kind,
     device: "cpu",
+    scope: clip.scope === "crew" ? "crew" : "seat",
   };
   // Left out when the page could not play the video, so the engine takes the first 60 seconds.
   if (typeof clip.section_length === "number") job.length = clip.section_length;
@@ -123,7 +133,7 @@ export class Analyser {
     const library = this.options.library();
     const clips = (await listClips(library)).filter((clip) => clip.state === "waiting" && clip.id !== this.current?.id);
     clips.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-    this.waiting = await Promise.all(clips.map(async (clip) => ({ id: clip.id, seconds: clipSeconds(((await readJson(path.join(library, clip.id, "clip.json"))) ?? {}) as Clip) })));
+    this.waiting = await Promise.all(clips.map(async (clip) => ({ id: clip.id, seconds: clipWork(((await readJson(path.join(library, clip.id, "clip.json"))) ?? {}) as Clip) })));
     if (this.current || this.quitting || this.waiting.length === 0) return this.changed();
     const command = this.options.engine();
     if (!command || !(this.options.modelsReady?.() ?? true)) return this.changed();
@@ -152,7 +162,7 @@ export class Analyser {
     child.stdin?.on("error", () => undefined);
     const current: Current = {
       id, child, stage: "Getting ready", progress: 0, startedAt: new Date().toISOString(), secondsLeft: null,
-      ended: false, stopping: false, seconds: clipSeconds(clip),
+      ended: false, stopping: false, seconds: clipWork(clip),
     };
     this.current = current;
 

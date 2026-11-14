@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { Analyser, FIRST_SPEED, MOVED, UNEXPECTED, jobFor, overallProgress, secondsLeft } from "../../src/main/analysis";
+import { Analyser, CREW_SEAT_SHARE, FIRST_SPEED, MOVED, UNEXPECTED, clipWork, jobFor, overallProgress, secondsLeft } from "../../src/main/analysis";
 import { readClip } from "../../src/main/library";
 import type { Analysis } from "../../src/shared/bridge";
 
@@ -75,7 +75,7 @@ test("progress runs across the stages and never goes back", () => {
 test("the job file carries the trim, and leaves the length out when the page could not play it", () => {
   const clip = { source: "/v.mp4", section_start: 3, section_length: 20, boat_class: "2-", side: "bow", seat: 2, tap: null };
   expect(jobFor("/lib/a", clip, "real")).toEqual({
-    folder: "/lib/a", source: "/v.mp4", start: 3, length: 20, boat_class: "2-", side: "bow", seat: 2, tap: null, engine: "real", device: "cpu",
+    folder: "/lib/a", source: "/v.mp4", start: 3, length: 20, boat_class: "2-", side: "bow", seat: 2, tap: null, engine: "real", device: "cpu", scope: "seat",
   });
   expect(jobFor("/lib/a", { ...clip, section_length: null }, "real")).not.toHaveProperty("length");
 });
@@ -193,4 +193,17 @@ test("clips wait for the measuring models, and start once they are there", async
   await a.next();
   await settled("a", "done");
   expect(a.snapshot().modelsMissing).toBe(false);
+});
+
+test("a crew job asks the engine for every seat, and is expected to take longer", () => {
+  const clip = { boat_class: "4-", side: "bow", seat: 2, section_length: 30 };
+  expect(jobFor("/lib/a", clip, "real").scope).toBe("seat");
+  expect(jobFor("/lib/a", { ...clip, scope: "crew" }, "real").scope).toBe("crew");
+  expect(clipWork(clip)).toBe(30);
+  expect(clipWork({ ...clip, scope: "crew" })).toBeCloseTo(30 * (1 + 3 * CREW_SEAT_SHARE));
+  expect(clipWork({ ...clip, scope: "crew", boat_class: "1x" })).toBe(30);
+});
+
+test("measuring a crew counts as the measuring stage", () => {
+  expect(overallProgress("Measuring your crew", 0.5, 0)).toBeCloseTo(0.7);
 });

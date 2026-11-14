@@ -8,5 +8,12 @@ export const STAGES = [
 
 /** Which stage is under way: -1 before the first, and STAGES.length when finished. */
 export function stageIndex(stage: string): number {
-  return STAGES.findIndex((item) => item.engine === stage);
+  return STAGES.findIndex((item) => item.engine === canonical(stage));
+}
+
+/** A whole crew is measured in the same stage as one rower, under its own name. */
+export const CREW_STAGE = "Measuring your crew";
+
+export function canonical(stage: string): string {
+  return stage === CREW_STAGE ? "Measuring your rower" : stage;
 }
