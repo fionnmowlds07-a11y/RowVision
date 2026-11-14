@@ -45,6 +45,25 @@ if (process.argv[2] === "--models") {
   process.exit(0);
 }
 
+// `--version` and `--remeasure FOLDER`, as the real engine has. Measuring again stamps the result with this version.
+const VERSION = "fake-2";
+if (process.argv[2] === "--version") {
+  process.stdout.write(`${JSON.stringify({ event: "version", version: VERSION })}\n`);
+  process.exit(0);
+}
+if (process.argv[2] === "--remeasure") {
+  const say = (event) => process.stdout.write(`${JSON.stringify(event)}\n`);
+  const kept = path.join(process.argv[3], "summary.json");
+  if (!existsSync(path.join(process.argv[3], "frames.json"))) {
+    say({ event: "failed", message: "This clip can't be measured again, as its video was removed. Its scores are unchanged." });
+    process.exit(1);
+  }
+  const summary = { ...JSON.parse(readFileSync(kept, "utf8")), version: VERSION };
+  writeFileSync(kept, JSON.stringify(summary));
+  say({ event: "done", version: VERSION, accuracy: null, band: null, overall: null });
+  process.exit(0);
+}
+
 const job = JSON.parse(readFileSync(process.argv[2], "utf8"));
 const folder = job.folder;
 const mode = () => {
