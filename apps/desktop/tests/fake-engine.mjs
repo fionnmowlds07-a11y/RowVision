@@ -119,8 +119,8 @@ if (mode() === "tap" && !job.tap) {
 
 send({ event: "stage", stage: "Measuring your rower", progress: 0.5 });
 await wait(100);
-const summary = { version: "fake", fps: 30, frames: 180, view_deg: 0, film_closer: null, warnings: [], shots: [], facing: 1, rower: null };
+const summary = { version: VERSION, fps: 30, frames: 180, view_deg: 0, film_closer: null, warnings: [], shots: [], facing: 1, rower: null };
 writeFileSync(path.join(folder, "frames.json"), JSON.stringify({ views: null, poses: [], angles: {} }));
 writeFileSync(path.join(folder, "summary.json"), JSON.stringify(summary));
-send({ event: "done", version: "fake", accuracy: null, band: null, overall: null });
+send({ event: "done", version: VERSION, accuracy: null, band: null, overall: null });
 process.exit(0);
