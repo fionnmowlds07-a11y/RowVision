@@ -506,3 +506,154 @@
   border-radius: var(--radius-field);
   overflow: hidden;
 }
+
+.group {
+  margin: 4px 0 0;
+  font-family: var(--font-text);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.numbers {
+  margin: 0;
+}
+
+.numbers > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.numbers > div + div {
+  border-top: 1px solid var(--quiet);
+}
+
+.numbers dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.unseen {
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.pill {
+  font-size: 12px;
+  border-radius: 99px;
+  padding: 2px 8px;
+  background: var(--quiet);
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.strokeChart {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.strokeChart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.chartBand {
+  fill: var(--link);
+  opacity: 0.25;
+}
+
+.chartLine {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.chartDot {
+  fill: var(--ink);
+}
+
+.chartDot[role="button"] {
+  cursor: pointer;
+}
+
+.chartDot:focus-visible {
+  outline: 2px solid var(--highlight);
+  outline-offset: 2px;
+}
+
+.scroll {
+  overflow-x: auto;
+}
+
+.strokeTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.strokeTable th,
+.strokeTable td {
+  padding: 7px 8px;
+  text-align: right;
+  white-space: nowrap;
+  border-top: 1px solid var(--quiet);
+  font-weight: 400;
+}
+
+.strokeTable thead th {
+  border-top: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  white-space: normal;
+  vertical-align: bottom;
+}
+
+.strokeTable th:first-child {
+  text-align: left;
+}
+
+.strokeLink {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  min-width: 44px;
+  min-height: 32px;
+  text-align: left;
+  padding: 0;
+}
+
+.off {
+  color: var(--danger);
+}
+
+.offMark {
+  font-size: 12px;
+}
+
+.fadeRow th,
+.fadeRow td {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.chartScale {
+  font-size: 11px;
+  fill: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}

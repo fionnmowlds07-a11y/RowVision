@@ -185,6 +185,29 @@ test("the results show what to work on, the measures and a freeze frame for each
   await page.evaluate(() => { window.location.hash = "#/"; });
 });
 
+test("the results show the extra numbers, and every stroke as a chart and a table", async () => {
+  await page.evaluate(() => { window.location.hash = "#/clip/test-clip"; });
+  const more = page.getByRole("region", { name: "More numbers" });
+  await expect(more.getByText("Recovery against drive")).toBeVisible();
+  await expect(more.getByText("1.4 to 1")).toBeVisible();
+  await expect(more.getByText("52°")).toBeVisible();
+  await expect(more.getByText("Could not be seen reliably in this video.")).toBeVisible();
+
+  const strokes = page.getByRole("region", { name: "Stroke by stroke" });
+  await expect(strokes.getByRole("group", { name: "Body angle at the catch, stroke by stroke" })).toBeVisible();
+  await expect(strokes.getByRole("button", { name: "Stroke 3, body angle at the catch: 22°. Go to this stroke" })).toBeVisible();
+  await strokes.getByText("See the numbers").click();
+  const rows = strokes.getByRole("row");
+  await expect(rows).toHaveCount(4);
+  await expect(rows.nth(1)).toContainText("28°");
+  // The third stroke is under the 26 to 31 target.
+  await expect(rows.nth(3)).toContainText("22° off target");
+  await expect(rows.nth(1)).toContainText("0.50 s");
+  await expect(rows.nth(1)).toContainText("60");
+  if (process.env.ROWVISION_SHOT) await page.screenshot({ path: process.env.ROWVISION_SHOT, fullPage: true });
+  await page.evaluate(() => { window.location.hash = "#/"; });
+});
+
 test("colours are saved on this computer", async () => {
   await page.getByRole("link", { name: "Settings" }).click();
   await page.getByRole("button", { name: "Forest" }).click();

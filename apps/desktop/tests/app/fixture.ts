@@ -85,7 +85,7 @@ export function makeClip(library: string, id = "test-clip") {
       rate_spm: 30,
       catches: CATCHES,
       finishes: FINISHES,
-      strokes: CATCHES.map((c, i) => ({ catch_frame: c, finish_frame: FINISHES[i], catch_lean_deg: 28 })),
+      strokes: CATCHES.map((c, i) => ({ catch_frame: c, finish_frame: FINISHES[i], next_catch_frame: c + 30, catch_lean_deg: 28 - 3 * i, finish_lean_deg: -22, drive_s: 0.5 })),
       timing: null,
       card: {
         overall: 84,
@@ -94,6 +94,12 @@ export function makeClip(library: string, id = "test-clip") {
           { name: "catch_lean_deg", label: "Body angle at the catch", phase: "catch", value: 28, spread: 1, target, score: 100, reason: null },
           // Knees are shown but never scored.
           { name: "catch_knee_deg", label: "Knee at the catch", phase: "catch", value: 60, spread: 2, target: { ...target, low: 50, high: 55 }, score: null, reason: "Knees are a rough guide." },
+        ],
+        // Shown only, and one of them could not be seen.
+        extras: [
+          { name: "ratio", label: "Recovery against drive", phase: "rhythm", value: 1.42, spread: 0.1, target: null, score: null, reason: "Shown only." },
+          { name: "body_swing_deg", label: "Body swing", phase: "drive", value: 52, spread: 3, target: null, score: null, reason: "Shown only." },
+          { name: "stroke_length", label: "Stroke length", phase: "drive", value: null, spread: null, target: null, score: null, reason: "Could not be seen reliably in this video." },
         ],
       },
       rating: { accuracy: 76, band: "Good", calibrated: true, labelled_frames: 108, warnings: [] },

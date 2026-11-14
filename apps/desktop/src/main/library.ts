@@ -60,7 +60,7 @@ export async function readClip(library: string, id: string, targets: TargetChoic
     accuracy: rower?.rating.accuracy ?? null,
     rate: rower?.rate_spm ?? null,
     version: summary?.version ?? null,
-    metrics: (rower?.card.metrics ?? []).map(({ name, value }) => ({ name, value })),
+    metrics: [...(rower?.card.metrics ?? []), ...(rower?.card.extras ?? [])].map(({ name, value }) => ({ name, value })),
     bytes: await folderBytes(folder),
     videoBytes: await fileBytes(path.join(folder, "working.mp4")),
     summary,
