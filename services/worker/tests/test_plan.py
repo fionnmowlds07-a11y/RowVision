@@ -4,7 +4,7 @@ from types import FunctionType
 from typing import Any
 
 import numpy as np
-from rowvision.pipeline import COARSE_STEP, BoatChoice
+from rowvision.pipeline import COARSE_STEP, BoatChoice, Scope
 from rowvision.tracking import Track
 
 from rowvision_worker.engine import Setup, Tap, Video, pause_for, plan_request
@@ -110,3 +110,10 @@ def test_a_pause_gives_the_frame_and_boats() -> None:
 def test_the_fake_track_matches_the_real_one() -> None:
     assert isinstance(vars(Track)["trunk"], FunctionType)
     assert isinstance(vars(Track)["centre"], FunctionType)
+
+
+def test_the_whole_crew_is_asked_for_only_when_the_setup_says_so() -> None:
+    alone = plan_request(FakeScouting([crew()]), setup(Tap(2.0, 0.5, 0.5)), VIDEO)
+    whole = plan_request(FakeScouting([crew()]), Setup("8+", "bow", 3, Tap(2.0, 0.5, 0.5), "crew"), VIDEO)
+    assert alone is not None and alone.scope is Scope.SEAT
+    assert whole is not None and whole.scope is Scope.CREW

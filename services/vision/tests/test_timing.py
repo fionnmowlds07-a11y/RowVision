@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from rowvision.synthetic import generate
-from rowvision.timing import follow_timing, leader_seat
+from rowvision.timing import follow_timing, leader_seat, seat_side
 
 
 @pytest.mark.parametrize(
@@ -86,3 +86,22 @@ def test_a_real_gap_survives_noise(frames: int) -> None:
     timing = follow_timing(moved, leader.points, 8, -1, leader.fps)
     assert timing is not None
     assert timing.catch_ms == pytest.approx(frames / leader.fps * 1000, abs=34)
+
+
+@pytest.mark.parametrize(
+    ("seat", "own_seat", "own_side", "side"),
+    [
+        (8, 8, "stroke", "stroke"),
+        (7, 8, "stroke", "bow"),
+        (2, 8, "stroke", "stroke"),
+        (3, 6, "bow", "stroke"),
+        (4, 6, "bow", "bow"),
+        (1, 2, "scull", "scull"),
+        (3, None, "bow", "bow"),
+        (None, 4, "stroke", "stroke"),
+    ],
+)
+def test_sides_alternate_along_a_sweep_boat(
+    seat: int | None, own_seat: int | None, own_side: str, side: str
+) -> None:
+    assert seat_side(seat, own_seat, own_side) == side
