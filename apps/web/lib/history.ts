@@ -12,7 +12,7 @@ export type ClipResult = {
   overall: number | null;
   code_version: string;
   created_at: string;
-  summary?: { rower?: { rate_spm?: number | null; card?: { metrics?: Pick<Metric, "name" | "value">[] } } | null };
+  summary?: { rower?: { rate_spm?: number | null; card?: { metrics?: Pick<Metric, "name" | "value">[]; extras?: Pick<Metric, "name" | "value">[] } } | null };
 };
 
 export type ClipRow = {
@@ -45,10 +45,21 @@ export function isOlder(result: { code_version: string }, current: string | null
   return current !== null && result.code_version !== current;
 }
 
-export type TrendPoint = { when: string; catchLean: number | null; layback: number | null; overall: number | null; older: boolean };
+export type TrendPoint = {
+  when: string;
+  catchLean: number | null;
+  layback: number | null;
+  overall: number | null;
+  older: boolean;
+  /** Missing on clips measured before these existed. */
+  bodySwing?: number | null;
+  rate?: number | null;
+};
 
 function value(result: ClipResult, name: string): number | null {
-  return result.summary?.rower?.card?.metrics?.find((metric) => metric.name === name)?.value ?? null;
+  const card = result.summary?.rower?.card;
+  const all = [...(card?.metrics ?? []), ...(card?.extras ?? [])];
+  return all.find((metric) => metric.name === name)?.value ?? null;
 }
 
 /** Only clips rated Good or better count, as the rest would add noise that reads as real change. */
@@ -63,6 +74,8 @@ export function trendPoints(clips: ClipRow[], current: string | null): TrendPoin
       layback: layback === null ? null : Math.abs(layback),
       overall: result.overall,
       older: isOlder(result, current),
+      bodySwing: value(result, "body_swing_deg"),
+      rate: result.summary?.rower?.rate_spm ?? null,
     }];
   });
   return points.sort((a, b) => a.when.localeCompare(b.when));

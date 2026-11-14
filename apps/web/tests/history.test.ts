@@ -51,6 +51,13 @@ describe("trend", () => {
   test("layback reads as a positive angle", () => {
     expect(trendPoints([clip("2026-01-01", result("Good"))], null)[0].layback).toBe(21);
   });
+  test("body swing and rate are read when the clip has them", () => {
+    const newer = result("Good");
+    newer.summary = { rower: { rate_spm: 22, card: { metrics: [], extras: [{ name: "body_swing_deg", value: 52 }] } } };
+    const [old, fresh] = trendPoints([clip("2026-01-01", result("Good")), clip("2026-01-02", newer)], null);
+    expect(old).toMatchObject({ bodySwing: null, rate: null });
+    expect(fresh).toMatchObject({ bodySwing: 52, rate: 22 });
+  });
   test("older clips are marked", () => {
     expect(trendPoints([clip("2026-01-01", result("Good"))], "v2")[0].older).toBe(true);
   });

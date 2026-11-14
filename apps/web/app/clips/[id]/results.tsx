@@ -7,6 +7,8 @@ import { workOnNext } from "@/lib/work-on-next";
 import { Evidence } from "./evidence";
 import { makeScene } from "./draw";
 import { ModelDialog } from "./model-dialog";
+import { MoreNumbers } from "./more-numbers";
+import { Strokes } from "./strokes";
 import { Viewer, type Jump } from "./viewer";
 import styles from "./clip.module.css";
 
@@ -177,6 +179,8 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
             </ul>
             {firstModel ? <button type="button" className="button quiet" onClick={() => setModel(firstModel.name)}>See the 3D model</button> : null}
           </section>
+          <MoreNumbers extras={card.extras} />
+          <Strokes rower={rower} fps={summary.fps} onPick={videoLink ? show : null} />
           {rower.timing ? (
             <section className="card stack">
               <h2 style={{ fontSize: 19 }}>Timing against seat {rower.timing.leader_seat}</h2>

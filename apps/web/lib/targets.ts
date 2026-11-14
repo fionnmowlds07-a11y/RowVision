@@ -103,5 +103,5 @@ export function rescore(rower: Rower, choices: TargetChoices | null): Rower {
   }
   const complete = phases.catch !== undefined && phases.finish !== undefined;
   const overall = complete ? mean(Object.values(phases) as number[]) : null;
-  return { ...rower, card: { overall, phases, metrics } };
+  return { ...rower, card: { ...rower.card, overall, phases, metrics } };
 }

@@ -34,7 +34,7 @@ function asRows(clips: ClipItem[]): ClipRow[] {
     jobs: [],
     results: clip.state === "done" ? [{
       band: clip.band, accuracy: clip.accuracy, overall: clip.overall, code_version: clip.version ?? "", created_at: clip.createdAt,
-      summary: { rower: { card: { metrics: clip.metrics } } },
+      summary: { rower: { rate_spm: clip.rate, card: { metrics: clip.metrics } } },
     }] : [],
   }));
 }
