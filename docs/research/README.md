@@ -29,6 +29,26 @@ The finish knee target sits straighter than the studies report. Those figures co
 
 The drive shares are worked out from Engstrom 2023, which gives the point in the cycle where the catch occurs (60.6%, 57.0% and 53.2%).
 
+## Measures that are shown and not scored
+
+These have no published target that fits footage from a launch, so they are shown for the athlete and coach to read, and never count towards a score. Each is left out when it varies too much from stroke to stroke to trust.
+
+| Measure | What it is |
+|---|---|
+| Time on the drive, time on the recovery | Seconds from catch to finish, and from finish to the next catch |
+| Recovery against drive | Recovery time divided by drive time. It falls towards 1 as the rate rises |
+| Rate steadiness | How much the time for one stroke varies, as a percentage |
+| Body swing | Body angle at the catch minus body angle at the finish |
+| Arms at the catch | Elbow angle of the near arm as the rower arrives at the catch. 180° is a straight arm |
+| When the arms start to bend | How far through the drive the elbow has closed a fifth of the way to its finish angle |
+| Elbow angle at the finish | A rough guide, as the arm is small in the picture |
+| Stroke length | How far the hands travel along the boat from catch to finish, in trunk lengths, and only within 45° of side-on |
+| Fade | The change in each measure from the first half of the strokes to the second, given with 6 or more strokes |
+
+Checked on 110 saved results from 15 real clips. Times vary by about 0.06 s from stroke to stroke, and rate steadiness is typically 1 to 7%. The elbow is much less reliable than the body angle. On small rowers the pose model often leaves the arm straight at the finish, so an elbow a body could not make there (outside 20 to 110°) is not believed, and the two finish-arm measures appear on under a third of those results. Stroke length appears on under half.
+
+Two readings were also changed after checking them on the same results and on the hand labels. The catch knee is now the smallest believable angle over the catch frame and the three before it, as the marked catch falls a frame or two after the legs reach the front. Its stroke-to-stroke scatter fell from about 14° to 6° (median across 45 rowers), and it read about 3° more bent. The finish elbow is the median of five frames, which was steadier for 106 of 110 rowers. The same five-frame reading was tried for the body angle and knee at the finish and rejected: it was no steadier, and no closer to the labels.
+
 ## Limits of the evidence
 
 - **Most data comes from ergometers.** Lumbar motion and arm kinematics differ between ergometers and boats (Wilson 2013; Trompeter 2021; Lamb 1989). Few studies report on-water body angles, so these targets are approximate for rowing on the water.
