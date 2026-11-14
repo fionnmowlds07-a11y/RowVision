@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { ClipForm, PickCard, freshChoice, useVideoDrop, type Choice } from "@/app/add/clip-form";
+import { BOAT_SEATS } from "@/lib/setup";
+import type { Scope } from "../shared/bridge";
 import styles from "@/app/add/add.module.css";
 
 const VIDEO_NAME = /\.(mp4|mov|m4v|avi|mkv|webm|mts|m2ts|3gp)$/i;
@@ -13,6 +15,7 @@ export function AddPage() {
   const [choice, setChoice] = useState<Choice | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
+  const [scope, setScope] = useState<Scope>("seat");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dragging = useVideoDrop(file ? null : take);
@@ -37,6 +40,7 @@ export function AddPage() {
 
   async function save() {
     if (!file || !choice) return;
+    const seats = BOAT_SEATS[choice.setup.boat] ?? 1;
     setSaving(true);
     setError(null);
     const { facts, trim, tap, setup, note } = choice;
@@ -48,6 +52,7 @@ export function AddPage() {
         note,
         section: { start: facts ? trim.start : 0, length: facts ? trim.end - trim.start : null },
         tap,
+        scope: seats > 1 ? scope : "seat",
       });
       window.location.hash = `#/analysis/${id}`;
     } catch {
@@ -57,6 +62,7 @@ export function AddPage() {
   }
 
   if (!choice) return <p aria-busy="true">Loading…</p>;
+  const seats = BOAT_SEATS[choice.setup.boat] ?? 1;
 
   return (
     <>
@@ -76,6 +82,18 @@ export function AddPage() {
               <strong>{file.name}</strong>
               <button type="button" className="button quiet" onClick={reset} disabled={saving}>Change video</button>
             </div>
+            {seats > 1 ? (
+              <fieldset className={styles.who}>
+                <legend>Who to measure</legend>
+                <div className={styles.seg}>
+                  <button type="button" aria-pressed={scope === "seat"} onClick={() => setScope("seat")} disabled={saving}>Just me</button>
+                  <button type="button" aria-pressed={scope === "crew"} onClick={() => setScope("crew")} disabled={saving}>Whole crew</button>
+                </div>
+                <p className="soft" style={{ fontSize: 14 }}>
+                  {scope === "crew" ? `Every seat is measured, with each rower's timing. A crew of ${seats} takes about ${seats} times as long.` : "Only you are measured, which is quickest."}
+                </p>
+              </fieldset>
+            ) : null}
             <p className="soft">The video stays where it is and is read from there, so keep it until the clip is analysed.</p>
             {error ? <p role="alert" className="error">{error}</p> : null}
             <button type="button" className="button primary" onClick={save} disabled={saving}>

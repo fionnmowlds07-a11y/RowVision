@@ -657,3 +657,99 @@
   fill: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
+
+.crewTiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.crewTiles .tile {
+  background: var(--quiet);
+}
+
+.boat {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.seat {
+  appearance: none;
+  width: 100%;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 48px;
+  gap: 12px;
+  align-items: center;
+  border: 2px solid transparent;
+  border-radius: var(--radius-field);
+  background: var(--quiet);
+  color: var(--ink);
+  padding: 6px 12px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.seat[aria-pressed="true"] {
+  border-color: var(--highlight);
+}
+
+.seatName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.seatName strong {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 19px;
+}
+
+.you {
+  font-size: 12px;
+  border-radius: 99px;
+  padding: 2px 8px;
+  background: var(--highlight);
+  color: var(--on-highlight);
+}
+
+.seat .pill {
+  background: var(--panel);
+}
+
+.timingBar {
+  position: relative;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--panel);
+}
+
+.timingBar::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--ink-soft);
+}
+
+.timingBar i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 3px;
+  background: var(--link);
+}
+
+.seatAngle {
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}

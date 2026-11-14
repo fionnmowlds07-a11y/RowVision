@@ -117,9 +117,27 @@ if (mode() === "tap" && !job.tap) {
   process.exit(3);
 }
 
-send({ event: "stage", stage: "Measuring your rower", progress: 0.5 });
+// A whole crew is a pair here: seat 2 is the athlete and follows nobody, seat 1 is late at the catch.
+const crewJob = job.scope === "crew";
+send({ event: "stage", stage: crewJob ? "Measuring your crew" : "Measuring your rower", progress: 0.5 });
 await wait(100);
-const summary = { version: VERSION, fps: 30, frames: 180, view_deg: 0, film_closer: null, warnings: [], shots: [], facing: 1, rower: null };
+const seatResult = (seat, lean, timing) => ({
+  seat, rate_spm: 30, catches: [12, 42], finishes: [27], strokes: [{ catch_frame: 12, finish_frame: 27, next_catch_frame: 42, catch_lean_deg: lean }], timing,
+  card: { overall: 80 + seat, phases: { catch: 80, finish: 80 }, extras: [], metrics: [
+    { name: "catch_lean_deg", label: "Body angle at the catch", phase: "catch", value: lean, spread: 1, target: { low: 26, high: 31, sources: [], evidence: "Test target." }, score: 90, reason: null },
+    { name: "finish_lean_deg", label: "Layback at the finish", phase: "finish", value: -20 - seat, spread: 1, target: null, score: null, reason: null },
+  ] },
+  rating: { accuracy: 76, band: "Good", calibrated: true, labelled_frames: 108, warnings: [] },
+});
+const crew = crewJob ? [
+  seatResult(1, 24, { leader_seat: 2, catch_ms: 90, finish_ms: 0, catch_spread_ms: 20, finish_spread_ms: 20, strokes: 6 }),
+  seatResult(2, 29, null),
+] : null;
+const summary = {
+  version: VERSION, fps: 30, frames: 180, view_deg: 0, film_closer: null, warnings: [], shots: [], facing: 1,
+  rower: crew ? crew[1] : null,
+  ...(crew ? { crew, crew_summary: { seats: [], catch_lean_range_deg: 5, finish_lean_range_deg: 1 } } : {}),
+};
 writeFileSync(path.join(folder, "frames.json"), JSON.stringify({ views: null, poses: [], angles: {} }));
 writeFileSync(path.join(folder, "summary.json"), JSON.stringify(summary));
 send({ event: "done", version: VERSION, accuracy: null, band: null, overall: null });

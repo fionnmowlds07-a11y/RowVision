@@ -22,9 +22,11 @@ type Props = {
   framesLink: string | null;
   oldVersion: boolean;
   daysLeft: number | null;
+  /** Set when `rower` is one seat of a measured crew, whose frame data is kept under its seat number. */
+  crewSeat?: number | null;
 };
 
-export function Results({ side, summary, rower, videoLink, framesLink, oldVersion, daysLeft }: Props) {
+export function Results({ side, summary, rower, videoLink, framesLink, oldVersion, daysLeft, crewSeat = null }: Props) {
   const [data, setData] = useState<FrameData | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [asking, setAsking] = useState(false);
@@ -40,10 +42,11 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
     return () => { live = false; };
   }, [framesLink]);
 
-  const scene = useMemo(
-    () => (data ? makeScene(rower, data, summary.facing, summary.view_deg) : null),
-    [data, rower, summary],
-  );
+  const scene = useMemo(() => {
+    if (!data) return null;
+    const seat = crewSeat === null ? undefined : data.crew?.[String(crewSeat)];
+    return makeScene(rower, seat ? { ...data, ...seat } : data, summary.facing, summary.view_deg);
+  }, [data, rower, summary, crewSeat]);
   const advice = workOnNext(rower);
   const { card, rating } = rower;
   const firstModel = card.metrics.find((metric) => modelFits(metric.name, card.metrics));
