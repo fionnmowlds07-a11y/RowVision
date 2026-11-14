@@ -132,7 +132,9 @@ def rower_json(
     rower: RowerResult, frames: int, facing: int, view_deg: float | FloatArray
 ) -> dict[str, Any]:
     catches, finishes = stroke_markers(rower.strokes, frames)
-    angles = angle_series(rower.points, facing, np.nan_to_num(view_deg))
+    angles = getattr(rower, "angles", None) or angle_series(
+        rower.points, facing, np.nan_to_num(view_deg)
+    )
     return {
         "seat": rower.seat,
         "rate_spm": _finite(rower.rate_spm),
