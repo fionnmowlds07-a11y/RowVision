@@ -5,6 +5,7 @@ import { APP_ORIGIN, CHANNELS, CLIP_ID, type Analysis, type ClipItem, type Model
 import { addClip, cleanAdd } from "./add";
 import { Analyser } from "./analysis";
 import { Models } from "./models";
+import { engineVersion, measureAgain } from "./remeasure";
 import { deleteClip, librarySpace, listClips, readClip, removeVideo } from "./library";
 import { registerSchemes, serve } from "./protocol";
 import { cleanConsent, sendClip } from "./send";
@@ -94,6 +95,7 @@ function cleanTap(value: unknown): { t: number; x: number; y: number } | null {
   return ok(t, 24 * 3600) && ok(x, 1) && ok(y, 1) ? { t: t as number, x: x as number, y: y as number } : null;
 }
 
+const BUSY = "This clip is being analysed. Try again when it has finished.";
 const clipId = (id: unknown): string => {
   if (typeof id !== "string" || !CLIP_ID.test(id)) throw new Error("Not a clip");
   return id;
@@ -184,6 +186,14 @@ void app.whenReady().then(async () => {
     return clip ? withRunning(clip) : null;
   });
   handle(CHANNELS.getAnalysis, async () => analyser.snapshot());
+  // Asked once, as the engine cannot change while the app is open.
+  let version: Promise<string | null> | null = null;
+  handle(CHANNELS.engineVersion, () => (version ??= engineVersion(engineCommand(), engineSettings())));
+  handle(CHANNELS.measureAgain, async (id) => {
+    const clip = clipId(id);
+    if (analyser.snapshot().running?.id === clip) return BUSY;
+    return measureAgain(engineCommand(), path.join(library(), clip), engineSettings());
+  });
   handle(CHANNELS.getModels, async () => models.snapshot());
   handle(CHANNELS.downloadModels, () => models.download());
   handle(CHANNELS.cancelModels, async () => models.cancel());
