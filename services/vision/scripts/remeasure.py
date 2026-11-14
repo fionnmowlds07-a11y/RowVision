@@ -10,16 +10,14 @@ Usage: python scripts/remeasure.py PATH [PATH ...]
 import argparse
 import json
 from collections.abc import Iterator
-from dataclasses import fields
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
-from rowvision.metrics import StrokeMetrics
+from rowvision.metrics import MEASURES
 from rowvision.remeasure import NoSkeleton, remeasure_rower
 
-MEASURES = [item.name for item in fields(StrokeMetrics) if item.type is float]
 MIN_STROKES = 3
 
 
