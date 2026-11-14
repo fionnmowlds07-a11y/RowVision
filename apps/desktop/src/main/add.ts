@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { MIN_SECONDS, SECTION_SECONDS } from "../../../web/lib/clip-checks";
+import { BOAT_SEATS } from "../../../web/lib/setup";
 import type { AddRequest } from "../shared/bridge";
 import { writeJson } from "./library";
 import { cleanSetup } from "./settings";
@@ -43,7 +44,11 @@ export function cleanAdd(value: unknown): AddRequest | null {
     point = { t, x: x as number, y: y as number };
   }
 
-  return { source, filmedAt: new Date(filmedAt).toISOString(), setup, note: note.trim(), section: { start, length: length as number | null }, tap: point };
+  // Older pages send no scope. A single has no crew to measure.
+  if (raw.scope !== undefined && raw.scope !== "seat" && raw.scope !== "crew") return null;
+  const scope = raw.scope === "crew" && BOAT_SEATS[setup.boat] > 1 ? "crew" : "seat";
+
+  return { source, filmedAt: new Date(filmedAt).toISOString(), setup, note: note.trim(), section: { start, length: length as number | null }, tap: point, scope };
 }
 
 /** Make the clip's folder. The video itself is left where it is. */
@@ -65,6 +70,7 @@ export async function addClip(library: string, request: AddRequest, now = new Da
     section_start: request.section.start,
     section_length: request.section.length,
     tap: request.tap,
+    scope: request.scope,
   };
   await writeJson(path.join(folder, "clip.json"), clip);
   return id;

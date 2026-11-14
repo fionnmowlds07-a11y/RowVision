@@ -127,6 +127,17 @@ test("the library lists the clips from their folders, newest first", async () =>
   await expect(space).toContainText(/free/);
 });
 
+test("clips from an older version are marked, and one button measures them all again", async () => {
+  const older = page.getByRole("region", { name: "Older clips" });
+  await expect(older).toContainText(/\d clips? (was|were) measured with an older version of RowVision\./);
+  await expect(page.getByRole("row").nth(1)).toContainText("Older version");
+  await older.getByRole("button", { name: "Measure all again" }).click();
+  await expect(older).toHaveCount(0);
+  await expect(page.getByText("Older version")).toHaveCount(0);
+  // The scores are still there afterwards.
+  await expect(page.getByRole("row").nth(1)).toContainText("84");
+});
+
 test("the viewer shows exactly the frame it says, stepping either way", async () => {
   await page.getByRole("row", { name: /2- seat 2/ }).getByRole("link").click();
   const viewer = page.getByRole("region", { name: "Frame viewer" });
@@ -182,6 +193,44 @@ test("the results show what to work on, the measures and a freeze frame for each
   await freezes.nth(1).click();
   await expectFrame(CATCHES[1]);
   // Leave the clip page as the other tests found it.
+  await page.evaluate(() => { window.location.hash = "#/"; });
+});
+
+test("the results show the extra numbers, and every stroke as a chart and a table", async () => {
+  await page.evaluate(() => { window.location.hash = "#/clip/test-clip"; });
+  const more = page.getByRole("region", { name: "More numbers" });
+  await expect(more.getByText("Recovery against drive")).toBeVisible();
+  await expect(more.getByText("1.4 to 1")).toBeVisible();
+  await expect(more.getByText("52°")).toBeVisible();
+  await expect(more.getByText("Could not be seen reliably in this video.")).toBeVisible();
+
+  const strokes = page.getByRole("region", { name: "Stroke by stroke" });
+  await expect(strokes.getByRole("group", { name: "Body angle at the catch, stroke by stroke" })).toBeVisible();
+  await expect(strokes.getByRole("button", { name: "Stroke 3, body angle at the catch: 22°. Go to this stroke" })).toBeVisible();
+  await strokes.getByText("See the numbers").click();
+  const rows = strokes.getByRole("row");
+  await expect(rows).toHaveCount(4);
+  await expect(rows.nth(1)).toContainText("28°");
+  // The third stroke is under the 26 to 31 target.
+  await expect(rows.nth(3)).toContainText("22° off target");
+  await expect(rows.nth(1)).toContainText("0.50 s");
+  await expect(rows.nth(1)).toContainText("60");
+  if (process.env.ROWVISION_SHOT) await page.screenshot({ path: process.env.ROWVISION_SHOT, fullPage: true });
+  await page.evaluate(() => { window.location.hash = "#/"; });
+});
+
+test("two clips are compared side by side, the earlier one first", async () => {
+  await page.evaluate(() => { window.location.hash = "#/clip/test-clip"; });
+  const pick = page.getByRole("region", { name: "Compare with another clip" });
+  const options = await pick.getByRole("option").allTextContents();
+  expect(options.length).toBeGreaterThanOrEqual(2);
+  await pick.getByRole("combobox").selectOption({ index: 1 });
+  await expect(page.getByRole("heading", { name: "Compare two clips" })).toBeVisible();
+  const table = page.getByRole("region", { name: "Comparison" });
+  await expect(table.getByRole("row", { name: /Overall/ })).toBeVisible();
+  await expect(table.getByRole("row", { name: /Body angle at the catch/ })).toContainText("28° forward");
+  await expect(table).toContainText("measurement noise");
+  if (process.env.ROWVISION_SHOT) await page.screenshot({ path: process.env.ROWVISION_SHOT.replace(".png", "-compare.png"), fullPage: true });
   await page.evaluate(() => { window.location.hash = "#/"; });
 });
 
@@ -457,6 +506,48 @@ test("a clip is sent only after both ticks, then marked as sent", async () => {
 });
 
 // Before the tests that try forbidden things on purpose.
+test("a whole crew is asked for when adding, then shown seat by seat", async () => {
+  writeFileSync(control, "done");
+  await openAdd();
+  await page.locator("input[type=file]").setInputFiles(path.join(sources, "row.mp4"));
+  const [boat, side, seat] = [0, 1, 2].map((n) => page.getByRole("region", { name: "Your boat" }).locator("select").nth(n));
+  await boat.selectOption("1x");
+  await expect(page.getByRole("group", { name: "Who to measure" })).toHaveCount(0);
+  await boat.selectOption("2-");
+  await side.selectOption("bow");
+  await seat.selectOption("2");
+  const who = page.getByRole("group", { name: "Who to measure" });
+  await expect(who.getByRole("button", { name: "Just me" })).toHaveAttribute("aria-pressed", "true");
+  await who.getByRole("button", { name: "Whole crew" }).click();
+  await expect(who).toContainText("A crew of 2 takes about 2 times as long.");
+  await page.getByRole("button", { name: "Add to your clips" }).click();
+  await expect(page).toHaveURL(/#\/analysis\/[a-z0-9-]+$/);
+  const id = /#\/analysis\/([a-z0-9-]+)$/.exec(page.url())![1];
+  expect(readJson(path.join(data, "clips", id, "clip.json")).scope).toBe("crew");
+  expect(readJson(path.join(data, "clips", id, "job.json")).scope).toBe("crew");
+  await expect(page.getByRole("heading", { name: "Analysed" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Progress" })).toContainText("Measuring your crew");
+  await panel().getByRole("link", { name: "See your results" }).click();
+
+  const crew = page.getByRole("region", { name: "Your crew" });
+  await expect(crew).toContainText("Catch angles within");
+  await expect(crew).toContainText("5°");
+  const seats = crew.getByRole("button", { name: /^Seat \d/ });
+  await expect(seats).toHaveCount(2);
+  // Stroke first. Seat 2 is the athlete, and seat 1 is late against them.
+  await expect(seats.nth(0)).toHaveAccessibleName("Seat 2, you, sets the rhythm, body angle at the catch 29°");
+  await expect(seats.nth(0)).toHaveAttribute("aria-pressed", "true");
+  await expect(seats.nth(1)).toHaveAccessibleName("Seat 1, catch against seat 2: about 90 ms late, body angle at the catch 24°");
+  await expect(page.getByRole("heading", { name: "Your results" })).toBeVisible();
+  await seats.nth(1).click();
+  await expect(page.getByRole("heading", { name: "Seat 1", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Measures" })).toContainText("You 24° forward");
+  await crew.getByText("See the numbers").click();
+  await expect(crew.getByRole("row", { name: /^1 / })).toContainText("About 90 ms late");
+  if (process.env.ROWVISION_SHOT) await page.screenshot({ path: process.env.ROWVISION_SHOT.replace(".png", "-crew.png") });
+  await page.evaluate(() => { window.location.hash = "#/"; });
+});
+
 test("the page broke none of its rules while in use", () => {
   expect(problems).toEqual([]);
 });

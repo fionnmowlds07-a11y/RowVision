@@ -1,12 +1,48 @@
 name: CI
 
+# Runs on pull requests only. Main is not run again after a merge, as the same code was just checked.
+# Each job runs only when files it covers changed, to keep within the free Actions minutes.
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    outputs:
+      vision: ${{ steps.find.outputs.vision }}
+      preview: ${{ steps.find.outputs.preview }}
+      worker: ${{ steps.find.outputs.worker }}
+      web: ${{ steps.find.outputs.web }}
+      database: ${{ steps.find.outputs.database }}
+      stack: ${{ steps.find.outputs.stack }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: find
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # A manual run, or a change to this file, checks everything.
+          if [ -z "$BASE" ]; then files=".github/workflows/ci.yml"; else files=$(git diff --name-only "$BASE"...HEAD); fi
+          echo "$files"
+          touched() { echo "$files" | grep -qE "^(\.github/workflows/ci\.yml|$1)" && echo true || echo false; }
+          {
+            echo "vision=$(touched 'services/vision/')"
+            echo "preview=$(touched 'apps/preview/|services/vision/')"
+            echo "worker=$(touched 'services/worker/|services/vision/')"
+            echo "web=$(touched 'apps/web/')"
+            echo "database=$(touched 'supabase/')"
+            echo "stack=$(touched 'apps/web/|supabase/|services/worker/|services/intake/|compose\.yaml')"
+          } >> "$GITHUB_OUTPUT"
+
   footage-guard:
     name: No footage in repository
     runs-on: ubuntu-latest
@@ -26,6 +62,8 @@ jobs:
   vision:
     name: Vision service
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.vision == 'true'
     defaults:
       run:
         working-directory: services/vision
@@ -50,6 +88,8 @@ jobs:
   preview:
     name: Preview page
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.preview == 'true'
     defaults:
       run:
         working-directory: apps/preview
@@ -79,6 +119,8 @@ jobs:
   worker:
     name: Worker
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.worker == 'true'
     defaults:
       run:
         working-directory: services/worker
@@ -105,6 +147,8 @@ jobs:
   web:
     name: Web app
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     defaults:
       run:
         working-directory: apps/web
@@ -129,6 +173,8 @@ jobs:
   database:
     name: Database
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.database == 'true'
     defaults:
       run:
         working-directory: apps/web
@@ -149,7 +195,8 @@ jobs:
   full-stack:
     name: Acceptance and browser tests
     runs-on: ubuntu-latest
-    needs: [web, database, worker]
+    needs: [changes, web, database, worker]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && needs.changes.outputs.stack == 'true' }}
     defaults:
       run:
         working-directory: apps/web

@@ -91,3 +91,22 @@
 .bandExcellent {
   color: var(--link);
 }
+
+.again {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.older {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 12px;
+  border-radius: 99px;
+  padding: 2px 8px;
+  background: var(--caution-bg);
+  color: var(--caution);
+  white-space: nowrap;
+}

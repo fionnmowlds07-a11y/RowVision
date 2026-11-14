@@ -506,3 +506,250 @@
   border-radius: var(--radius-field);
   overflow: hidden;
 }
+
+.group {
+  margin: 4px 0 0;
+  font-family: var(--font-text);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.numbers {
+  margin: 0;
+}
+
+.numbers > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.numbers > div + div {
+  border-top: 1px solid var(--quiet);
+}
+
+.numbers dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.unseen {
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.pill {
+  font-size: 12px;
+  border-radius: 99px;
+  padding: 2px 8px;
+  background: var(--quiet);
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.strokeChart {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.strokeChart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.chartBand {
+  fill: var(--link);
+  opacity: 0.25;
+}
+
+.chartLine {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.chartDot {
+  fill: var(--ink);
+}
+
+.chartDot[role="button"] {
+  cursor: pointer;
+}
+
+.chartDot:focus-visible {
+  outline: 2px solid var(--highlight);
+  outline-offset: 2px;
+}
+
+.scroll {
+  overflow-x: auto;
+}
+
+.strokeTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.strokeTable th,
+.strokeTable td {
+  padding: 7px 8px;
+  text-align: right;
+  white-space: nowrap;
+  border-top: 1px solid var(--quiet);
+  font-weight: 400;
+}
+
+.strokeTable thead th {
+  border-top: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  white-space: normal;
+  vertical-align: bottom;
+}
+
+.strokeTable th:first-child {
+  text-align: left;
+}
+
+.strokeLink {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  min-width: 44px;
+  min-height: 32px;
+  text-align: left;
+  padding: 0;
+}
+
+.off {
+  color: var(--danger);
+}
+
+.offMark {
+  font-size: 12px;
+}
+
+.fadeRow th,
+.fadeRow td {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.chartScale {
+  font-size: 11px;
+  fill: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.crewTiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.crewTiles .tile {
+  background: var(--quiet);
+}
+
+.boat {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.seat {
+  appearance: none;
+  width: 100%;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 48px;
+  gap: 12px;
+  align-items: center;
+  border: 2px solid transparent;
+  border-radius: var(--radius-field);
+  background: var(--quiet);
+  color: var(--ink);
+  padding: 6px 12px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.seat[aria-pressed="true"] {
+  border-color: var(--highlight);
+}
+
+.seatName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.seatName strong {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 19px;
+}
+
+.you {
+  font-size: 12px;
+  border-radius: 99px;
+  padding: 2px 8px;
+  background: var(--highlight);
+  color: var(--on-highlight);
+}
+
+.seat .pill {
+  background: var(--panel);
+}
+
+.timingBar {
+  position: relative;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--panel);
+}
+
+.timingBar::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--ink-soft);
+}
+
+.timingBar i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 3px;
+  background: var(--link);
+}
+
+.seatAngle {
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
