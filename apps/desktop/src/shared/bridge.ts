@@ -133,6 +133,10 @@ export type Bridge = {
   /** Whether there is anywhere to send clips to yet. */
   canSend(): Promise<boolean>;
   sendClip(id: string, consent: { note: string; adult: boolean; allowed: boolean }): Promise<void>;
+  /** Which version of the measuring code is installed, or null when it can't say. */
+  engineVersion(): Promise<string | null>;
+  /** Measures a finished clip again from its saved skeleton. Gives back why it couldn't, or null when it did. */
+  measureAgain(id: string): Promise<string | null>;
   getModels(): Promise<ModelsState>;
   /** Starts the download when the models are missing. Progress arrives through onModels. */
   downloadModels(): Promise<void>;
@@ -165,6 +169,8 @@ export const CHANNELS = {
   canSend: "send:ready",
   sendClip: "send:clip",
   sendProgress: "send:progress",
+  engineVersion: "engine:version",
+  measureAgain: "clips:measure-again",
   getModels: "models:get",
   downloadModels: "models:download",
   cancelModels: "models:cancel",
