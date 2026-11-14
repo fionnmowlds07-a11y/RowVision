@@ -1,21 +1,9 @@
 name: Desktop app
 
+# Pull requests are checked on Linux only. Windows costs double the Actions minutes, so it runs when
+# started by hand, which is done before testers are given a new version.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - apps/desktop/**
-      - apps/web/app/clips/**
-      - apps/web/app/settings/colours.*
-      - apps/web/app/add/**
-      - apps/web/app/guide/**
-      - apps/web/app/trend.tsx
-      - services/intake/**
-      - apps/web/app/*.css
-      - apps/web/components/shell.module.css
-      - apps/web/lib/**
-      - .github/workflows/desktop.yml
   pull_request:
     paths:
       - apps/desktop/**
@@ -28,7 +16,10 @@ on:
       - apps/web/app/*.css
       - apps/web/components/shell.module.css
       - apps/web/lib/**
-      - .github/workflows/desktop.yml
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   desktop:
@@ -36,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, windows-latest]
+        os: ${{ github.event_name == 'workflow_dispatch' && fromJSON('["ubuntu-22.04", "windows-latest"]') || fromJSON('["ubuntu-22.04"]') }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:
