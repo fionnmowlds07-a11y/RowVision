@@ -5,6 +5,7 @@ import { AddPage } from "./add-page";
 import { AnalysisPage } from "./analysis-page";
 import { ClipPage } from "./clip-page";
 import { ClipsPage } from "./clips-page";
+import { ComparePage } from "./compare-page";
 import { GuidePage } from "./guide-page";
 import { useRoute } from "./route";
 import { SettingsPage } from "./settings-page";
@@ -50,6 +51,7 @@ export function App() {
   else if (route.page === "analysis") page = <AnalysisPage key={route.id} id={route.id} />;
   else if (route.page === "settings") page = <SettingsPage colours={colours} save={save} />;
   else if (route.page === "guide") page = <GuidePage />;
+  else if (route.page === "compare") page = <ComparePage key={`${route.first}/${route.second}`} first={route.first} second={route.second} />;
   else page = <ClipsPage clips={clips} />;
 
   return (

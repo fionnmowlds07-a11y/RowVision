@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { compareOverall, compareRowers, margin } from "@/lib/compare";
+import { compareOverall, compareRowers, margin, ratesDiffer, verdictText } from "@/lib/compare";
 import type { Metric, Rower } from "@/lib/result";
 
 const TARGET = { low: 26, high: 31, sources: [], evidence: "ergometer" };
@@ -64,4 +64,21 @@ test("a small change in the overall score is not called", () => {
   expect(compareOverall(rower([], [], 84), rower([], [], 90))).toEqual({ change: 6, clear: true });
   expect(compareOverall(rower([], [], 84), rower([], [], 87))).toEqual({ change: 3, clear: false });
   expect(compareOverall(rower([], [], null), rower([], [], 87))).toBeNull();
+});
+
+test("each verdict reads in a few plain words", () => {
+  expect(verdictText({ name: "catch_lean_deg", change: 3, verdict: "unclear" })).toBe("Too close to call");
+  expect(verdictText({ name: "catch_lean_deg", change: 9, verdict: "nearer" })).toBe("Nearer the target");
+  expect(verdictText({ name: "catch_lean_deg", change: 9, verdict: "further" })).toBe("Further from the target");
+  expect(verdictText({ name: "body_swing_deg", change: 11, verdict: "more" })).toBe("11° more");
+  expect(verdictText({ name: "ratio", change: -0.3, verdict: "less" })).toBe("0.3 less");
+  expect(verdictText({ name: "ratio", change: 0, verdict: "same" })).toBe("Same");
+  expect(verdictText({ name: "ratio", change: null, verdict: null })).toBe("Not in both clips");
+});
+
+test("clips at different rates are flagged", () => {
+  const at = (rate: number | null) => ({ ...rower([]), rate_spm: rate });
+  expect(ratesDiffer(at(22), at(23))).toBe(false);
+  expect(ratesDiffer(at(22), at(30))).toBe(true);
+  expect(ratesDiffer(at(null), at(30))).toBe(false);
 });

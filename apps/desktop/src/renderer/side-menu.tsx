@@ -35,7 +35,7 @@ export function SideMenu({ route, running, clips, space }: Props) {
     <aside className={styles.side}>
       <a href="#/" className={styles.logo}>RowVision</a>
       <nav aria-label="Main" className={styles.nav}>
-        <a href="#/" aria-current={here(["clips", "clip", "add"])}><Icon name="clips" />Clips</a>
+        <a href="#/" aria-current={here(["clips", "clip", "add", "compare"])}><Icon name="clips" />Clips</a>
         <a href="#/guide" aria-current={here(["guide"])}><Icon name="guide" />Filming guide</a>
         <a href="#/settings" aria-current={here(["settings"])}><Icon name="settings" />Settings</a>
         {running ? (
