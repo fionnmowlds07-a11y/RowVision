@@ -206,3 +206,9 @@ def test_the_program_measures_again_and_tells_its_version(
     assert json.loads(capsys.readouterr().out) == {"event": "version", "version": desktop.code_version()}
     assert desktop.main(["--remeasure", str(tmp_path)]) == desktop.FINISHED
     assert json.loads(capsys.readouterr().out)["event"] == "done"
+
+
+def test_a_job_can_ask_for_the_whole_crew() -> None:
+    assert job_in(Path("clip")).setup.scope == "seat"
+    assert job_in(Path("clip"), scope="crew").setup.scope == "crew"
+    assert job_in(Path("clip"), scope="everyone").setup.scope == "seat"

@@ -7,7 +7,7 @@ from typing import Any, Protocol
 
 import numpy as np
 from rowvision.boats import boat_at
-from rowvision.pipeline import COARSE_STEP, Request, Scouting, analyse, scout
+from rowvision.pipeline import COARSE_STEP, Request, Scope, Scouting, analyse, scout
 from rowvision.pose import PoseBackend, RtmBackend
 from rowvision.report import analysis_json, boat_choices_json
 from rowvision.seats import track_at
@@ -15,6 +15,7 @@ from rowvision.version import code_version
 from rowvision.video import VideoReader
 
 BOAT_SEATS = {"1x": 1, "2x": 2, "2-": 2, "4x": 4, "4-": 4, "4+": 4, "8+": 8}
+MEASURING = {Scope.SEAT: "Measuring your rower", Scope.CREW: "Measuring your crew"}
 TAP_REACH_TRUNKS = 2.5
 """How far from the middle of a rower's body a tap may land. Heads and feet are about this far."""
 
@@ -37,6 +38,8 @@ class Setup:
     side: str
     seat: int
     tap: Tap | None
+    scope: str = "seat"
+    """"seat" measures the athlete alone. "crew" measures every seat, which takes far longer."""
 
 
 @dataclass(frozen=True)
@@ -81,6 +84,7 @@ def plan_request(scouting: Scouting, setup: Setup, video: Video) -> Request | No
         "seat": setup.seat,
         "boats_in_video": max(confirmed, 1),
         "side": setup.side,
+        "scope": Scope(setup.scope),
     }
     if not scouting.boats:
         return Request(**base)
@@ -145,7 +149,7 @@ class RealEngine:
         if request is None:
             return pause_for(scouting, video)
         analysis = analyse(
-            watched("Measuring your rower"), video.frames, video.fps, request, backend, scouting
+            watched(MEASURING[request.scope]), video.frames, video.fps, request, backend, scouting
         )
         if analysis.needs_boat_choice or (scouting.boats and not analysis.rowers and _unseen(analysis)):
             return pause_for(scouting, video)

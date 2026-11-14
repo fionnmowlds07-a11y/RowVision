@@ -35,7 +35,7 @@ from rowvision.seats import assign_seats, track_at
 from rowvision.shots import Shot, ShotKind, split_shots
 from rowvision.skeleton import FloatArray
 from rowvision.strokes import StrokeTimeline, crew_reach, detect_strokes, reach_signal
-from rowvision.timing import FollowTiming, follow_timing, leader_seat
+from rowvision.timing import FollowTiming, follow_timing, leader_seat, seat_side
 from rowvision.tracking import Track, track_people
 from rowvision.view import estimate_view_deg
 
@@ -148,6 +148,8 @@ class Analysis:
     """Share of the chosen boat's frames dropped because another boat crossed it."""
     frame_views: FloatArray | None = None
     """The camera angle used to correct each frame."""
+    own_seat: int | None = None
+    """The athlete's own seat, when a whole crew was measured."""
 
 
 def coarse_pass(
@@ -419,14 +421,17 @@ def analyse(
     frame_views = correction_views(views, view)
 
     targets: list[tuple[int | None, Track]] = []
+    own_seat = request.seat
+    tapped: Track | None = None
+    if request.tap is not None:
+        frame, x, y = request.tap
+        tapped = track_at(boat.tracks, frame // COARSE_STEP, np.array([x, y]))
+        if tapped is not None:
+            own_seat = next((s for s, t in assignment.seats.items() if t is tapped), None)
     if request.scope is Scope.CREW:
         targets = list(assignment.seats.items())
     elif request.tap is not None:
-        frame, x, y = request.tap
-        chosen = track_at(boat.tracks, frame // COARSE_STEP, np.array([x, y]))
-        if chosen is not None:
-            seat = next((s for s, t in assignment.seats.items() if t is chosen), None)
-            targets = [(seat, chosen)]
+        targets = [] if tapped is None else [(own_seat, tapped)]
     elif request.seat in assignment.seats:
         targets = [(request.seat, assignment.seats[request.seat])]
     elif rowers:
@@ -449,7 +454,8 @@ def analyse(
 
     leaders: dict[int | None, int] = {}
     for seat, _ in targets:
-        leader = None if seat is None else leader_seat(seat, request.boat_seats, request.side)
+        side = seat_side(seat, own_seat, request.side)
+        leader = None if seat is None else leader_seat(seat, request.boat_seats, side)
         if leader is not None and leader in assignment.seats:
             leaders[seat] = leader
     wanted = dict(targets)
@@ -505,4 +511,5 @@ def analyse(
         warnings,
         overlap_share=overlap_share,
         frame_views=frame_views,
+        own_seat=own_seat if request.scope is Scope.CREW else None,
     )

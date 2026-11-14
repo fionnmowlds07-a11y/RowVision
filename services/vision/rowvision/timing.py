@@ -39,6 +39,17 @@ def leader_seat(seat: int, boat_seats: int, side: str) -> int | None:
     return boat_seats
 
 
+def seat_side(seat: int | None, own_seat: int | None, own_side: str) -> str:
+    """Return the side a seat rows on, worked out from the athlete's own seat and side.
+
+    Sides alternate along a sweep boat, so seats an even number apart row on the same side. With
+    no seat to count from, the athlete's own side is used.
+    """
+    if own_side == "scull" or seat is None or own_seat is None or (seat - own_seat) % 2 == 0:
+        return own_side
+    return "bow" if own_side == "stroke" else "stroke"
+
+
 def _lag(mine: FloatArray, theirs: FloatArray, centre: int, half: int, reach: int) -> int | None:
     """Return how many frames my movement trails the leader's around one moment.
 

@@ -15,7 +15,7 @@ import numpy as np
 from rowvision import skeleton as sk
 from rowvision.pipeline import RowerResult, measure_rower
 from rowvision.reliability import Band, Rating
-from rowvision.report import rower_json
+from rowvision.report import crew_summary, own_rower, rower_json
 from rowvision.skeleton import FloatArray
 from rowvision.strokes import StrokeTimeline
 from rowvision.timing import FollowTiming
@@ -75,12 +75,9 @@ def _saved_rating(rating: dict[str, Any]) -> Rating:
     )
 
 
-def remeasure_rower(summary: dict[str, Any], frames: dict[str, Any]) -> RowerResult:
-    """Measure the saved rower with the current code."""
-    saved = summary.get("rower")
-    poses = frames.get("poses")
-    if saved is None or not poses:
-        raise NoSkeleton("this result has no saved joints to measure from")
+def _remeasure_one(
+    summary: dict[str, Any], saved: dict[str, Any], poses: list[Any], views: FloatArray
+) -> RowerResult:
     count = int(summary["frames"])
     fps = float(summary["fps"])
     points, scores = saved_points(poses, count)
@@ -91,7 +88,7 @@ def remeasure_rower(summary: dict[str, Any], frames: dict[str, Any]) -> RowerRes
         scores,
         int(summary["facing"]),
         float(summary.get("view_deg") or 0.0),
-        saved_views(frames.get("views"), summary.get("view_deg"), count),
+        views,
         fps,
         saved_timeline(saved, fps),
         trunk_px=float(evidence["trunk_px"]) if evidence else 1.0,
@@ -105,14 +102,42 @@ def remeasure_rower(summary: dict[str, Any], frames: dict[str, Any]) -> RowerRes
     return replace(result, rating=_saved_rating(saved["rating"]), evidence=None)
 
 
-def remeasure(summary: dict[str, Any], frames: dict[str, Any]) -> dict[str, Any]:
-    """Return a full report for a saved result, measured with the current code."""
-    rower = remeasure_rower(summary, frames)
+def remeasure_rower(summary: dict[str, Any], frames: dict[str, Any]) -> RowerResult:
+    """Measure the saved rower with the current code."""
+    saved = summary.get("rower")
+    poses = frames.get("poses")
+    if saved is None or not poses:
+        raise NoSkeleton("this result has no saved joints to measure from")
     count = int(summary["frames"])
     views = saved_views(frames.get("views"), summary.get("view_deg"), count)
+    return _remeasure_one(summary, saved, poses, views)
+
+
+def remeasure(summary: dict[str, Any], frames: dict[str, Any]) -> dict[str, Any]:
+    """Return a full report for a saved result, measured with the current code.
+
+    A whole-crew result has every seat measured again, from the joints saved for each seat.
+    """
+    count = int(summary["frames"])
+    facing = int(summary["facing"])
+    views = saved_views(frames.get("views"), summary.get("view_deg"), count)
     kept = {key: value for key, value in summary.items() if key not in ("rower", "version")}
+    report = {**kept, "views": frames.get("views")}
+    crew = summary.get("crew")
+    if not crew:
+        rower = remeasure_rower(summary, frames)
+        return {**report, "rower": rower_json(rower, count, facing, views)}
+    saved_crew = frames.get("crew") or {}
+    again = []
+    for saved in crew:
+        poses = (saved_crew.get(str(saved["seat"])) or {}).get("poses")
+        if not poses:
+            raise NoSkeleton("this result has no saved joints to measure from")
+        again.append(rower_json(_remeasure_one(summary, saved, poses, views), count, facing, views))
+    own = (summary.get("rower") or {}).get("seat")
     return {
-        **kept,
-        "views": frames.get("views"),
-        "rower": rower_json(rower, count, int(summary["facing"]), views),
+        **report,
+        "rower": own_rower(again, own),
+        "crew": again,
+        "crew_summary": crew_summary(again),
     }
