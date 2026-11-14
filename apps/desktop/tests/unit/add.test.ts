@@ -25,7 +25,7 @@ const good = () => ({
 });
 
 test("a good request comes through tidied", () => {
-  expect(cleanAdd(good())).toEqual({ ...good(), note: "Saturday" });
+  expect(cleanAdd(good())).toEqual({ ...good(), note: "Saturday", scope: "seat" });
   expect(cleanAdd({ ...good(), section: { start: 0, length: null }, tap: null })).not.toBeNull();
 });
 
@@ -57,11 +57,24 @@ test("adding writes the clip's folder and leaves the video where it is", async (
   const clip = JSON.parse(readFileSync(path.join(library, id, "clip.json"), "utf8"));
   expect(clip).toEqual({
     created_at: "2026-11-08T10:00:00.000Z", filmed_at: "2026-11-08T09:30:00.000Z", source: video, source_bytes: 18,
-    boat_class: "2-", side: "bow", seat: 2, note: "Saturday", section_start: 4.5, section_length: 30, tap: { t: 1.2, x: 0.4, y: 0.6 },
+    boat_class: "2-", side: "bow", seat: 2, note: "Saturday", section_start: 4.5, section_length: 30, tap: { t: 1.2, x: 0.4, y: 0.6 }, scope: "seat",
   });
   expect(readFileSync(video, "utf8")).toBe("not really a video");
 });
 
 test("a missing video is refused", async () => {
   await expect(addClip(path.join(folder, "clips"), { ...cleanAdd(good())!, source: path.join(folder, "gone.mp4") })).rejects.toThrow(/can't be found/);
+});
+
+test("a whole crew can be asked for, except in a single", () => {
+  expect(cleanAdd({ ...good(), scope: "crew" })?.scope).toBe("crew");
+  expect(cleanAdd({ ...good(), scope: "seat" })?.scope).toBe("seat");
+  expect(cleanAdd({ ...good(), scope: "crew", setup: { boat: "1x", side: "scull", seat: 1 } })?.scope).toBe("seat");
+  expect(cleanAdd({ ...good(), scope: "everyone" })).toBeNull();
+});
+
+test("the clip remembers that the whole crew was asked for", async () => {
+  const library = path.join(folder, "clips");
+  const id = await addClip(library, cleanAdd({ ...good(), scope: "crew" })!);
+  expect(JSON.parse(readFileSync(path.join(library, id, "clip.json"), "utf8")).scope).toBe("crew");
 });

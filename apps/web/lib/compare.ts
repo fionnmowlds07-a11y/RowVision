@@ -1,6 +1,7 @@
 /** Compare two results of the same rower, without reading more into a change than the footage can show. */
 
 import { MARGIN_DEG } from "./history";
+import { formatChange } from "./logic";
 import type { Metric, Rower } from "./result";
 
 export type Verdict = "nearer" | "further" | "more" | "less" | "unclear" | "same";
@@ -75,4 +76,22 @@ export function compareOverall(before: Rower, after: Rower): { change: number; c
   const now = after.card.overall;
   if (was === null || now === null) return null;
   return { change: now - was, clear: Math.abs(now - was) >= OVERALL_MARGIN };
+}
+
+/** A few plain words for a row's verdict. */
+export function verdictText(row: Pick<Comparison, "name" | "change" | "verdict">): string {
+  if (row.verdict === null) return "Not in both clips";
+  if (row.verdict === "same") return "Same";
+  if (row.verdict === "unclear") return "Too close to call";
+  if (row.verdict === "nearer") return "Nearer the target";
+  if (row.verdict === "further") return "Further from the target";
+  return formatChange(row.name, row.change);
+}
+
+/** Rhythm depends on the rate, so two clips at different rates are not like for like. */
+export const RATE_MARGIN = 2;
+
+export function ratesDiffer(before: Rower, after: Rower): boolean {
+  if (before.rate_spm === null || after.rate_spm === null) return false;
+  return Math.abs(before.rate_spm - after.rate_spm) > RATE_MARGIN;
 }

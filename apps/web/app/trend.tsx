@@ -12,6 +12,8 @@ const SERIES: Series[] = [
   { title: "Catch lean", unit: "°", margin: MARGIN_DEG, read: (point) => point.catchLean },
   { title: "Layback", unit: "°", margin: MARGIN_DEG, read: (point) => point.layback },
   { title: "Overall", unit: "", margin: 0, read: (point) => point.overall },
+  { title: "Body swing", unit: "°", margin: MARGIN_DEG, read: (point) => point.bodySwing ?? null },
+  { title: "Rate", unit: "", margin: 0, read: (point) => point.rate ?? null },
 ];
 
 function Small({ series, points }: { series: Series; points: TrendPoint[] }) {
@@ -62,7 +64,7 @@ export function Trend({ points }: { points: TrendPoint[] }) {
       <details>
         <summary>See the numbers</summary>
         <table className={styles.table}>
-          <thead><tr><th scope="col">Clip</th><th scope="col">Catch lean</th><th scope="col">Layback</th><th scope="col">Overall</th></tr></thead>
+          <thead><tr><th scope="col">Clip</th>{SERIES.map((series) => <th key={series.title} scope="col">{series.title}</th>)}</tr></thead>
           <tbody>
             {points.map((point) => (
               <tr key={point.when}>

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { CompareWith } from "./compare-page";
 import { SendClip } from "./send-dialog";
 import { libraryChanged } from "./use-library";
+import { Crew } from "@/app/clips/[id]/crew";
 import { Results } from "@/app/clips/[id]/results";
 import { clipUrl, type ClipDetail } from "../shared/bridge";
 import { longDate, setupLine, size } from "./format";
@@ -8,6 +10,8 @@ import { longDate, setupLine, size } from "./format";
 export function ClipPage({ id }: { id: string }) {
   const [clip, setClip] = useState<ClipDetail | null | undefined>(undefined);
   const [count, setCount] = useState(0);
+  // Which seat of a measured crew is shown. Undefined until one is pressed, which means the athlete's own.
+  const [seat, setSeat] = useState<number | null | undefined>(undefined);
 
   useEffect(() => {
     let live = true;
@@ -26,6 +30,10 @@ export function ClipPage({ id }: { id: string }) {
   }
 
   const { summary } = clip;
+  const crew = summary?.crew ?? null;
+  const own = summary?.rower?.seat ?? null;
+  const chosen = seat === undefined ? own : seat;
+  const shown = crew?.find((rower) => rower.seat === chosen) ?? summary?.rower ?? null;
   return (
     <>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -46,16 +54,23 @@ export function ClipPage({ id }: { id: string }) {
           <p className="soft">{summary.film_closer ?? summary.warnings[0] ?? "We couldn't find your rower in this clip."}</p>
         </section>
       ) : (
+        <>
+        {crew && crew.length > 1 ? <Crew crew={crew} summary={summary.crew_summary} ownSeat={own} chosen={chosen} onChoose={setSeat} /> : null}
+        {crew && crew.length > 1 ? <h2 style={{ fontSize: 24 }}>{chosen === own ? "Your results" : `Seat ${chosen ?? "unknown"}`}</h2> : null}
         <Results
+          key={chosen ?? "own"}
           side={clip.setup.side ?? "stroke"}
           summary={summary}
-          rower={summary.rower}
+          rower={shown ?? summary.rower}
+          crewSeat={crew && crew.length > 1 ? chosen : null}
           videoLink={clip.hasVideo ? clipUrl(clip.id, "working.mp4") : null}
           framesLink={clip.hasVideo ? clipUrl(clip.id, "frames.json") : null}
           oldVersion={false}
           daysLeft={null}
         />
+        </>
       )}
+      {summary?.rower ? <CompareWith id={clip.id} /> : null}
       <Manage clip={clip} onChange={() => { setCount((value) => value + 1); libraryChanged(); }} />
     </>
   );

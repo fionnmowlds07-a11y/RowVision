@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TREND_MINIMUM, trendPoints, type ClipRow } from "@/lib/history";
 import { Trend } from "@/app/trend";
 import type { ClipItem } from "../shared/bridge";
 import { setupLine, shortDate, size } from "./format";
+import { MeasureAgain } from "./measure-again";
+import { olderClips } from "./older";
 import styles from "./library.module.css";
 
 const STATE_TEXT = {
@@ -34,17 +36,23 @@ function asRows(clips: ClipItem[]): ClipRow[] {
     jobs: [],
     results: clip.state === "done" ? [{
       band: clip.band, accuracy: clip.accuracy, overall: clip.overall, code_version: clip.version ?? "", created_at: clip.createdAt,
-      summary: { rower: { card: { metrics: clip.metrics } } },
+      summary: { rower: { rate_spm: clip.rate, card: { metrics: clip.metrics } } },
     }] : [],
   }));
 }
 
 export function ClipsPage({ clips }: { clips: ClipItem[] | null }) {
   const [sort, setSort] = useState<Sort>("date");
+  const [version, setVersion] = useState<string | null>(null);
+  useEffect(() => {
+    void window.rowvision.engineVersion().then(setVersion);
+  }, []);
   if (clips === null) return <p aria-busy="true">Loading your clips…</p>;
   const sorted = clips.slice().sort(ORDER[sort]);
   const newest = sort === "date" ? sorted.find((clip) => score(clip) !== null)?.id : undefined;
   const points = trendPoints(asRows(clips), null);
+  const older = olderClips(clips, version);
+  const isOlder = new Set(older.map((clip) => clip.id));
 
   const header = (name: Sort, label: string) => (
     <th scope="col" aria-sort={sort === name ? "descending" : undefined}>
@@ -67,6 +75,8 @@ export function ClipsPage({ clips }: { clips: ClipItem[] | null }) {
           <a href="#/guide">How to film a good clip</a>
         </section>
       ) : (
+        <>
+        <MeasureAgain older={older} />
         <div className={styles.tableCard}>
           <table className={styles.table}>
             <thead>
@@ -84,7 +94,7 @@ export function ClipsPage({ clips }: { clips: ClipItem[] | null }) {
                 const shown = score(clip);
                 return (
                   <tr key={clip.id}>
-                    <td><a href={clip.state === "done" ? `#/clip/${clip.id}` : `#/analysis/${clip.id}`}>{shortDate(filmed(clip))}</a></td>
+                    <td><a href={clip.state === "done" ? `#/clip/${clip.id}` : `#/analysis/${clip.id}`}>{shortDate(filmed(clip))}</a>{isOlder.has(clip.id) ? <span className={styles.older}>Older version</span> : null}</td>
                     <td>{setupLine(clip.setup) || "–"}{clip.setup.note ? <span className={styles.note}>{clip.setup.note}</span> : null}</td>
                     <td>
                       {shown !== null ? <span className={clip.id === newest ? styles.scoreMain : styles.score}>{shown}</span>
@@ -99,6 +109,7 @@ export function ClipsPage({ clips }: { clips: ClipItem[] | null }) {
             </tbody>
           </table>
         </div>
+        </>
       )}
       {clips.length > 0 ? (
         points.length >= TREND_MINIMUM ? <Trend points={points} /> : (
