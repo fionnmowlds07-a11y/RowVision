@@ -219,6 +219,21 @@ test("the results show the extra numbers, and every stroke as a chart and a tabl
   await page.evaluate(() => { window.location.hash = "#/"; });
 });
 
+test("two clips are compared side by side, the earlier one first", async () => {
+  await page.evaluate(() => { window.location.hash = "#/clip/test-clip"; });
+  const pick = page.getByRole("region", { name: "Compare with another clip" });
+  const options = await pick.getByRole("option").allTextContents();
+  expect(options.length).toBeGreaterThanOrEqual(2);
+  await pick.getByRole("combobox").selectOption({ index: 1 });
+  await expect(page.getByRole("heading", { name: "Compare two clips" })).toBeVisible();
+  const table = page.getByRole("region", { name: "Comparison" });
+  await expect(table.getByRole("row", { name: /Overall/ })).toBeVisible();
+  await expect(table.getByRole("row", { name: /Body angle at the catch/ })).toContainText("28° forward");
+  await expect(table).toContainText("measurement noise");
+  if (process.env.ROWVISION_SHOT) await page.screenshot({ path: process.env.ROWVISION_SHOT.replace(".png", "-compare.png"), fullPage: true });
+  await page.evaluate(() => { window.location.hash = "#/"; });
+});
+
 test("colours are saved on this computer", async () => {
   await page.getByRole("link", { name: "Settings" }).click();
   await page.getByRole("button", { name: "Forest" }).click();
