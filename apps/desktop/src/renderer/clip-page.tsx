@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { CompareWith } from "./compare-page";
 import { SendClip } from "./send-dialog";
 import { libraryChanged } from "./use-library";
 import { Results } from "@/app/clips/[id]/results";
@@ -56,6 +57,7 @@ export function ClipPage({ id }: { id: string }) {
           daysLeft={null}
         />
       )}
+      {summary?.rower ? <CompareWith id={clip.id} /> : null}
       <Manage clip={clip} onChange={() => { setCount((value) => value + 1); libraryChanged(); }} />
     </>
   );
