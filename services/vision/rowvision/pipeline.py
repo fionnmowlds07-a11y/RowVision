@@ -31,7 +31,7 @@ from rowvision.pose import PoseBackend
 from rowvision.reference import Targets, load_targets
 from rowvision.reliability import Calibration, Evidence, Rating, load_calibration, rate
 from rowvision.scoring import ScoreCard, score_stroke
-from rowvision.seats import assign_seats, track_at
+from rowvision.seats import assign_seats, seat_holding, track_at
 from rowvision.shots import Shot, ShotKind, split_shots
 from rowvision.skeleton import FloatArray
 from rowvision.strokes import StrokeTimeline, crew_reach, detect_strokes, reach_signal
@@ -427,7 +427,9 @@ def analyse(
         frame, x, y = request.tap
         tapped = track_at(boat.tracks, frame // COARSE_STEP, np.array([x, y]))
         if tapped is not None:
-            own_seat = next((s for s, t in assignment.seats.items() if t is tapped), None)
+            own_seat = seat_holding(assignment.seats, tapped, frame // COARSE_STEP)
+            if own_seat is not None:
+                tapped = assignment.seats[own_seat]
     if request.scope is Scope.CREW:
         targets = list(assignment.seats.items())
     elif request.tap is not None:
