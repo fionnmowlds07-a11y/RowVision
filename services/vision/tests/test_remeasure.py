@@ -165,3 +165,12 @@ def test_a_crew_with_a_seat_missing_its_joints_cannot_be_measured_again() -> Non
     del frames["crew"]["1"]
     with pytest.raises(NoSkeleton):
         remeasure(summary, frames)
+
+
+def test_a_sweep_crew_stays_compared_along_each_side_when_measured_again() -> None:
+    summary, frames = saved_crew()
+    assert not remeasure(summary, frames)["crew_summary"]["along_sides"]
+    summary["crew_summary"]["along_sides"] = True
+    again = remeasure(summary, frames)["crew_summary"]
+    assert again["along_sides"]
+    assert again["catch_lean_range_deg"] is None
