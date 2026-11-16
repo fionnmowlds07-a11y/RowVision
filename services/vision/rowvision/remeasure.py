@@ -135,9 +135,10 @@ def remeasure(summary: dict[str, Any], frames: dict[str, Any]) -> dict[str, Any]
             raise NoSkeleton("this result has no saved joints to measure from")
         again.append(rower_json(_remeasure_one(summary, saved, poses, views), count, facing, views))
     own = (summary.get("rower") or {}).get("seat")
+    saved_summary = summary.get("crew_summary") or {}
     return {
         **report,
         "rower": own_rower(again, own),
         "crew": again,
-        "crew_summary": crew_summary(again),
+        "crew_summary": crew_summary(again, bool(saved_summary.get("along_sides"))),
     }
