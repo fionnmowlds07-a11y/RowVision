@@ -72,4 +72,11 @@ describe("work on next", () => {
   test("Poor with no notes still says what to do", () => {
     expect(workOnNext(rower([], "Poor")).items[0].text).toContain("alongside the boat");
   });
+
+  test("a clip with no scores gets filming advice, not praise", () => {
+    const reason = "Too much of this video was filmed end-on.";
+    const advice = workOnNext({ ...rower([metric("catch_lean_deg", 23, 26, 31, null)], "Good", [reason]), no_scores: reason });
+    expect(advice.kind).toBe("filming");
+    expect(advice.items[0].text).toBe(reason);
+  });
 });

@@ -5,6 +5,7 @@ from crew import crew_detections, distant_people, two_boat_detections
 from rowvision.pipeline import (
     COARSE_STEP,
     FILM_CLOSER,
+    FILM_SIDE_ON,
     Analysis,
     Request,
     RowerResult,
@@ -427,3 +428,27 @@ def test_a_clip_with_too_few_clear_strokes_is_measured_whole() -> None:
     points, clear, timeline = panned_to_end_on()
     barely = clear & (np.arange(len(points)) < timeline.catches[2])
     assert measured(points, barely, timeline).summary == measured(points, None, timeline).summary
+
+
+def test_a_clip_filmed_mostly_end_on_gets_figures_and_no_scores() -> None:
+    points, clear, timeline = panned_to_end_on()
+    barely = clear & (np.arange(len(points)) < timeline.catches[2])
+    scored = measured(points, None, timeline)
+    assert scored.no_scores is None and any(m.score is not None for m in scored.card.metrics)
+    rower = measured(points, barely, timeline)
+    assert rower.no_scores == FILM_SIDE_ON and rower.rating.warnings[0] == FILM_SIDE_ON
+    assert rower.card.overall is None and not rower.card.phases
+    assert all(metric.score is None for metric in rower.card.metrics)
+    assert [m.value for m in rower.card.metrics] == [m.value for m in scored.card.metrics]
+
+
+def test_a_clip_with_enough_clear_strokes_keeps_its_scores() -> None:
+    points, clear, timeline = panned_to_end_on()
+    assert measured(points, clear, timeline).no_scores is None
+
+
+def test_one_end_on_stroke_among_clear_ones_keeps_the_scores() -> None:
+    points, _, timeline = panned_to_end_on()
+    mostly = np.arange(len(points)) < timeline.catches[2]
+    short = StrokeTimeline(timeline.catches[:4], timeline.finishes[:3], timeline.rate_spm, 0.0)
+    assert measured(points, mostly, short).no_scores is None
