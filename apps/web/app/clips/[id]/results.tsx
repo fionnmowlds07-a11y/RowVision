@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { evidenceFrames, formatTarget, formatValue, laneMarks, modelFits, overallGap, overallVisible, ratingNote, sourceLink, timingText } from "@/lib/logic";
 import type { FrameData, Metric, Rower, Summary } from "@/lib/result";
+import { strokeSeries } from "@/lib/strokes";
 import { workOnNext } from "@/lib/work-on-next";
 import { Evidence } from "./evidence";
 import { makeScene } from "./draw";
@@ -13,6 +14,35 @@ import { Viewer, type Jump } from "./viewer";
 import styles from "./clip.module.css";
 
 const MIN_STROKES = 3;
+/** The fewest strokes the stroke-by-stroke charts are drawn for. */
+const MIN_CHARTED_STROKES = 2;
+const VIEW_KEY = "rowvision.clip-view";
+const SECTIONS = [
+  ["scores", "Scores"],
+  ["more-numbers", "More numbers"],
+  ["timing", "Timing"],
+  ["stroke-by-stroke", "Stroke by stroke"],
+] as const;
+
+type View = "split" | "stats";
+
+const VIEW_CHANGED = "rowvision:clip-view";
+
+/** The view last chosen on this computer. Storage can be blocked, and then the video is shown. */
+function savedView(): View {
+  try {
+    return window.localStorage.getItem(VIEW_KEY) === "stats" ? "stats" : "split";
+  } catch {
+    return "split";
+  }
+}
+
+function watchView(changed: () => void) {
+  window.addEventListener(VIEW_CHANGED, changed);
+  return () => window.removeEventListener(VIEW_CHANGED, changed);
+}
+
+let unsavedView: View | null = null;
 
 type Props = {
   side: string;
@@ -34,6 +64,33 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
   const [fullScreen, setFullScreen] = useState(false);
   const [jump, setJump] = useState<Jump | null>(null);
   const [model, setModel] = useState<string | null>(null);
+  const view = useSyncExternalStore<View>(watchView, () => unsavedView ?? savedView(), () => "split");
+  // Some sections are left out when the clip has nothing for them, so the links follow what is on the page.
+  const sections = useMemo(() => {
+    const charted = rower.strokes.length >= MIN_CHARTED_STROKES && strokeSeries(rower, summary.fps).length > 0;
+    return SECTIONS.filter(([id]) => (
+      id === "scores"
+      || (id === "more-numbers" && Boolean(rower.card.extras?.length))
+      || (id === "timing" && Boolean(rower.timing))
+      || (id === "stroke-by-stroke" && charted)
+    ));
+  }, [rower, summary.fps]);
+
+  function choose(next: View) {
+    try {
+      window.localStorage.setItem(VIEW_KEY, next);
+      unsavedView = null;
+    } catch {
+      // Storage is blocked, so the choice holds until the app is closed.
+      unsavedView = next;
+    }
+    window.dispatchEvent(new Event(VIEW_CHANGED));
+  }
+
+  function goToSection(id: string) {
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.getElementById(id)?.scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" });
+  }
 
   useEffect(() => {
     if (!framesLink) return;
@@ -114,11 +171,25 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
       {oldVersion ? <p className={styles.caution}>Measured with an older version of RowVision. You can measure it again below while the video exists.</p> : null}
       {notes.length ? <ul className={styles.notes}>{notes.map((text) => <li key={text}>{text}</li>)}</ul> : null}
 
-      <div className={styles.body}>
+      <nav className={styles.toolbar} aria-label="Results">
+        <ul className={styles.sectionLinks}>
+          {sections.map(([id, name]) => (
+            <li key={id}><button type="button" onClick={() => goToSection(id)}>{name}</button></li>
+          ))}
+        </ul>
+        {videoLink ? (
+          <div className={styles.viewSwitch} role="group" aria-label="What to show">
+            <button type="button" aria-pressed={view === "split"} onClick={() => choose("split")}>Video and stats</button>
+            <button type="button" aria-pressed={view === "stats"} onClick={() => choose("stats")}>Stats only</button>
+          </div>
+        ) : null}
+      </nav>
+
+      <div className={`${styles.body} ${view === "stats" || !videoLink ? styles.statsOnly : ""}`}>
         {videoLink ? (
           <div className={styles.videoColumn}>
             <button type="button" className={`button primary ${styles.openVideo}`} onClick={() => setFullScreen(true)}>Open video</button>
-            <div className={fullScreen ? undefined : styles.videoHolder}>
+            <div className={fullScreen ? undefined : view === "stats" ? styles.videoAway : styles.videoHolder}>
               <Viewer
                 link={videoLink}
                 fps={summary.fps}
@@ -135,6 +206,7 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
           <p className={styles.gone}>The video has been deleted, as it is after 30 days. Your scores stay here.</p>
         )}
         <div className={styles.side}>
+          <div id="scores" className={styles.cluster}>
           <section className="card stack">
             <h2 style={{ fontSize: 24 }}>{advice.kind === "filming" ? "Film it better next time" : "Work on next"}</h2>
             <ol className={styles.advice}>
@@ -182,8 +254,10 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
             </ul>
             {firstModel ? <button type="button" className="button quiet" onClick={() => setModel(firstModel.name)}>See the 3D model</button> : null}
           </section>
-          <MoreNumbers extras={card.extras} />
-          <Strokes rower={rower} fps={summary.fps} onPick={videoLink ? show : null} />
+          </div>
+          <div className={styles.cluster}>
+          <div id="more-numbers" className={styles.section}><MoreNumbers extras={card.extras} /></div>
+          <div id="timing" className={styles.section}>
           {rower.timing ? (
             <section className="card stack">
               <h2 style={{ fontSize: 19 }}>Timing against seat {rower.timing.leader_seat}</h2>
@@ -192,6 +266,11 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
               <p className="soft" style={{ fontSize: 13 }}>Trend across {rower.timing.strokes} strokes, from hand movement. Not scored, and good to about 50 ms.</p>
             </section>
           ) : null}
+          </div>
+          </div>
+          <div id="stroke-by-stroke" className={`${styles.section} ${styles.across}`}>
+            <Strokes rower={rower} fps={summary.fps} onPick={videoLink ? show : null} numbersOpen={view === "stats"} />
+          </div>
         </div>
       </div>
       {model ? <ModelDialog name={model} side={side} metrics={card.metrics} onClose={() => setModel(null)} /> : null}
