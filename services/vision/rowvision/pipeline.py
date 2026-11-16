@@ -34,7 +34,7 @@ from rowvision.reference import Targets, load_targets
 from rowvision.reliability import Calibration, Evidence, Rating, load_calibration, rate
 from rowvision.scoring import ScoreCard, score_stroke
 from rowvision.seats import assign_seats, seat_holding, track_at
-from rowvision.shots import Shot, ShotKind, split_shots
+from rowvision.shots import Shot, ShotKind, clear_frames, split_shots
 from rowvision.skeleton import FloatArray
 from rowvision.strokes import StrokeTimeline, crew_reach, detect_strokes, reach_signal
 from rowvision.timing import FollowTiming, follow_timing, leader_seat, seat_side
@@ -310,23 +310,30 @@ def measure_rower(
     )
     angles = angle_series(points, facing, frame_views, side, turns)
     readable = forward_lean_readable(points, facing, frame_views, side, turns)
+    mixed = clear is not None and bool(clear.any()) and not bool(clear.all())
+    if clear is not None and mixed:
+        angles = _without_end_on(angles, clear)
     strokes = per_stroke(angles, timeline, fps, catch_lean_readable=readable)
+    # Where some of the clip is clear of end-on, the rower's figures come from those strokes alone.
+    # On a real clip that panned round from astern, the end-on strokes read a catch angle near 3
+    # degrees for a rower who read 20 side-on, and nine of them pulled the rower's figure down.
+    counted = [s for s in strokes if clear is None or not mixed or clear[s.catch_frame]] or strokes
     summary: dict[str, float] = {}
     spread: dict[str, float] = {}
     for name in MEASURES:
-        values = np.array([getattr(stroke, name) for stroke in strokes], dtype=float)
+        values = np.array([getattr(stroke, name) for stroke in counted], dtype=float)
         values = values[np.isfinite(values)]
-        if len(values) and len(values) >= MIN_KNOWN_SHARE * len(strokes):
+        if len(values) and len(values) >= MIN_KNOWN_SHARE * len(counted):
             summary[name] = float(np.median(values))
             spread[name] = float(np.subtract(*np.percentile(values, [75, 25])))
-    steadiness = rate_steadiness(strokes)
+    steadiness = rate_steadiness(counted)
     if np.isfinite(steadiness):
         summary["rate_steadiness"] = steadiness
     card = score_stroke(
-        summary, spread, len(strokes), timeline.rate_spm, targets if targets is not None else load_targets()
+        summary, spread, len(counted), timeline.rate_spm, targets if targets is not None else load_targets()
     )
     evidence = Evidence(
-        trunk_px, view, spread.get("catch_lean_deg", 0.0), coverage, len(strokes), agreement
+        trunk_px, view, spread.get("catch_lean_deg", 0.0), coverage, len(counted), agreement
     )
     return RowerResult(
         seat,
@@ -340,9 +347,19 @@ def measure_rower(
         card,
         _with_lean_warning(rate(evidence, calibration), readable),
         evidence=evidence,
-        fade=fade(strokes),
+        fade=fade(counted),
         angles=angles,
         side=side,
+    )
+
+
+def _without_end_on(angles: AngleSeries, clear: NDArray[np.bool_]) -> AngleSeries:
+    """Blank the angles on end-on frames, where the body is seen from in front or behind."""
+    return AngleSeries(
+        np.where(clear, angles.trunk_lean, np.nan),
+        np.where(clear, angles.knee, np.nan),
+        np.where(clear, angles.elbow, np.nan),
+        None if angles.reach is None else np.where(clear, angles.reach, np.nan),
     )
 
 
@@ -438,10 +455,7 @@ def analyse(
     views = coarse_views[nearest] if len(coarse_views) else np.full(frames, np.nan)
     shots = split_shots(views, fps)
     view = _usable_view(shots, views)
-    clear = np.ones(frames, dtype=bool)
-    for shot in shots:
-        if shot.kind is ShotKind.END_ON:
-            clear[shot.start : shot.end] = False
+    clear = clear_frames(shots, frames)
 
     warnings = _boat_warnings(
         boat, assignment.surplus, request.boat_seats, found.boats, request.boats_in_video
