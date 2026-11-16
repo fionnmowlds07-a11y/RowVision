@@ -194,3 +194,17 @@ def test_a_sweep_rower_keeps_their_side_and_the_camera_turn_when_measured_again(
     assert again["rower"]["side"] == "stroke"
     assert again["turns"] == turned["turns"]
     assert remeasure(summary, frames)["rower"]["side"] is None
+
+
+def test_measuring_again_leaves_out_strokes_from_end_on_shots() -> None:
+    summary, frames = saved(8)
+    count = summary["frames"]
+    summary["shots"] = [
+        {"start": 0, "end": count // 2, "kind": "side_on"},
+        {"start": count // 2, "end": count, "kind": "end_on"},
+    ]
+    again = remeasure(summary, frames)["rower"]
+    late = [stroke for stroke in again["strokes"] if stroke["catch_frame"] >= count // 2]
+    early = [stroke for stroke in again["strokes"] if stroke["catch_frame"] < count // 2]
+    assert late and all(stroke["catch_lean_deg"] is None for stroke in late)
+    assert early and all(stroke["catch_lean_deg"] is not None for stroke in early)

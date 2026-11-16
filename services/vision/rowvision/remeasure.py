@@ -11,11 +11,13 @@ from dataclasses import replace
 from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 
 from rowvision import skeleton as sk
 from rowvision.pipeline import RowerResult, measure_rower
 from rowvision.reliability import Band, Rating
 from rowvision.report import crew_summary, own_rower, rower_json
+from rowvision.shots import ShotKind
 from rowvision.skeleton import FloatArray
 from rowvision.strokes import StrokeTimeline
 from rowvision.timing import FollowTiming, seat_side
@@ -75,6 +77,17 @@ def _saved_rating(rating: dict[str, Any]) -> Rating:
     )
 
 
+def saved_clear(shots: list[dict[str, Any]] | None, frames: int) -> NDArray[np.bool_] | None:
+    """Return which frames were clear of end-on, from the shots kept with a result, or None."""
+    if not shots:
+        return None
+    clear = np.ones(frames, dtype=bool)
+    for shot in shots:
+        if shot.get("kind") == ShotKind.END_ON:
+            clear[int(shot["start"]) : int(shot["end"])] = False
+    return clear
+
+
 def saved_turns(turns: list[float | None] | None, frames: int) -> FloatArray | None:
     """Return which way the camera was turned on each frame, or None for results from before it
     was kept, which work it out from the rower's own shoulders."""
@@ -108,6 +121,7 @@ def _remeasure_one(
         agreement=evidence.get("agreement") if evidence else None,
         side=saved.get("side"),
         turns=turns,
+        clear=saved_clear(summary.get("shots"), count),
     )
     result = replace(result, timing=_saved_timing(saved.get("timing")))
     if evidence:
