@@ -367,3 +367,15 @@ def test_a_single_rower_report_has_no_crew() -> None:
     assert report["rower"]["seat"] == 3
     assert report["crew"] is None
     assert report["crew_summary"] is None
+
+
+def test_a_tap_on_someone_without_a_seat_still_tells_the_two_sides_apart() -> None:
+    # Five people in a four: one holds no seat, as a cox would not.
+    backend = FakeBackend(5)
+    sides = []
+    for person in backend.points[0]:
+        x, y = person.mean(axis=0)
+        request = Request(boat_seats=4, scope=Scope.CREW, seat=2, side="bow", tap=(0, float(x), float(y)))
+        result = analyse(lambda index: index, len(backend.points), FPS, request, backend)
+        sides.append({rower.seat: rower.side for rower in result.rowers})
+    assert all(set(found.values()) == {"bow", "stroke"} for found in sides)

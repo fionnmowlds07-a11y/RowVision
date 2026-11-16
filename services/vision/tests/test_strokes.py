@@ -139,3 +139,29 @@ def test_crew_signal_covers_frames_seen_by_anyone() -> None:
     second = np.array([np.nan, np.nan, 2.0, 1.0, 0.0])
     combined = crew_reach([first, second])
     assert np.isfinite(combined).all()
+
+
+def end_on_after_side_on() -> tuple[np.ndarray, np.ndarray]:
+    """Four clear strokes, then eight filmed from the bow, where reach is shapeless and out of step."""
+    period = 55
+    side_on = plateau_stroke(period, 4)
+    rng = np.random.default_rng(3)
+    end_on = 0.4 * np.roll(plateau_stroke(period, 8), period // 2) + rng.normal(0, 0.15, period * 8)
+    clear = np.arange(period * 12) < len(side_on)
+    return np.concatenate([side_on, end_on]), clear
+
+
+def test_end_on_footage_does_not_move_the_catches_filmed_side_on() -> None:
+    signal, clear = end_on_after_side_on()
+    side_on = int(clear.sum())
+    alone = detect_strokes(signal[:side_on], 30)
+    timeline = detect_strokes(signal, 30, clear)
+    assert [frame for frame in timeline.catches if frame < side_on] == alone.catches
+    assert [frame for frame in timeline.finishes if frame < side_on] == alone.finishes
+
+
+def test_rate_comes_from_clear_footage_even_when_end_on_footage_is_longer() -> None:
+    signal, clear = end_on_after_side_on()
+    slower = np.concatenate([signal[: clear.sum()], np.interp(np.arange(0, 440, 0.5), np.arange(440), signal[clear.sum() :])])
+    timeline = detect_strokes(slower, 30, np.arange(len(slower)) < clear.sum())
+    assert timeline.rate_spm == pytest.approx(60 * 30 / 55, abs=1)

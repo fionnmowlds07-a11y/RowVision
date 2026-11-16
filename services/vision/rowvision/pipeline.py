@@ -7,6 +7,7 @@ from itertools import pairwise
 from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 
 from rowvision import skeleton as sk
 from rowvision.boats import (
@@ -252,12 +253,17 @@ def _usable_view(shots: list[Shot], views: FloatArray) -> float:
 
 
 def crew_timeline(
-    crew: list[Track], facing: int, frames: int, fps: float
+    crew: list[Track],
+    facing: int,
+    frames: int,
+    fps: float,
+    clear: NDArray[np.bool_] | None = None,
 ) -> StrokeTimeline | None:
     """Time strokes from the whole crew, which is steadier than any one rower.
 
     Rowers in a boat share one rhythm, so combining them stops one rower's stroke shape from moving
-    the catch. Needs at least MIN_CREW_FOR_TIMING rowers, and otherwise returns None.
+    the catch. Needs at least MIN_CREW_FOR_TIMING rowers, and otherwise returns None. `clear` is
+    False on end-on frames, which are timed apart from the rest.
     """
     if len(crew) < MIN_CREW_FOR_TIMING:
         return None
@@ -269,7 +275,7 @@ def crew_timeline(
     positions = np.arange(len(coarse)) * COARSE_STEP
     signal = np.interp(every, positions[seen], coarse[seen])
     signal[~seen[np.minimum(every // COARSE_STEP, len(coarse) - 1)]] = np.nan
-    timeline = detect_strokes(signal, fps)
+    timeline = detect_strokes(signal, fps, clear)
     return timeline if timeline.catches else None
 
 
@@ -290,13 +296,18 @@ def measure_rower(
     calibration: Calibration | None = None,
     side: str | None = None,
     turns: FloatArray | None = None,
+    clear: NDArray[np.bool_] | None = None,
 ) -> RowerResult:
     """Measure one rower's strokes from their joints, and score and rate the result.
 
     Targets and calibration are read from their files unless given, which saves reading them again
     for each rower of a crew.
     """
-    timeline = shared if shared is not None else detect_strokes(reach_signal(points, facing), fps)
+    timeline = (
+        shared
+        if shared is not None
+        else detect_strokes(reach_signal(points, facing), fps, clear)
+    )
     angles = angle_series(points, facing, frame_views, side, turns)
     readable = forward_lean_readable(points, facing, frame_views, side, turns)
     strokes = per_stroke(angles, timeline, fps, catch_lean_readable=readable)
@@ -427,6 +438,10 @@ def analyse(
     views = coarse_views[nearest] if len(coarse_views) else np.full(frames, np.nan)
     shots = split_shots(views, fps)
     view = _usable_view(shots, views)
+    clear = np.ones(frames, dtype=bool)
+    for shot in shots:
+        if shot.kind is ShotKind.END_ON:
+            clear[shot.start : shot.end] = False
 
     warnings = _boat_warnings(
         boat, assignment.surplus, request.boat_seats, found.boats, request.boats_in_video
@@ -455,6 +470,10 @@ def analyse(
             own_seat = seat_holding(assignment.seats, tapped, frame // COARSE_STEP)
             if own_seat is not None:
                 tapped = assignment.seats[own_seat]
+        if own_seat is None and request.scope is Scope.CREW:
+            # The tap landed on someone who holds no seat, such as the cox. The seat the athlete
+            # gave still tells the two sides of a sweep crew apart.
+            own_seat = request.seat
     if request.scope is Scope.CREW:
         targets = list(assignment.seats.items())
     elif request.tap is not None:
@@ -475,7 +494,7 @@ def analyse(
             "Those frames were left out."
         )
 
-    shared = crew_timeline(rowers, assignment.facing, frames, fps)
+    shared = crew_timeline(rowers, assignment.facing, frames, fps, clear)
     agreements = dict(zip(map(id, rowers), crew_agreement(rowers), strict=True))
     in_view = boat.seen()[np.minimum(np.arange(frames) // COARSE_STEP, coarse_frames - 1)]
 
@@ -521,6 +540,7 @@ def analyse(
             calibration=calibration,
             side=seat_side(seat, own_seat, request.side),
             turns=frame_turns,
+            clear=clear,
         )
         if seat in leaders:
             leader = leaders[seat]
