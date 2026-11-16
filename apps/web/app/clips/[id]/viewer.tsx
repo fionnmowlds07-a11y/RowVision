@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import {
   FIT, bodyCentre, centreOn, clampFrame, clampView, clipTime, nextMarker, viewPoint, zoomAt,
   type Point, type View,
@@ -225,7 +225,7 @@ export function Viewer({ link, fps, frames, rower, scene, jump, fullScreen, onCl
       <div
         ref={stage}
         className={styles.stage}
-        style={size.width ? { aspectRatio: `${size.width} / ${size.height}` } : undefined}
+        style={size.width ? { aspectRatio: `${size.width} / ${size.height}`, "--ratio": size.width / size.height } as CSSProperties : undefined}
         onPointerDown={pointerDown}
         onPointerMove={pointerMove}
         onPointerUp={pointerUp}
@@ -275,41 +275,51 @@ export function Viewer({ link, fps, frames, rower, scene, jump, fullScreen, onCl
       ) : null}
 
       <div className={styles.controls}>
-        <button type="button" className="button primary" onClick={togglePlay}>{playing ? "Pause" : "Play"}</button>
-        <button type="button" className="button quiet" onClick={() => goTo(frame - 1)}>Back 1</button>
-        <button type="button" className="button quiet" onClick={() => goTo(frame + 1)}>Forward 1</button>
-        <button type="button" className="button quiet" onClick={() => jumpTo(rower.catches, -1)}>Last catch</button>
-        <button type="button" className="button quiet" onClick={() => jumpTo(rower.catches, 1)}>Next catch</button>
-        <button type="button" className="button quiet" onClick={() => jumpTo(rower.finishes, 1)}>Next finish</button>
-        <span className={styles.wide}>
-          <button type="button" className="button quiet" onClick={() => goTo(frame - 10)}>Back 10</button>
-          <button type="button" className="button quiet" onClick={() => goTo(frame + 10)}>Forward 10</button>
-          <button type="button" className="button quiet" onClick={() => zoom(1 / ZOOM_STEP)} >Zoom out</button>
-          <button type="button" className="button quiet" onClick={() => zoom(ZOOM_STEP)} >Zoom in</button>
-          <button type="button" className="button quiet" onClick={() => setView(FIT)}>Fit</button>
-        </span>
-        <button type="button" className="button quiet" onClick={zoomToRower} disabled={!scene}>Zoom to rower</button>
-        <label className={styles.speed}>
-          Speed
-          <select value={speed} onChange={(event) => {
-            const value = Number(event.target.value);
-            setSpeed(value);
-            if (video.current) video.current.playbackRate = value;
-          }}>
-            {SPEEDS.map(([value, name]) => <option key={value} value={value}>{name}</option>)}
-          </select>
-        </label>
-        {scene ? (["limbs", "angles", "targets"] as const).map((layer) => (
-          <label key={layer} className={styles.toggle}>
-            <input type="checkbox" checked={layers[layer]} onChange={() => setLayers((old) => ({ ...old, [layer]: !old[layer] }))} />
-            {layer[0].toUpperCase() + layer.slice(1)}
+        <div className={styles.controlRow} role="group" aria-label="Step through the frames">
+          <span className={styles.group} aria-hidden="true">Step</span>
+          <button type="button" className={`button quiet ${styles.wide}`} onClick={() => goTo(frame - 10)}>Back 10</button>
+          <button type="button" className="button quiet" onClick={() => goTo(frame - 1)}>Back 1</button>
+          <button type="button" className={`button primary ${styles.play}`} onClick={togglePlay}>{playing ? "Pause" : "Play"}</button>
+          <button type="button" className="button quiet" onClick={() => goTo(frame + 1)}>Forward 1</button>
+          <button type="button" className={`button quiet ${styles.wide}`} onClick={() => goTo(frame + 10)}>Forward 10</button>
+        </div>
+        <div className={styles.controlRow} role="group" aria-label="Jump to a catch or finish">
+          <span className={styles.group} aria-hidden="true">Jump</span>
+          <button type="button" className="button quiet" onClick={() => jumpTo(rower.catches, -1)}>Last catch</button>
+          <button type="button" className="button quiet" onClick={() => jumpTo(rower.catches, 1)}>Next catch</button>
+          <button type="button" className="button quiet" onClick={() => jumpTo(rower.finishes, 1)}>Next finish</button>
+          <label className={styles.speed}>
+            Speed
+            <select value={speed} onChange={(event) => {
+              const value = Number(event.target.value);
+              setSpeed(value);
+              if (video.current) video.current.playbackRate = value;
+            }}>
+              {SPEEDS.map(([value, name]) => <option key={value} value={value}>{name}</option>)}
+            </select>
           </label>
-        )) : null}
+        </div>
+        <div className={styles.controlRow} role="group" aria-label="The picture">
+          <span className={styles.group} aria-hidden="true">Picture</span>
+          <button type="button" className={`button quiet ${styles.wide}`} onClick={() => zoom(1 / ZOOM_STEP)}>Zoom out</button>
+          <button type="button" className={`button quiet ${styles.wide}`} onClick={() => zoom(ZOOM_STEP)}>Zoom in</button>
+          <button type="button" className={`button quiet ${styles.wide}`} onClick={() => setView(FIT)}>Fit</button>
+          <button type="button" className="button quiet" onClick={zoomToRower} disabled={!scene}>Zoom to rower</button>
+        </div>
         {scene ? (
-          <label className={styles.toggle}>
-            <input type="checkbox" checked={follow} onChange={() => setFollow((old) => !old)} />
-            Follow
-          </label>
+          <div className={styles.controlRow} role="group" aria-label="Drawn on the picture">
+            <span className={styles.group} aria-hidden="true">Show</span>
+            {(["limbs", "angles", "targets"] as const).map((layer) => (
+              <label key={layer} className={styles.toggle}>
+                <input type="checkbox" checked={layers[layer]} onChange={() => setLayers((old) => ({ ...old, [layer]: !old[layer] }))} />
+                {layer[0].toUpperCase() + layer.slice(1)}
+              </label>
+            ))}
+            <label className={styles.toggle}>
+              <input type="checkbox" checked={follow} onChange={() => setFollow((old) => !old)} />
+              Follow
+            </label>
+          </div>
         ) : null}
       </div>
       <p className={styles.hint}>Turn your phone sideways for a bigger picture.</p>
