@@ -1,7 +1,7 @@
 """Compare a rower's timing with the rower they follow.
 
-Early or late only means something against who you are following. Stroke side follows stroke, bow
-side follows the seat behind stroke, and scullers follow stroke. Sweep rowers on one side share a
+Early or late only means something against who you are following. Sweep rowers follow the rower
+nearest the stern on their own side, and scullers follow stroke. Sweep rowers on one side share a
 view of the camera, so comparing along a side also cancels most of the near and far side effect.
 """
 
@@ -30,11 +30,17 @@ class FollowTiming:
     strokes: int
 
 
-def leader_seat(seat: int, boat_seats: int, side: str) -> int | None:
-    """Return the seat a rower follows, or None for the stroke seat and a single sculler."""
+def leader_seat(seat: int, boat_seats: int, side: str, stroke_side: str = "stroke") -> int | None:
+    """Return the seat a rower follows, or None for the stroke seat and a single sculler.
+
+    A sweep rower follows the rower nearest the stern on their own side. That is the stroke seat
+    for the side the stroke seat rows on, and the seat behind it for the other side, whose own
+    leader follows stroke. Most boats have the stroke seat on stroke side, but not all, so
+    `stroke_side` says which side the stroke seat rows on.
+    """
     if seat >= boat_seats:
         return None
-    if side == "bow" and seat < boat_seats - 1:
+    if side not in ("scull", stroke_side) and seat < boat_seats - 1:
         return boat_seats - 1
     return boat_seats
 

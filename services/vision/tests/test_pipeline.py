@@ -324,8 +324,14 @@ def test_a_crew_result_knows_the_athletes_own_seat() -> None:
 def test_each_seat_of_a_sweep_crew_is_timed_against_who_it_follows() -> None:
     result = run(FakeBackend(4), Request(boat_seats=4, scope=Scope.CREW, seat=2, side="bow"))
     followed = {rower.seat: rower.timing.leader_seat if rower.timing else None for rower in result.rowers}
-    # Seat 2 is bow side, so seats 2 and 4 are bow side and follow 3. Seats 1 and 3 are stroke side.
-    assert followed == {1: 4, 2: 3, 3: 4, 4: None}
+    # Seat 2 is bow side, so the stroke seat is too. Seat 2 follows it, and stroke side follows 3.
+    assert followed == {1: 3, 2: 4, 3: 4, 4: None}
+
+
+def test_a_usual_sweep_crew_has_bow_side_following_the_seat_behind_stroke() -> None:
+    result = run(FakeBackend(4), Request(boat_seats=4, scope=Scope.CREW, seat=1, side="bow"))
+    followed = {rower.seat: rower.timing.leader_seat if rower.timing else None for rower in result.rowers}
+    assert followed == {1: 3, 2: 4, 3: 4, 4: None}
 
 
 def test_every_sculler_is_timed_against_stroke() -> None:
@@ -345,6 +351,15 @@ def test_a_crew_report_lists_every_seat_and_puts_the_athlete_first() -> None:
     assert summary["seats"][3]["catch_ms"] is None
     assert 0 <= summary["catch_lean_range_deg"] < 10
     assert summary["finish_lean_range_deg"] is not None
+
+
+def test_a_sweep_crew_has_body_angles_compared_along_each_side() -> None:
+    request = Request(boat_seats=4, scope=Scope.CREW, seat=3, side="bow")
+    summary = analysis_json(run(FakeBackend(4), request))["crew_summary"]
+    assert summary["along_sides"]
+    assert summary["catch_lean_range_deg"] is not None
+    sculling = analysis_json(run(FakeBackend(4), Request(boat_seats=4, scope=Scope.CREW, seat=3)))
+    assert not sculling["crew_summary"]["along_sides"]
 
 
 def test_a_single_rower_report_has_no_crew() -> None:
