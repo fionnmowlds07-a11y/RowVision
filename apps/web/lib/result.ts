@@ -56,6 +56,8 @@ export type Rower = {
   timing: Timing | null;
   card: Card;
   rating: Rating;
+  /** Why no scores were given, when the footage cannot support any. */
+  no_scores?: string | null;
   evidence?: Evidence | null;
   /** The change in each measure from the first half of the strokes to the second. */
   fade?: Record<string, number | null>;
