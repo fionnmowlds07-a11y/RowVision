@@ -58,6 +58,8 @@ export type Rower = {
   rating: Rating;
   /** Why no scores were given, when the footage cannot support any. */
   no_scores?: string | null;
+  /** Catch frames of strokes filmed end-on, which are listed but do not count. */
+  left_out?: number[];
   evidence?: Evidence | null;
   /** The change in each measure from the first half of the strokes to the second. */
   fade?: Record<string, number | null>;

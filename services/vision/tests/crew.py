@@ -74,3 +74,28 @@ def side_by_side_detections() -> tuple[list[FloatArray], list[FloatArray]]:
         points.append(people)
         scores.append(np.full(people.shape[:2], 0.9))
     return points, scores
+
+
+def crossing_sides_detections(
+    seats: int = 4, *, second_share: float = 0.6
+) -> tuple[list[FloatArray], list[FloatArray]]:
+    """Return a crew filmed from one side, then, after a second out of view, from the other.
+
+    From the other side the crew faces the other way and the seats run the other way across the
+    picture, which is the first part mirrored.
+    """
+    points, scores = crew_detections(seats)
+    width = 2400.0
+    mirrored = []
+    for people in points[: int(len(points) * second_share)]:
+        flipped = people.copy()
+        flipped[..., 0] = width - flipped[..., 0]
+        # Left and right joints swap when a person is mirrored.
+        swapped = flipped.copy()
+        swapped[:, 1::2], swapped[:, 2::2] = flipped[:, 2::2], flipped[:, 1::2]
+        mirrored.append(swapped)
+    gap = [np.zeros((0, 17, 2))] * 30
+    return (
+        points + gap + mirrored,
+        scores + [np.zeros((0, 17))] * 30 + scores[: len(mirrored)],
+    )

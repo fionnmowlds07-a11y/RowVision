@@ -58,12 +58,14 @@ export function Strokes({ rower, fps, onPick, numbersOpen = false }: Props) {
   const all = useMemo(() => strokeSeries(rower, fps), [rower, fps]);
   if (rower.strokes.length < MIN_STROKES || all.length === 0) return null;
   const fades = all.some((series) => series.fade !== null);
+  const leftOut = new Set(rower.left_out ?? []);
   return (
     <section className="card stack" aria-labelledby="strokes-title">
       <h2 id="strokes-title" style={{ fontSize: 19 }}>Stroke by stroke</h2>
       <p className={styles.small} style={{ color: "var(--ink-soft)" }}>
         The green band is your target.{onPick ? " Press a stroke to see it in the video." : ""}
         {fades ? "" : " With 6 strokes or more, this also says whether you fade in the second half."}
+        {leftOut.size ? " Strokes filmed end-on are listed but do not count towards your results." : ""}
       </p>
       <div className={styles.strokeCharts}>
         {all.map((series) => <Chart key={series.name} series={series} onPick={onPick} />)}
@@ -77,9 +79,10 @@ export function Strokes({ rower, fps, onPick, numbersOpen = false }: Props) {
             </thead>
             <tbody>
               {rower.strokes.map((stroke, index) => (
-                <tr key={stroke.catch_frame}>
+                <tr key={stroke.catch_frame} className={leftOut.has(stroke.catch_frame) ? styles.fadeRow : undefined}>
                   <th scope="row">
                     {onPick ? <button type="button" className={styles.strokeLink} onClick={() => onPick(stroke.catch_frame)} aria-label={`Go to stroke ${index + 1}`}>{index + 1}</button> : index + 1}
+                    {leftOut.has(stroke.catch_frame) ? <span className={styles.offMark}> end-on, not counted</span> : null}
                   </th>
                   {all.map((series) => {
                     const { value } = series.points[index];

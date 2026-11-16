@@ -1,6 +1,6 @@
 """Group tracked people into boats, so the athlete can say which boat is theirs."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import combinations
 
 import numpy as np
@@ -36,6 +36,14 @@ OFF_LINE_TRUNKS = 1.0
 On 16 real clips of one boat the furthest person was within 0.3. Two eights side by side, joined
 through three short tracks between them, came to 4.7."""
 MIN_LINE_PEOPLE = 3
+DOUBLE_TRUNKS = 0.6
+"""Two tracks this close along the boat while both are in view are one person found twice.
+Neighbours in a boat sit about 2.5 trunk lengths apart."""
+MIN_SPARE_SECONDS = 5.0
+MUCH_LONGER = 2.0
+"""A spare person seen this many times longer than a crew member takes their seat."""
+MIN_SPARE_REACH = 0.5
+"""Least a person's hands travel, against the crew's, to be taken for a rower. A cox's stay put."""
 
 
 @dataclass
@@ -43,6 +51,8 @@ class Boat:
     tracks: list[Track]
     """Everyone grouped into this boat, including anyone who is not rowing, such as a cox."""
     rowers: list[Track]
+    spare: list[Track] = field(default_factory=list)
+    """People in the boat who show no stroke rhythm of their own: a cox, or a rower seen badly."""
 
     @property
     def confirmed(self) -> bool:
@@ -65,8 +75,8 @@ class Boat:
     def too_far(self) -> bool:
         return self.trunk_px < MIN_ANALYSIS_TRUNK_PX
 
-    def crew(self) -> list[Track]:
-        """Return the rowers from the shot showing the most of the crew.
+    def crews(self) -> list[list[Track]]:
+        """Return the rowers of each shot, the shot showing the most of the crew first.
 
         People in shots with no frames in common cannot be matched to each other, so seats come
         from one shot only.
@@ -76,11 +86,12 @@ class Boat:
             for first, second in combinations(range(len(self.rowers)), 2)
             if _shared_frames(self.rowers[first], self.rowers[second]).sum() >= MIN_SHARED_FRAMES
         ]
-        groups = _components(len(self.rowers), links)
-        if not groups:
-            return []
-        best = max(groups, key=len)
-        return [self.rowers[index] for index in best]
+        groups = sorted(_components(len(self.rowers), links), key=len, reverse=True)
+        return [[self.rowers[index] for index in group] for group in groups]
+
+    def crew(self) -> list[Track]:
+        """Return the rowers from the shot showing the most of the crew."""
+        return next(iter(self.crews()), [])
 
     def seen(self) -> BoolArray:
         """Return a mask of frames where anyone counted in the boat is visible."""
@@ -214,7 +225,91 @@ def fit_to_seats(rowers: list[Track], seats: int) -> list[Track]:
     Tracks that never overlap and sit close together are merged, because tracks seen together are
     always different people. Anyone left over who is clearly out of time, such as a cox, is dropped.
     """
-    return _without_outliers(_merge_to_fit(rowers, seats), seats)
+    return _without_outliers(_merge_to_fit(_without_doubles(rowers), seats), seats)
+
+
+def _along_gap(first: Track, second: Track) -> float:
+    """Return how far apart two people sit while both are in view, in trunk lengths, or NaN."""
+    shared = _shared_frames(first, second)
+    if shared.sum() < MIN_SHARED_FRAMES:
+        return float("nan")
+    gap = np.linalg.norm(first.centre()[shared] - second.centre()[shared], axis=-1)
+    sizes = (_frame_trunks(first)[shared] + _frame_trunks(second)[shared]) / 2
+    return float(np.nanmedian(gap / sizes))
+
+
+def _without_doubles(rowers: list[Track]) -> list[Track]:
+    """Drop the shorter of two tracks that sit in the same place at the same time.
+
+    Two people cannot share a seat, so the shorter track is the same person found twice.
+    """
+    kept: list[Track] = []
+    for track in sorted(rowers, key=lambda item: item.coverage, reverse=True):
+        if not any(_along_gap(track, other) < DOUBLE_TRUNKS for other in kept):
+            kept.append(track)
+    return kept
+
+
+def _reach_range(track: Track) -> float:
+    reach = reach_signal(track.points, 1)
+    known = reach[np.isfinite(reach)]
+    return float(np.subtract(*np.percentile(known, [90, 10]))) if len(known) else 0.0
+
+
+def _could_row(person: Track, crew: list[Track], fps: float) -> bool:
+    """Return True if someone with no clear rhythm of their own still looks like one of the crew:
+    seen with them for long enough, their size, on their line, in a seat of their own, and with
+    hands that travel as a rower's do."""
+    together = np.any([_shared_frames(person, rower) for rower in crew], axis=0)
+    if together.sum() < MIN_SPARE_SECONDS * fps:
+        return False
+    size = float(np.median([rower.trunk() for rower in crew]))
+    if max(size, person.trunk()) / min(size, person.trunk()) > MAX_SIZE_RATIO:
+        return False
+    if any(_along_gap(person, rower) < DOUBLE_TRUNKS for rower in crew):
+        return False
+    if _off_line([*crew, person]) > OFF_LINE_TRUNKS:
+        return False
+    travel = float(np.median([_reach_range(rower) for rower in crew]))
+    return _reach_range(person) >= MIN_SPARE_REACH * travel
+
+
+def _out_of_time(crew: list[Track]) -> int | None:
+    scores = np.array(crew_agreement(crew))
+    if not np.isfinite(scores).any():
+        return None
+    worst = int(np.nanargmin(scores))
+    return worst if np.nanmedian(scores) - scores[worst] >= OUT_OF_TIME_MARGIN else None
+
+
+def fill_from_spare(
+    crew: list[Track], spare: list[Track], seats: int, fps: float
+) -> tuple[list[Track], list[Track]]:
+    """Give empty seats to people in the boat who look like rowers but show no clear rhythm.
+
+    Returns the crew and those added. A rower half hidden behind the cox may never show a rhythm,
+    and leaving them out moves every seat number along by one. In a full crew, someone clearly
+    out of time gives up their place, such as a cox whose arms happened to keep a beat. Failing
+    that, so does someone seen for under half as long, which is a stray track and not a rower.
+    """
+    crew, added = list(crew), []
+    waiting = sorted(spare, key=lambda item: item.coverage, reverse=True)
+    while crew and waiting:
+        person = next((item for item in waiting if _could_row(item, crew, fps)), None)
+        if person is None:
+            break
+        if len(crew) >= seats:
+            leaving = _out_of_time(crew)
+            if leaving is None:
+                briefest = min(range(len(crew)), key=lambda index: crew[index].coverage)
+                if person.coverage < MUCH_LONGER * crew[briefest].coverage:
+                    break
+                leaving = briefest
+            del crew[leaving]
+        waiting.remove(person)
+        crew.append(person)
+        added.append(person)
+    return crew, added
 
 
 def _merge_to_fit(rowers: list[Track], seats: int) -> list[Track]:
@@ -329,6 +424,7 @@ def _merge_separate_shots(boats: list[Boat]) -> list[Boat]:
             if shared <= MAX_DISJOINT_OVERLAP * shortest and max(sizes) / min(sizes) <= 2.5:
                 existing.tracks.extend(boat.tracks)
                 existing.rowers.extend(boat.rowers)
+                existing.spare.extend(boat.spare)
                 break
         else:
             merged.append(boat)
@@ -360,7 +456,8 @@ def find_boats(tracks: list[Track], fps: float) -> list[Boat]:
         people = [tracks[index] for index in group]
         rowers = [track for track in people if is_rowing(track, fps)]
         if rowers:
-            boats.append(Boat(people, _merge_same_seat(rowers)))
+            spare = [track for track in people if all(track is not rower for rower in rowers)]
+            boats.append(Boat(people, _merge_same_seat(rowers), spare))
     confirmed = sorted(
         _merge_separate_shots(boats), key=lambda boat: int(boat.seen().sum()), reverse=True
     )

@@ -1,11 +1,12 @@
 import numpy as np
 import pytest
-from crew import crew_detections, distant_people, two_boat_detections
+from crew import crew_detections, crossing_sides_detections, distant_people, two_boat_detections
 
 from rowvision.pipeline import (
     COARSE_STEP,
     FILM_CLOSER,
     FILM_SIDE_ON,
+    OTHER_SIDE,
     Analysis,
     Request,
     RowerResult,
@@ -416,6 +417,8 @@ def test_strokes_filmed_end_on_do_not_count_towards_body_angles() -> None:
     end_on = [stroke for stroke in rower.strokes if not clear[stroke.catch_frame]]
     assert end_on and all(np.isnan(stroke.catch_lean_deg) for stroke in end_on)
     assert rower.evidence is not None and rower.evidence.strokes == len(rower.strokes) - len(end_on)
+    assert rower.left_out == [stroke.catch_frame for stroke in end_on]
+    assert measured(points, None, timeline).left_out == []
 
 
 def test_a_clip_filmed_end_on_throughout_is_measured_as_before() -> None:
@@ -452,3 +455,33 @@ def test_one_end_on_stroke_among_clear_ones_keeps_the_scores() -> None:
     mostly = np.arange(len(points)) < timeline.catches[2]
     short = StrokeTimeline(timeline.catches[:4], timeline.finishes[:3], timeline.rate_spm, 0.0)
     assert measured(points, mostly, short).no_scores is None
+
+
+def crossing_backend() -> FakeBackend:
+    backend = FakeBackend(4)
+    backend.points, backend.scores = crossing_sides_detections()
+    return backend
+
+
+def test_a_camera_that_crosses_sides_has_the_better_part_measured() -> None:
+    backend = crossing_backend()
+    first = len(crew_detections(4)[0])
+    result = run(backend, Request(boat_seats=4, scope=Scope.CREW))
+    assert OTHER_SIDE in result.warnings
+    assert [rower.seat for rower in result.rowers] == [1, 2, 3, 4] and result.facing == -1
+    for rower in result.rowers:
+        assert not np.isfinite(rower.points[first:, 5, 0]).any()
+        assert rower.summary["catch_lean_deg"] == pytest.approx(25, abs=4)
+
+
+def test_a_tap_after_the_camera_crosses_sides_measures_that_part() -> None:
+    backend = crossing_backend()
+    frame = len(crew_detections(4)[0]) + 90
+    x, y = backend.points[frame][0].mean(axis=0)
+    result = run(backend, Request(boat_seats=4, tap=(frame, float(x), float(y))))
+    assert result.facing == 1 and len(result.rowers) == 1
+    assert result.rowers[0].summary["catch_lean_deg"] == pytest.approx(25, abs=4)
+
+
+def test_a_clip_from_one_side_gets_no_other_side_warning() -> None:
+    assert OTHER_SIDE not in run(FakeBackend(4), Request(boat_seats=4, seat=2)).warnings
