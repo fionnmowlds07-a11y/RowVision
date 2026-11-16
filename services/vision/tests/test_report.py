@@ -13,6 +13,7 @@ from rowvision.reliability import Evidence, rate
 from rowvision.report import (
     analysis_json,
     boat_choices_json,
+    crew_summary,
     result_summary,
     stroke_markers,
 )
@@ -202,3 +203,23 @@ def test_shown_only_measures_and_fade_are_reported_apart_from_the_scored_ones() 
         "reason": "Shown only. There is no published target for this yet, so it is not scored.",
     }
     assert result["fade"] == {"catch_lean_deg": -2.5, "drive_s": None}
+
+
+def seat_card(seat: int, catch: float) -> dict[str, Any]:
+    metrics = [{"name": "catch_lean_deg", "value": catch}, {"name": "finish_lean_deg", "value": -20.0}]
+    return {"seat": seat, "card": {"overall": 80.0, "metrics": metrics}, "rating": {"band": "Good"}, "timing": None}
+
+
+def test_a_sweep_crew_is_compared_along_each_side() -> None:
+    crew = [seat_card(1, 2.0), seat_card(2, 33.0), seat_card(3, 1.0), seat_card(4, 36.0)]
+    assert crew_summary(crew)["catch_lean_range_deg"] == 35.0
+    along = crew_summary(crew, along_sides=True)
+    assert along["along_sides"]
+    assert along["catch_lean_range_deg"] == 3.0
+    assert along["finish_lean_range_deg"] == 0.0
+
+
+def test_a_pair_has_no_body_angle_gap_as_its_rowers_are_on_opposite_sides() -> None:
+    pair = [seat_card(1, 10.0), seat_card(2, 25.0)]
+    assert crew_summary(pair, along_sides=True)["catch_lean_range_deg"] is None
+    assert crew_summary(pair)["catch_lean_range_deg"] == 15.0

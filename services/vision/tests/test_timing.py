@@ -28,6 +28,16 @@ def test_each_seat_follows_the_right_rower(
     assert leader_seat(seat, boats, side) == leader
 
 
+@pytest.mark.parametrize(
+    ("seat", "side", "leader"),
+    [(1, "stroke", 3), (2, "bow", 4), (3, "stroke", 4), (4, "bow", None)],
+)
+def test_a_boat_with_stroke_on_bow_side_still_follows_along_each_side(
+    seat: int, side: str, leader: int | None
+) -> None:
+    assert leader_seat(seat, 4, side, stroke_side="bow") == leader
+
+
 def delayed(frames: int) -> tuple[np.ndarray, np.ndarray, float]:
     clip = generate(strokes=10, rate_spm=24)
     return np.roll(clip.points, frames, axis=0), clip.points, clip.fps

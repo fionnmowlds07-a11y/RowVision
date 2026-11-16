@@ -75,6 +75,8 @@ export type CrewSeat = {
 
 export type CrewSummary = {
   seats: CrewSeat[];
+  /** True for a sweep crew, where only seats on the same side are compared. Missing on older results. */
+  along_sides?: boolean;
   /** The gap in degrees between the seats furthest apart. */
   catch_lean_range_deg: number | null;
   finish_lean_range_deg: number | null;

@@ -5,10 +5,12 @@ import pytest
 
 from rowvision import skeleton as sk
 from rowvision.metrics import (
+    LEAN_OUT_SHARE,
     AngleSeries,
     StrokeMetrics,
     angle_series,
     fade,
+    forward_lean_readable,
     legs_believable,
     per_stroke,
     rate_steadiness,
@@ -328,3 +330,69 @@ def test_an_arm_folded_at_the_catch_is_not_believed() -> None:
     assert np.isnan(stroke.catch_elbow_deg)
     assert stroke.finish_elbow_deg == pytest.approx(60.0)
     assert np.isnan(stroke.arms_break)
+
+
+def sweep_rower_filmed_from(
+    side: str, camera_side: str, towards_stern_deg: float, lean_out: float = LEAN_OUT_SHARE
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """Return the joints of a sweep rower filmed by a real camera, their true lean, and facing.
+
+    Built in three dimensions and then projected, so it does not share the sums the correction
+    uses. The boat's x is towards the bow, y towards stroke side (port), z up. The rower faces the
+    stern, so stroke side is on their right. They lean out towards their own rigger as they come
+    forward of the hips, and sit square behind them.
+    """
+    frames = 240
+    lean = np.radians(5 + 25 * np.sin(np.linspace(0, 6 * np.pi, frames)))
+    rigger = 1.0 if side == "stroke" else -1.0
+    forward = np.sin(lean)
+    out = lean_out * np.clip(forward, 0, None) * rigger
+    up = np.sqrt(1 - forward**2 - out**2)
+    top = 100 * np.stack([-forward, out, up], axis=1)
+    joints = np.zeros((frames, 17, 3))
+    joints[:, sk.RIGHT_SHOULDER] = top + [0, 20, 0]
+    joints[:, sk.LEFT_SHOULDER] = top + [0, -20, 0]
+    joints[:, sk.RIGHT_HIP] = [0, 15, 0]
+    joints[:, sk.LEFT_HIP] = [0, -15, 0]
+    for index in range(17):
+        if index not in (sk.RIGHT_SHOULDER, sk.LEFT_SHOULDER, sk.RIGHT_HIP, sk.LEFT_HIP):
+            joints[:, index] = [-40 - 3 * index, 0, -20 - index]
+    port = 1.0 if camera_side == "stroke" else -1.0
+    turn = np.radians(towards_stern_deg)
+    camera = np.array([-np.sin(turn), port * np.cos(turn), 0.0])
+    right = np.cross([0.0, 0.0, 1.0], camera)
+    points = np.stack([joints @ right, -joints[..., 2]], axis=-1)
+    return points, np.degrees(np.arctan2(forward, up)), 1 if camera_side == "stroke" else -1
+
+
+@pytest.mark.parametrize("side", ["stroke", "bow"])
+@pytest.mark.parametrize("camera_side", ["stroke", "bow"])
+@pytest.mark.parametrize("towards_stern", [-30.0, -15.0, 20.0, 30.0])
+def test_a_sweep_rower_reads_the_same_lean_from_any_camera(
+    side: str, camera_side: str, towards_stern: float
+) -> None:
+    points, truth, facing = sweep_rower_filmed_from(side, camera_side, towards_stern)
+    measured = angle_series(points, facing, abs(towards_stern), side).trunk_lean
+    assert np.abs(measured - truth).max() < 1
+    uncorrected = angle_series(points, facing, abs(towards_stern)).trunk_lean
+    assert np.abs(uncorrected - truth).max() > 4
+
+
+def test_a_lean_that_does_not_show_in_the_picture_is_not_read() -> None:
+    # Riggers towards a camera turned well towards the stern: forward lean barely moves the shoulders.
+    points, _, facing = sweep_rower_filmed_from("stroke", "stroke", 45.0)
+    assert not forward_lean_readable(points, facing, 45.0, "stroke")
+    measured = angle_series(points, facing, 45.0, "stroke").trunk_lean
+    assert np.isnan(measured[np.argmax(points[:, sk.RIGHT_SHOULDER, 0])])
+    assert forward_lean_readable(points, facing, 45.0, "bow")
+    assert forward_lean_readable(points, facing, 45.0, None)
+    timeline = StrokeTimeline([20, 100, 180], [60, 140, 220], 22.0, 1.0, 80.0)
+    strokes = per_stroke(angle_series(points, facing, 45.0, "stroke"), timeline, catch_lean_readable=False)
+    assert all(np.isnan(stroke.catch_lean_deg) and np.isnan(stroke.body_swing_deg) for stroke in strokes)
+    assert all(np.isfinite(stroke.finish_lean_deg) for stroke in strokes)
+
+
+def test_a_sculler_is_measured_as_before() -> None:
+    clip = generate(strokes=4, view_deg=30)
+    plain = angle_series(clip.points, clip.facing, 30).trunk_lean
+    assert np.allclose(angle_series(clip.points, clip.facing, 30, "scull").trunk_lean, plain)

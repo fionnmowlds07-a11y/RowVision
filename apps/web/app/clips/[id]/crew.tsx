@@ -14,13 +14,24 @@ type Props = {
 /** The boat from stroke to bow: each seat's catch timing against who it follows, and its body angle. */
 export function Crew({ crew, summary, ownSeat, chosen, onChoose }: Props) {
   const rows = crewRows(crew, ownSeat);
+  const alongSides = summary?.along_sides === true;
+  const noAngles = alongSides && summary?.catch_lean_range_deg === null && summary?.finish_lean_range_deg === null;
   return (
     <section className="card stack" aria-labelledby="crew-title">
       <h2 id="crew-title" style={{ fontSize: 24 }}>Your crew</h2>
-      <div className={styles.crewTiles}>
-        <div className={styles.tile}><span>Catch angles within</span><strong>{degrees(summary?.catch_lean_range_deg ?? null)}</strong></div>
-        <div className={styles.tile}><span>Laybacks within</span><strong>{degrees(summary?.finish_lean_range_deg ?? null)}</strong></div>
-      </div>
+      {noAngles ? null : (
+        <div className={styles.crewTiles}>
+          <div className={styles.tile}><span>Catch angles within</span><strong>{degrees(summary?.catch_lean_range_deg ?? null)}</strong></div>
+          <div className={styles.tile}><span>Laybacks within</span><strong>{degrees(summary?.finish_lean_range_deg ?? null)}</strong></div>
+        </div>
+      )}
+      {alongSides ? (
+        <p className={styles.small} style={{ color: "var(--ink-soft)" }}>
+          {noAngles
+            ? "Body angles are only compared between rowers on the same side, as the two sides look different to the camera. A pair has one rower on each side."
+            : "Body angles are compared between rowers on the same side, as the two sides look different to the camera."}
+        </p>
+      ) : null}
       <p className={styles.small} style={{ color: "var(--ink-soft)" }}>
         Each bar is the catch against the rower that seat follows: left is early, right is late, and no bar is in time. Good to about 50 ms. Press a seat to see its results below.
       </p>
@@ -60,7 +71,7 @@ export function Crew({ crew, summary, ownSeat, chosen, onChoose }: Props) {
                 </tr>
               ))}
               <tr className={styles.fadeRow}>
-                <th scope="row">Furthest apart</th><td></td>
+                <th scope="row">{alongSides ? "Furthest apart on a side" : "Furthest apart"}</th><td></td>
                 <td>{degrees(summary?.catch_lean_range_deg ?? null)}</td>
                 <td>{degrees(summary?.finish_lean_range_deg ?? null)}</td>
                 <td></td><td></td><td></td>
