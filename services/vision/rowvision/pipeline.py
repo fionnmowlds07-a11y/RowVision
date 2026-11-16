@@ -47,6 +47,8 @@ MAX_BOX_GAP_FRAMES = 30
 MIN_CREW_FOR_TIMING = 3
 MIN_KNOWN_SHARE = 0.5
 """A measure needs a believable reading on this share of strokes to be shown at all."""
+MIN_CLEAR_STROKES = 3
+"""The fewest strokes clear of end-on for a rower's figures to come from those strokes alone."""
 VIEW_WINDOW_SECONDS = 3.0
 MIN_VIEW_FRAMES = 4
 UNCORRECTABLE_VIEW_DEG = 60.0
@@ -310,14 +312,17 @@ def measure_rower(
     )
     angles = angle_series(points, facing, frame_views, side, turns)
     readable = forward_lean_readable(points, facing, frame_views, side, turns)
-    mixed = clear is not None and bool(clear.any()) and not bool(clear.all())
-    if clear is not None and mixed:
+    # Where enough of the clip is clear of end-on, the rower's figures come from those strokes
+    # alone. On a real clip that panned round from astern, the end-on strokes read a catch angle
+    # near 3 degrees for a rower who read 20 side-on, and nine of them pulled the figure down.
+    # A clip with too few clear strokes is measured whole, as its warnings already say.
+    in_clear = clear is not None and (
+        int(clear[timeline.catches[:-1]].sum()) >= MIN_CLEAR_STROKES and not bool(clear.all())
+    )
+    if clear is not None and in_clear:
         angles = _without_end_on(angles, clear)
     strokes = per_stroke(angles, timeline, fps, catch_lean_readable=readable)
-    # Where some of the clip is clear of end-on, the rower's figures come from those strokes alone.
-    # On a real clip that panned round from astern, the end-on strokes read a catch angle near 3
-    # degrees for a rower who read 20 side-on, and nine of them pulled the rower's figure down.
-    counted = [s for s in strokes if clear is None or not mixed or clear[s.catch_frame]] or strokes
+    counted = [s for s in strokes if clear is None or not in_clear or clear[s.catch_frame]] or strokes
     summary: dict[str, float] = {}
     spread: dict[str, float] = {}
     for name in MEASURES:
