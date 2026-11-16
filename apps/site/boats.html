@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Boats and crews. RowVision</title>
+<meta name="description" content="RowVision works on any boat from a single to an eight. It finds the crew, numbers the seats and times you against the rower you follow.">
+<!--head-->
+</head>
+<body>
+<canvas id="water" aria-hidden="true"></canvas>
+<!--nav-->
+<main id="main" class="page">
+  <h1>Any boat, from a single to an eight.</h1>
+  <p class="lead">Sculling or sweep, coxed or not. RowVision finds the crew in the picture, works out who sits where, and follows the seat you care about.</p>
+
+  <h2>Who do you follow?</h2>
+  <p>Early or late only means something against the rower in front of you. Pick your boat and seat to see whose catch RowVision times you against.</p>
+  <form id="follow" onsubmit="return false">
+    <div class="picks">
+      <fieldset><legend>Boat</legend><div class="seg">
+        <label><input type="radio" name="boat" value="1x"><span>1x</span></label>
+        <label><input type="radio" name="boat" value="2x"><span>2x</span></label>
+        <label><input type="radio" name="boat" value="2-"><span>2-</span></label>
+        <label><input type="radio" name="boat" value="4x"><span>4x</span></label>
+        <label><input type="radio" name="boat" value="4-"><span>4-</span></label>
+        <label><input type="radio" name="boat" value="4+"><span>4+</span></label>
+        <label><input type="radio" name="boat" value="8+" checked><span>8+</span></label>
+      </div></fieldset>
+      <fieldset><legend>Your seat, counted from the bow</legend><div class="seg" data-seats><label><input type="radio" name="seat" value="4" checked><span>4</span></label></div></fieldset>
+      <fieldset data-sides><legend>Your side</legend><div class="seg">
+        <label><input type="radio" name="side" value="stroke"><span>Stroke side</span></label>
+        <label><input type="radio" name="side" value="bow" checked><span>Bow side</span></label>
+      </div></fieldset>
+    </div>
+    <div class="hull"><p>Scullers follow stroke. Sweep rowers follow the rower nearest the stern on their own side.</p><p>Turn on JavaScript to try your own seat.</p></div>
+  </form>
+
+  <h2>How it finds your crew.</h2>
+  <dl class="rows">
+    <div><dt>It follows people, not the boat</dt><dd>Every person in the picture is tracked through the clip. Those who move with a stroke rhythm are rowers. A cox, a coach in the launch and people on the bank are left out.</dd></div>
+    <div><dt>A crew sits on one line</dt><dd>Rowers in one boat fall along a straight line from any camera position. That is how two crews racing side by side are kept apart.</dd></div>
+    <div><dt>Seats are numbered from the bow</dt><dd>Rowers face the stern, so the way the crew faces gives the order. You tap yourself once and say your seat, and the rest follow from that.</dd></div>
+    <div><dt>More than one boat</dt><dd>If the clip shows several crews, RowVision stops and asks you to tap yours. When another boat crosses yours, those frames are left out.</dd></div>
+    <div><dt>One rower or the whole crew</dt><dd>Measure only yourself, or every seat at once. A whole-crew result shows each rower beside the others.</dd></div>
+  </dl>
+
+  <h2>Sweep boats are read by side.</h2>
+  <p>A sweep rower leans out towards their rigger, so the two sides of a boat look different to any camera that is not exactly side-on. RowVision knows which side each seat rows on and corrects each one for it.</p>
+  <p>This was checked on an eight filmed by a drone from every angle. About 300 catches were compared with the same rower’s side-on reading.</p>
+
+  <div class="next"><a class="btn" href="/measures.html">See everything it measures</a><p>And explore one real stroke.</p></div>
+</main>
+<!--foot-->
+<script type="module" src="/src/water.js"></script>
+<script type="module" src="/src/seats.js"></script>
+</body>
+</html>

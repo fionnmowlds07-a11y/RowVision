@@ -5,16 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Download RowVision</title>
 <meta name="description" content="RowVision is a free desktop app for Windows and Linux. Installers are coming soon.">
-<meta name="theme-color" content="#020403">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23020403'/%3E%3Cpath d='M9 22l6-5 3-8 6 4' fill='none' stroke='%234be38a' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='18' cy='9' r='2.6' fill='%23fff'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="/src/site.css">
+<!--head-->
 </head>
 <body>
-<a class="skip" href="#main">Skip to the page</a>
-<header class="nav">
-  <a class="mark" href="/">RowVision</a>
-  <nav aria-label="Main"><a class="wide" href="/how.html">How it works</a><a class="wide" href="/about.html">About</a><a class="get" href="/download.html" aria-current="page">Download</a></nav>
-</header>
+<canvas id="water" aria-hidden="true"></canvas>
+<!--nav-->
 <main id="main" class="page">
   <h1>Get RowVision.</h1>
   <p class="lead">A free desktop app. Your video is analysed on your own computer and stays there.</p>
@@ -33,11 +28,9 @@
 
   <h2>While you wait.</h2>
   <p>Film your next outing anyway. Side on, close enough to pick yourself out, for a few full strokes. It will be ready to analyse the day the installers are.</p>
-  <p><a href="/how.html">See how it works</a></p>
+  <p><a href="/filming.html">The filming guide</a> shows what measures well, and <a href="/roadmap.html">where it is now</a> says what is left to build.</p>
 </main>
-<footer class="foot">
-  <p>RowVision gives coaching feedback, not medical advice.</p>
-  <nav aria-label="Footer"><a href="/">Home</a><a href="/how.html">How it works</a><a href="/about.html">About</a><a href="/download.html">Download</a></nav>
-</footer>
+<!--foot-->
+<script type="module" src="/src/water.js"></script>
 </body>
 </html>
