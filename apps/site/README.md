@@ -1,6 +1,16 @@
 # RowVision marketing site
 
-Static Vite site with four pages: the home page film (`index.html`), How it works, About and Download.
+Static Vite site with eleven pages: the home page film (`index.html`), How it works, What it measures, Accuracy, Filming, Boats and crews, Your video, Where it is now, Questions, About and Download.
+
+Every page shares one header and footer, kept in `partials/` and written into the HTML by a small plugin in `vite.config.js`, so each page is whole without script. To add a page, add its name to `PAGES` there and link it from `partials/nav.html` and `partials/foot.html`.
+
+Three pages have something to try, each fed by real figures and none by invented ones:
+
+- `src/explorer.js` (What it measures): one rower's tracked joints from `public/data/pose-pair.json`, with the angles worked out as you drag.
+- `src/dial.js` (Accuracy): a camera moved round a boat, using the engine's own limits of 25° and 60° off side-on.
+- `src/seats.js` (Boats and crews): the engine's rule for which rower each seat is timed against.
+
+If the engine's limits, messages or follow rule change, change them here too.
 
 ```
 npm install

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How accurate RowVision is</title>
+<meta name="description" content="Every RowVision result carries an accuracy rating. Poor footage gets a warning, and footage it cannot measure gets no score.">
+<!--head-->
+</head>
+<body>
+<canvas id="water" aria-hidden="true"></canvas>
+<!--nav-->
+<main id="main" class="page">
+  <h1>It says when not to believe it.</h1>
+  <p class="lead">A number with no warning on it looks the same whether the footage was good or hopeless. RowVision rates every result, and would rather show no score than one it cannot stand behind.</p>
+
+  <h2>Every result has a rating.</h2>
+  <p>The rating is the share of your angle readings expected to fall within 5° of the truth. It is marked as estimated, because it has not yet been checked against enough hand-marked footage to be called measured.</p>
+  <div class="bands">
+    <div><b>Excellent</b><span>90% and up</span><em>Close, side-on and steady.</em></div>
+    <div><b>Great</b><span>80 to 89%</span><em>Trust the scores.</em></div>
+    <div><b>Good</b><span>70 to 79%</span><em>Trust the pattern more than any one degree.</em></div>
+    <div><b>Fair</b><span>60 to 69%</span><em>A guide. Film closer or more side-on next time.</em></div>
+    <div class="poor"><b>Poor</b><span>Under 60%</span><em>The overall score stays hidden until you have read the warning.</em></div>
+  </div>
+  <p class="note">What moves the rating: how big you are in the picture, how far the camera is from side-on, and how much your own strokes disagree with each other.</p>
+
+  <h2>Where the camera is matters most.</h2>
+  <p>Rowing happens along the boat, so a camera looking along the boat sees almost none of it. Move the launch round the crew and see what RowVision does with footage from there.</p>
+  <div class="bench" id="dial">
+    <svg class="draw" viewBox="225 30 550 540" role="img" aria-label="A boat seen from above with a camera on a ring around it. The ring is green beside the boat, amber towards the ends and red at the bow and stern">
+      <g class="ring">
+      <path class="ok" d="M400.7 513.0 A235 235 0 0 0 599.3 513.0"/>
+      <path class="warn" d="M599.3 513.0 A235 235 0 0 0 703.5 417.5"/>
+      <path class="warn" d="M296.5 417.5 A235 235 0 0 0 400.7 513.0"/>
+      <path class="ok" d="M599.3 87.0 A235 235 0 0 0 400.7 87.0"/>
+      <path class="warn" d="M400.7 87.0 A235 235 0 0 0 296.5 182.5"/>
+      <path class="warn" d="M703.5 182.5 A235 235 0 0 0 599.3 87.0"/>
+      <path class="stop" d="M703.5 417.5 A235 235 0 0 0 703.5 182.5"/>
+      <path class="stop" d="M296.5 182.5 A235 235 0 0 0 296.5 417.5"/>
+      </g>
+      <path id="sight" d="M500 535 L500 300"/>
+      <path d="M352 300 C400 283 600 283 648 300 C600 317 400 317 352 300Z" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+      <g fill="#4be38a"><circle cx="420" cy="300" r="9"/><circle cx="473" cy="300" r="9"/><circle cx="527" cy="300" r="9"/><circle cx="580" cy="300" r="9"/></g>
+      <g stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M420 300 L436 262"/><path d="M473 300 L489 338"/><path d="M527 300 L543 262"/><path d="M580 300 L596 338"/></g>
+      <text x="342" y="306" text-anchor="end">Bow</text><text x="658" y="306">Stern</text>
+      <g id="cam" transform="translate(500 535)"><circle r="30" fill="#000" stroke="#fff" stroke-width="3"/><rect x="-13" y="-9" width="26" height="20" rx="4" fill="#fff"/><path d="M-7 -9 L0 -22 L7 -9Z" fill="#fff"/></g>
+    </svg>
+    <dl class="read">
+      <div><dt>Off side-on</dt><dd data-read="off">0°</dd></div>
+      <div><dt>Of your reach in view</dt><dd data-read="seen">100%</dd></div>
+      <p><strong data-head>Side-on</strong><span data-say>Measured as filmed. This is the view to aim for, level with the boat.</span></p>
+    </dl>
+    <div class="bar">
+      <label for="round">Move the camera round the boat</label>
+      <input id="round" type="range" min="0" max="359" value="0">
+      <small>Green is side-on, up to 25° either way. Amber is corrected, up to 60°. Red is end-on. You can also drag the camera.</small>
+    </div>
+  </div>
+
+  <h2>What it tells you.</h2>
+  <p>Messages the app gives when the footage cannot carry a result.</p>
+  <ul class="said">
+    <li><b>The rowers are too small in this video to measure accurately, so no scores were given.</b><span>The boat was too far off. Film closer, so the boat fills most of the frame width.</span></li>
+    <li><b>Too much of this video was filmed from in front of or behind the boat, so the results are unreliable and no scores were given.</b><span>Your numbers are still shown. The scores are not.</span></li>
+    <li><b>The camera moved to the other side of the boat during this video, so only the part with the best view was measured.</b><span>From the other side the crew faces the other way, so the two parts cannot be measured as one.</span></li>
+    <li><b>Another boat crossed yours for part of the time it was in view. Those frames were left out.</b><span>So a rower in the other crew is never read as you.</span></li>
+    <li><b>Your body angle at the catch can’t be read from this camera angle on your side of the boat.</b><span>Sweep rowers lean out towards their rigger, which hides the forward lean from some angles.</span></li>
+  </ul>
+
+  <h2>What it will not claim.</h2>
+  <ul class="plain">
+    <li>Knee angles are shown and never scored. They are the least certain thing it reads.</li>
+    <li>The targets come from published studies, mostly on rowing machines, and have not yet been reviewed by a coach.</li>
+    <li>Blade work is not measured. RowVision reads the body, not the oar.</li>
+    <li>It gives coaching feedback, not medical advice.</li>
+  </ul>
+
+  <div class="next"><a class="btn" href="/filming.html">Film footage that measures well</a><p>Five habits that lift the rating.</p></div>
+</main>
+<!--foot-->
+<script type="module" src="/src/water.js"></script>
+<script type="module" src="/src/dial.js"></script>
+</body>
+</html>
