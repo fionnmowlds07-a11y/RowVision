@@ -14,6 +14,7 @@ if [ ! -x engine/rowvision-engine ]; then
   echo "== Bundling the measuring program (Docker, python 3.12)"
   rm -rf engine
   docker run --rm -v "$root:/src:ro" -v "$PWD:/out" -e OWNER="$(id -u):$(id -g)" \
+    -e PIP_DEFAULT_TIMEOUT=180 -e PIP_RETRIES=10 \
     -w /tmp python:3.12-slim bash -euc '
       apt-get update -qq >/dev/null && apt-get install -y -qq binutils >/dev/null
       python -m venv /tmp/venv && . /tmp/venv/bin/activate

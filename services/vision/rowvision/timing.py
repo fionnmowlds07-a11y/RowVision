@@ -8,6 +8,7 @@ view of the camera, so comparing along a side also cancels most of the near and 
 from dataclasses import dataclass
 
 import numpy as np
+from numpy.typing import NDArray
 
 from rowvision.skeleton import FloatArray
 from rowvision.strokes import detect_strokes, reach_signal
@@ -76,7 +77,9 @@ def _lag(mine: FloatArray, theirs: FloatArray, centre: int, half: int, reach: in
         score = float(np.corrcoef(leader, window)[0, 1])
         if score > best_score:
             best, best_score = lag, score
-    return best
+    # The best match at the very edge of the search means the true gap lies outside it, or there
+    # is no clear match at all. Either way it is not a gap to report.
+    return None if best is None or abs(best) == reach else best
 
 
 def _lags(
@@ -95,19 +98,30 @@ def _summary(gaps: list[int], fps: float) -> tuple[float | None, float | None]:
 
 
 def follow_timing(
-    points: FloatArray, leader_points: FloatArray, leader: int, facing: int, fps: float
+    points: FloatArray,
+    leader_points: FloatArray,
+    leader: int,
+    facing: int,
+    fps: float,
+    clear: NDArray[np.bool_] | None = None,
 ) -> FollowTiming | None:
-    """Measure how a rower's catches and finishes sit against the leader's, across all strokes."""
+    """Measure how a rower's catches and finishes sit against the leader's, across all strokes.
+
+    `clear` is False on end-on frames. Movement along the boat can hardly be seen there, so those
+    strokes are timed apart and their catches and finishes are not compared.
+    """
     mine = reach_signal(points, facing)
     theirs = reach_signal(leader_points, facing)
-    timeline = detect_strokes(theirs, fps)
+    timeline = detect_strokes(theirs, fps, clear)
     period = timeline.period_frames
     if not period:
         return None
     half = round(WINDOW_PERIODS * period)
     reach = round(MAX_OFFSET_PERIODS * period)
-    catches = _lags(mine, theirs, timeline.catches, half, reach)
-    finishes = _lags(mine, theirs, timeline.finishes, half, reach)
+    seen = [moment for moment in timeline.catches if clear is None or clear[moment]]
+    catches = _lags(mine, theirs, seen, half, reach)
+    seen = [moment for moment in timeline.finishes if clear is None or clear[moment]]
+    finishes = _lags(mine, theirs, seen, half, reach)
     catch_ms, catch_spread = _summary(catches, fps)
     finish_ms, finish_spread = _summary(finishes, fps)
     if catch_ms is None and finish_ms is None:

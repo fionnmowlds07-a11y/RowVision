@@ -14,6 +14,7 @@ from rowvision.boats import (
     Boat,
     boat_at,
     crew_agreement,
+    fill_from_spare,
     find_boats,
     fit_to_seats,
     overlap_frames,
@@ -34,7 +35,8 @@ from rowvision.reference import Targets, load_targets
 from rowvision.reliability import Calibration, Evidence, Rating, load_calibration, rate
 from rowvision.scoring import ScoreCard, score_stroke
 from rowvision.seats import assign_seats, seat_holding, track_at
-from rowvision.shots import Shot, ShotKind, clear_frames, split_shots
+from rowvision.shots import OBLIQUE_LIMIT_DEG, Shot, ShotKind, clear_frames, split_shots
+from rowvision.sides import side_changes, split_at
 from rowvision.skeleton import FloatArray
 from rowvision.strokes import StrokeTimeline, crew_reach, detect_strokes, reach_signal
 from rowvision.timing import FollowTiming, follow_timing, leader_seat, seat_side
@@ -62,6 +64,11 @@ FILM_CLOSER = (
 FILM_SIDE_ON = (
     "Too much of this video was filmed from in front of or behind the boat, so the results are "
     "unreliable and no scores were given. Film side-on, from directly alongside the boat."
+)
+
+OTHER_SIDE = (
+    "The camera moved to the other side of the boat during this video, "
+    "so only the part with the best view was measured."
 )
 
 FrameReader = Callable[[int], Any]
@@ -113,6 +120,8 @@ class RowerResult:
     side: str | None = None
     """The side a sweep rower rows on, kept so the rower can be measured again."""
     no_scores: str | None = None
+    left_out: list[int] = field(default_factory=list)
+    """Catch frames of strokes filmed end-on, which are listed but do not count."""
     """Why no scores were given, when the footage cannot support any."""
 
 
@@ -134,6 +143,8 @@ class Scouting:
     boats: list[Boat]
     preview: int
     """Full-rate frame index showing the most boats."""
+    side_changes: list[int] = field(default_factory=list)
+    """Sampled frames where the camera crossed to the other side of the boat."""
 
     def choices(self) -> list[BoatChoice]:
         frame = self.preview // COARSE_STEP
@@ -369,6 +380,7 @@ def measure_rower(
         angles=angles,
         side=side,
         no_scores=FILM_SIDE_ON if too_end_on else None,
+        left_out=[s.catch_frame for s in strokes if s not in counted],
     )
 
 
@@ -408,8 +420,42 @@ def scout(read: FrameReader, frames: int, fps: float, backend: PoseBackend) -> S
     """Find every person and boat in the clip from sampled frames."""
     coarse_fps = fps / COARSE_STEP
     tracks = track_people(*coarse_pass(read, frames, backend), coarse_fps)
+    # Seat order and every angle depend on which way the crew faces in the picture, so no track
+    # may run from one side of the boat to the other.
+    changes = side_changes(tracks, coarse_fps)
+    tracks = split_at(tracks, changes)
     boats = find_boats(tracks, coarse_fps)
-    return Scouting(tracks, boats, preview_frame(boats) * COARSE_STEP)
+    return Scouting(tracks, boats, preview_frame(boats) * COARSE_STEP, changes)
+
+
+def _seen_together(first: Track, second: Track) -> bool:
+    return bool((np.isfinite(first.centre()[:, 0]) & np.isfinite(second.centre()[:, 0])).any())
+
+
+def _crew_to_measure(boat: Boat, seats: int, fps: float, tap_frame: int | None) -> list[Track]:
+    """Choose which shot of the boat to take the crew from.
+
+    The shot the athlete tapped in comes first. Then the one showing the most of the crew, then the
+    one with the most footage clear of end-on. On a real clip that swung round astern, the end-on
+    part showed as many rowers as the side-on part.
+    """
+    crews = boat.crews()
+    if not crews:
+        return []
+
+    def tapped(crew: list[Track]) -> bool:
+        return tap_frame is not None and any(
+            np.isfinite(track.centre()[tap_frame, 0]) for track in crew
+        )
+
+    def clear(crew: list[Track]) -> int:
+        views = view_by_frame(crew, fps)
+        return int((views <= OBLIQUE_LIMIT_DEG).sum())
+
+    most = max(min(len(crew), seats) for crew in crews)
+    return max(
+        crews, key=lambda crew: (tapped(crew), min(len(crew), seats) == most, clear(crew))
+    )
 
 
 def needs_boat_choice(scouting: Scouting, request: Request) -> bool:
@@ -476,9 +522,15 @@ def analyse(
         return Analysis(fps, frames, warnings=[FILM_CLOSER])
 
     coarse_fps = fps / COARSE_STEP
-    assignment = assign_seats(
-        fit_to_seats(boat.crew(), request.boat_seats), request.boat_seats, coarse_fps
+    tap_frame = None if request.tap is None else request.tap[0] // COARSE_STEP
+    crew = _crew_to_measure(boat, request.boat_seats, coarse_fps, tap_frame)
+    spare = [
+        person for person in boat.spare if any(_seen_together(person, rower) for rower in crew)
+    ]
+    fitted, added = fill_from_spare(
+        fit_to_seats(crew, request.boat_seats), spare, request.boat_seats, coarse_fps
     )
+    assignment = assign_seats(fitted, request.boat_seats, coarse_fps, added)
     rowers = list(assignment.seats.values())
 
     coarse_views = view_by_frame(rowers, coarse_fps)
@@ -491,6 +543,8 @@ def analyse(
     warnings = _boat_warnings(
         boat, assignment.surplus, request.boat_seats, found.boats, request.boats_in_video
     )
+    if any(boat.seen()[:change].any() and boat.seen()[change:].any() for change in found.side_changes):
+        warnings.append(OTHER_SIDE)
     if rowers and not assignment.complete and request.tap is None:
         warnings.append(
             f"Only {len(rowers)} of {request.boat_seats} rowers were seen, "
@@ -589,7 +643,7 @@ def analyse(
         )
         if seat in leaders:
             leader = leaders[seat]
-            timing = follow_timing(points, fine[leader][0], leader, assignment.facing, fps)
+            timing = follow_timing(points, fine[leader][0], leader, assignment.facing, fps, clear)
             rower = replace(rower, timing=timing)
         results.append(rower)
 
