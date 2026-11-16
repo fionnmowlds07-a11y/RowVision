@@ -7,8 +7,8 @@ PER_FRAME = ("poses", "angles")
 
 def split_report(report: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     """Return the summary and the frame data. Joint positions must only be in the frame data."""
-    summary = {key: value for key, value in report.items() if key != "views"}
-    frames: dict[str, Any] = {"views": report.get("views")}
+    summary = {key: value for key, value in report.items() if key not in ("views", "turns")}
+    frames: dict[str, Any] = {"views": report.get("views"), "turns": report.get("turns")}
     rower = report.get("rower")
     if rower is not None:
         summary["rower"] = {k: v for k, v in rower.items() if k not in PER_FRAME}

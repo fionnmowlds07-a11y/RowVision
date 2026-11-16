@@ -9,6 +9,7 @@ from rowvision import skeleton as sk
 from rowvision.geometry import joint_angle, lean_from_vertical, undo_foreshortening
 from rowvision.skeleton import FloatArray
 from rowvision.strokes import StrokeTimeline
+from rowvision.view import camera_turn, rigger_towards_camera
 
 ONSET_FRACTION = 0.2
 MIN_ANKLE_DROP_TRUNKS = 0.02
@@ -29,6 +30,16 @@ FINISH_FRAMES_EITHER_SIDE = 2
 """The arms are close to still around the finish, so the frames either side of it show the same
 position. Their median was steadier than one frame for the elbow on real clips. It was not for the
 body angle or the knee, which are still read on the finish frame alone."""
+
+
+LEAN_OUT_SHARE = 0.65
+"""How far a sweep rower's shoulders move out towards their rigger for each unit they move forward
+of the hips. Found on two real crews (a pair filmed 27 degrees off side-on and a four at 55): with
+this share, rowers on the two sides of the pair read the same forward lean, 18 degrees each, where
+they had read 13 and 24. Rowers differ, so this is a typical figure and not a measurement."""
+MIN_FORWARD_GAIN = 0.45
+"""Below this, leaning forward barely moves the shoulders in the picture, so the lean cannot be
+read. It happens to the side whose riggers face a camera turned well towards the stern."""
 
 
 MAX_LENGTH_VIEW_DEG = 45.0
@@ -106,7 +117,77 @@ def _within(value: float, limits: tuple[float, float]) -> float:
     return float(value) if limits[0] <= value <= limits[1] else float("nan")
 
 
-def angle_series(points: FloatArray, facing: int, view_deg: float | FloatArray) -> AngleSeries:
+def forward_gain(
+    points: FloatArray,
+    facing: int,
+    view_deg: float | FloatArray,
+    side: str | None,
+    turn: FloatArray | None = None,
+) -> FloatArray:
+    """Return how much of a forward lean shows along the boat in the picture, on each frame.
+
+    A camera off side-on sees less of any movement along the boat, by cos(view). A sweep rower also
+    leans out towards their own rigger as they come forward. The same camera sees part of that
+    sideways lean as movement along the boat, added for one side of the boat and taken away for
+    the other, depending on which way the camera is turned. `turn` is that direction on each frame,
+    worked out from this rower alone if not given.
+    """
+    views = np.radians(np.broadcast_to(np.asarray(view_deg, dtype=float), len(points)))
+    towards = rigger_towards_camera(side, facing)
+    if not towards:
+        return np.cos(views)
+    turned = camera_turn(points, facing) if turn is None else turn
+    lean_out = towards * turned * LEAN_OUT_SHARE
+    return np.cos(views) - lean_out * np.sin(views)
+
+
+def _sweep_lean(
+    points: FloatArray,
+    facing: int,
+    view_deg: float | FloatArray,
+    side: str,
+    turn: FloatArray | None,
+) -> FloatArray:
+    """Return a sweep rower's forward lean, allowing for their lean out towards the rigger.
+
+    Behind the hips, at the finish, rowers on both sides sit square, so only the forward half of
+    the stroke is corrected.
+    """
+    hip, shoulder = sk.hips(points), sk.shoulders(points)
+    forward = (shoulder[:, 0] - hip[:, 0]) * facing
+    up = hip[:, 1] - shoulder[:, 1]
+    views = np.radians(np.broadcast_to(np.asarray(view_deg, dtype=float), len(points)))
+    gain = np.where(forward > 0, forward_gain(points, facing, view_deg, side, turn), np.cos(views))
+    with np.errstate(invalid="ignore", divide="ignore"):
+        lean = np.degrees(np.arctan2(forward / gain, up))
+    return np.where(gain >= MIN_FORWARD_GAIN, lean, np.nan)
+
+
+def forward_lean_readable(
+    points: FloatArray,
+    facing: int,
+    view_deg: float | FloatArray,
+    side: str | None,
+    turn: FloatArray | None = None,
+) -> bool:
+    """Return False if this rower's forward lean cannot be read from where the camera is."""
+    gain = forward_gain(points, facing, view_deg, side, turn)
+    seen = np.isfinite(points[:, sk.LEFT_SHOULDER, 0]) & np.isfinite(gain)
+    return not seen.any() or float(np.median(gain[seen])) >= MIN_FORWARD_GAIN
+
+
+def angle_series(
+    points: FloatArray,
+    facing: int,
+    view_deg: float | FloatArray,
+    side: str | None = None,
+    turn: FloatArray | None = None,
+) -> AngleSeries:
+    """Return the angle on every frame.
+
+    `side` is a sweep rower's side, "stroke" or "bow". `turn` is which way the camera is turned
+    from side-on on each frame, as `camera_turn` gives it.
+    """
     hip = sk.hips(points)
     side_on = undo_foreshortening(points, hip[:, None, :], view_deg)
     hip = sk.hips(side_on)
@@ -114,8 +195,11 @@ def angle_series(points: FloatArray, facing: int, view_deg: float | FloatArray) 
     # The knee is read from the near leg alone. Averaging in the far leg, which the model often loses,
     # dragged the angle up or down by the same amount the far knee was misplaced.
     knee = joint_angle(*sk.near_leg(side_on, facing))
+    sweep = side in ("stroke", "bow")
     return AngleSeries(
-        trunk_lean=lean_from_vertical(hip, shoulder, facing),
+        trunk_lean=_sweep_lean(points, facing, view_deg, str(side), turn)
+        if sweep
+        else lean_from_vertical(hip, shoulder, facing),
         knee=np.where(legs_believable(side_on, facing), knee, np.nan),
         # The elbow is read from the near arm alone, for the same reason. The midpoint of two arms that
         # sit apart in the picture is a point on neither of them.
@@ -192,11 +276,16 @@ def _stroke_length(reach: FloatArray | None, catch: int, finish: int) -> float:
 
 
 def per_stroke(
-    angles: AngleSeries, timeline: StrokeTimeline, fps: float = float("nan")
+    angles: AngleSeries,
+    timeline: StrokeTimeline,
+    fps: float = float("nan"),
+    *,
+    catch_lean_readable: bool = True,
 ) -> list[StrokeMetrics]:
     """Measure each complete stroke: a catch, the finish after it, and the next catch.
 
-    Without a frame rate the times in seconds are left out.
+    Without a frame rate the times in seconds are left out. When the forward lean cannot be read
+    from where the camera is, the body angle at the catch is left out, and so is the body swing.
     """
     results = []
     for catch, next_catch in zip(timeline.catches, timeline.catches[1:]):
@@ -205,7 +294,7 @@ def per_stroke(
         if not finishes or too_long:
             continue
         finish = finishes[0]
-        catch_lean = _catch_lean(angles.trunk_lean, catch)
+        catch_lean = _catch_lean(angles.trunk_lean, catch) if catch_lean_readable else float("nan")
         finish_lean = float(angles.trunk_lean[finish])
         catch_elbow = _within(_catch_lean(angles.elbow, catch), CATCH_ELBOW_RANGE)
         finish_elbow = _within(_finish_elbow(angles.elbow, finish), FINISH_ELBOW_RANGE)

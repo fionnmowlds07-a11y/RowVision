@@ -129,14 +129,20 @@ def _stroke(stroke: StrokeMetrics) -> dict[str, Any]:
 
 
 def rower_json(
-    rower: RowerResult, frames: int, facing: int, view_deg: float | FloatArray
+    rower: RowerResult,
+    frames: int,
+    facing: int,
+    view_deg: float | FloatArray,
+    turns: FloatArray | None = None,
 ) -> dict[str, Any]:
     catches, finishes = stroke_markers(rower.strokes, frames)
+    side = getattr(rower, "side", None)
     angles = getattr(rower, "angles", None) or angle_series(
-        rower.points, facing, np.nan_to_num(view_deg)
+        rower.points, facing, np.nan_to_num(view_deg), side, turns
     )
     return {
         "seat": rower.seat,
+        "side": side,
         "rate_spm": _finite(rower.rate_spm),
         "catches": catches,
         "finishes": finishes,
@@ -166,11 +172,30 @@ def _range(values: list[float | None]) -> float | None:
     return float(max(known) - min(known)) if len(known) >= 2 else None
 
 
-def crew_summary(crew: list[dict[str, Any]]) -> dict[str, Any]:
+def _range_of_all(seats: list[dict[str, Any]], name: str) -> float | None:
+    return _range([seat[name] for seat in seats])
+
+
+def _range_along_sides(seats: list[dict[str, Any]], name: str) -> float | None:
+    """Return the widest gap between seats on one side. Sides alternate along a sweep boat."""
+    gaps = [
+        _range([seat[name] for seat in seats if seat["seat"] is not None and seat["seat"] % 2 == odd])
+        for odd in (0, 1)
+    ]
+    known = [gap for gap in gaps if gap is not None]
+    return max(known) if known else None
+
+
+def crew_summary(crew: list[dict[str, Any]], along_sides: bool = False) -> dict[str, Any]:
     """Return each seat's headline figures side by side, and how well the crew matches.
 
     The match is the gap in degrees between the seats furthest apart, for the body angle at the
-    catch and at the finish.
+    catch and at the finish. `along_sides` is for sweep crews, where only seats on the same side are
+    compared. To a camera off side-on the two sides read differently: on a real four filmed 55
+    degrees off side-on, seats on one side agreed within 4 degrees while the two sides read 32
+    degrees apart. The likely cause is that a sweep rower turns and leans out towards their own
+    rigger, which such a camera sees as more or less forward lean. A pair has one rower a side, so
+    it has no figure.
     """
     seats = [
         {
@@ -185,10 +210,12 @@ def crew_summary(crew: list[dict[str, Any]]) -> dict[str, Any]:
         }
         for rower in crew
     ]
+    spread = _range_along_sides if along_sides else _range_of_all
     return {
         "seats": seats,
-        "catch_lean_range_deg": _range([seat["catch_lean_deg"] for seat in seats]),
-        "finish_lean_range_deg": _range([seat["finish_lean_deg"] for seat in seats]),
+        "along_sides": along_sides,
+        "catch_lean_range_deg": spread(seats, "catch_lean_deg"),
+        "finish_lean_range_deg": spread(seats, "finish_lean_deg"),
     }
 
 
@@ -207,11 +234,13 @@ def analysis_json(analysis: Analysis) -> dict[str, Any]:
         rower_json(rower, analysis.frames, analysis.facing, view) for rower in analysis.rowers
     ]
     whole_crew = getattr(analysis, "own_seat", None) is not None or len(rowers) > 1
+    turns = getattr(analysis, "frame_turns", None)
     return {
         "fps": analysis.fps,
         "frames": analysis.frames,
         "view_deg": _finite(analysis.view_deg),
         "views": None if views is None else _series(views),
+        "turns": None if turns is None else _series(turns),
         "film_closer": FILM_CLOSER if FILM_CLOSER in analysis.warnings else None,
         "warnings": [warning for warning in analysis.warnings if warning != FILM_CLOSER],
         "shots": [
@@ -221,7 +250,7 @@ def analysis_json(analysis: Analysis) -> dict[str, Any]:
         "facing": analysis.facing,
         "rower": own_rower(rowers, analysis.own_seat),
         "crew": rowers if whole_crew else None,
-        "crew_summary": crew_summary(rowers) if whole_crew else None,
+        "crew_summary": crew_summary(rowers, getattr(analysis, "sweep", False)) if whole_crew else None,
     }
 
 
