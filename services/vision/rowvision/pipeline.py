@@ -24,6 +24,7 @@ from rowvision.metrics import (
     StrokeMetrics,
     angle_series,
     fade,
+    forward_lean_readable,
     per_stroke,
     rate_steadiness,
 )
@@ -37,7 +38,7 @@ from rowvision.skeleton import FloatArray
 from rowvision.strokes import StrokeTimeline, crew_reach, detect_strokes, reach_signal
 from rowvision.timing import FollowTiming, follow_timing, leader_seat, seat_side
 from rowvision.tracking import Track, track_people
-from rowvision.view import estimate_view_deg
+from rowvision.view import TURN_WINDOW_FRAMES, camera_turn, estimate_view_deg
 
 COARSE_STEP = 5
 BOX_MARGIN = 0.25
@@ -101,6 +102,8 @@ class RowerResult:
     """How each measure changes from the first half of the strokes to the second."""
     angles: AngleSeries | None = None
     """The angle on every frame, kept so the report need not work them out again."""
+    side: str | None = None
+    """The side a sweep rower rows on, kept so the rower can be measured again."""
 
 
 @dataclass(frozen=True)
@@ -148,10 +151,12 @@ class Analysis:
     """Share of the chosen boat's frames dropped because another boat crossed it."""
     frame_views: FloatArray | None = None
     """The camera angle used to correct each frame."""
+    frame_turns: FloatArray | None = None
+    """Which way the camera is turned from side-on on each frame: +1 stern, -1 bow, 0 unclear."""
     own_seat: int | None = None
+    """The athlete's own seat, when a whole crew was measured."""
     sweep: bool = False
     """True for a sweep crew, whose two sides look different to a camera off side-on."""
-    """The athlete's own seat, when a whole crew was measured."""
 
 
 def coarse_pass(
@@ -283,6 +288,8 @@ def measure_rower(
     agreement: float | None = None,
     targets: Targets | None = None,
     calibration: Calibration | None = None,
+    side: str | None = None,
+    turns: FloatArray | None = None,
 ) -> RowerResult:
     """Measure one rower's strokes from their joints, and score and rate the result.
 
@@ -290,8 +297,9 @@ def measure_rower(
     for each rower of a crew.
     """
     timeline = shared if shared is not None else detect_strokes(reach_signal(points, facing), fps)
-    angles = angle_series(points, facing, frame_views)
-    strokes = per_stroke(angles, timeline, fps)
+    angles = angle_series(points, facing, frame_views, side, turns)
+    readable = forward_lean_readable(points, facing, frame_views, side, turns)
+    strokes = per_stroke(angles, timeline, fps, catch_lean_readable=readable)
     summary: dict[str, float] = {}
     spread: dict[str, float] = {}
     for name in MEASURES:
@@ -319,11 +327,22 @@ def measure_rower(
         summary,
         spread,
         card,
-        rate(evidence, calibration),
+        _with_lean_warning(rate(evidence, calibration), readable),
         evidence=evidence,
         fade=fade(strokes),
         angles=angles,
+        side=side,
     )
+
+
+LEAN_UNREADABLE = (
+    "Your body angle at the catch can't be read from this camera angle on your side of the boat. "
+    "Film closer to side-on."
+)
+
+
+def _with_lean_warning(rating: Rating, readable: bool) -> Rating:
+    return rating if readable else replace(rating, warnings=[*rating.warnings, LEAN_UNREADABLE])
 
 
 def scout(read: FrameReader, frames: int, fps: float, backend: PoseBackend) -> Scouting:
@@ -421,6 +440,10 @@ def analyse(
         warnings.append("No side-on footage found, so side-view angles cannot be measured.")
         view = 0.0 if not np.isfinite(view) else UNCORRECTABLE_VIEW_DEG
     frame_views = correction_views(views, view)
+    coarse_turns = camera_turn(
+        [track.points for track in rowers], assignment.facing, TURN_WINDOW_FRAMES // COARSE_STEP | 1
+    )
+    frame_turns = coarse_turns[nearest] if len(coarse_turns) else np.zeros(frames)
 
     targets: list[tuple[int | None, Track]] = []
     own_seat = request.seat
@@ -496,6 +519,8 @@ def analyse(
             agreement=None if agreement is None or np.isnan(agreement) else agreement,
             targets=targets_file,
             calibration=calibration,
+            side=seat_side(seat, own_seat, request.side),
+            turns=frame_turns,
         )
         if seat in leaders:
             leader = leaders[seat]
@@ -518,6 +543,7 @@ def analyse(
         warnings,
         overlap_share=overlap_share,
         frame_views=frame_views,
+        frame_turns=frame_turns,
         own_seat=own_seat if request.scope is Scope.CREW else None,
         sweep=request.side != "scull",
     )

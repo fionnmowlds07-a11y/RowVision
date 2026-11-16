@@ -129,14 +129,20 @@ def _stroke(stroke: StrokeMetrics) -> dict[str, Any]:
 
 
 def rower_json(
-    rower: RowerResult, frames: int, facing: int, view_deg: float | FloatArray
+    rower: RowerResult,
+    frames: int,
+    facing: int,
+    view_deg: float | FloatArray,
+    turns: FloatArray | None = None,
 ) -> dict[str, Any]:
     catches, finishes = stroke_markers(rower.strokes, frames)
+    side = getattr(rower, "side", None)
     angles = getattr(rower, "angles", None) or angle_series(
-        rower.points, facing, np.nan_to_num(view_deg)
+        rower.points, facing, np.nan_to_num(view_deg), side, turns
     )
     return {
         "seat": rower.seat,
+        "side": side,
         "rate_spm": _finite(rower.rate_spm),
         "catches": catches,
         "finishes": finishes,
@@ -228,11 +234,13 @@ def analysis_json(analysis: Analysis) -> dict[str, Any]:
         rower_json(rower, analysis.frames, analysis.facing, view) for rower in analysis.rowers
     ]
     whole_crew = getattr(analysis, "own_seat", None) is not None or len(rowers) > 1
+    turns = getattr(analysis, "frame_turns", None)
     return {
         "fps": analysis.fps,
         "frames": analysis.frames,
         "view_deg": _finite(analysis.view_deg),
         "views": None if views is None else _series(views),
+        "turns": None if turns is None else _series(turns),
         "film_closer": FILM_CLOSER if FILM_CLOSER in analysis.warnings else None,
         "warnings": [warning for warning in analysis.warnings if warning != FILM_CLOSER],
         "shots": [
@@ -242,7 +250,7 @@ def analysis_json(analysis: Analysis) -> dict[str, Any]:
         "facing": analysis.facing,
         "rower": own_rower(rowers, analysis.own_seat),
         "crew": rowers if whole_crew else None,
-        "crew_summary": crew_summary(rowers, analysis.sweep) if whole_crew else None,
+        "crew_summary": crew_summary(rowers, getattr(analysis, "sweep", False)) if whole_crew else None,
     }
 
 

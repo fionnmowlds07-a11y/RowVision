@@ -18,7 +18,7 @@ from rowvision.reliability import Band, Rating
 from rowvision.report import crew_summary, own_rower, rower_json
 from rowvision.skeleton import FloatArray
 from rowvision.strokes import StrokeTimeline
-from rowvision.timing import FollowTiming
+from rowvision.timing import FollowTiming, seat_side
 
 
 class NoSkeleton(ValueError):
@@ -75,8 +75,20 @@ def _saved_rating(rating: dict[str, Any]) -> Rating:
     )
 
 
+def saved_turns(turns: list[float | None] | None, frames: int) -> FloatArray | None:
+    """Return which way the camera was turned on each frame, or None for results from before it
+    was kept, which work it out from the rower's own shoulders."""
+    if not turns:
+        return None
+    return np.array([0.0 if turn is None else turn for turn in turns[:frames]], dtype=float)
+
+
 def _remeasure_one(
-    summary: dict[str, Any], saved: dict[str, Any], poses: list[Any], views: FloatArray
+    summary: dict[str, Any],
+    saved: dict[str, Any],
+    poses: list[Any],
+    views: FloatArray,
+    turns: FloatArray | None,
 ) -> RowerResult:
     count = int(summary["frames"])
     fps = float(summary["fps"])
@@ -94,6 +106,8 @@ def _remeasure_one(
         trunk_px=float(evidence["trunk_px"]) if evidence else 1.0,
         coverage=float(evidence["coverage"]) if evidence else 1.0,
         agreement=evidence.get("agreement") if evidence else None,
+        side=saved.get("side"),
+        turns=turns,
     )
     result = replace(result, timing=_saved_timing(saved.get("timing")))
     if evidence:
@@ -110,7 +124,27 @@ def remeasure_rower(summary: dict[str, Any], frames: dict[str, Any]) -> RowerRes
         raise NoSkeleton("this result has no saved joints to measure from")
     count = int(summary["frames"])
     views = saved_views(frames.get("views"), summary.get("view_deg"), count)
-    return _remeasure_one(summary, saved, poses, views)
+    return _remeasure_one(summary, saved, poses, views, saved_turns(frames.get("turns"), count))
+
+
+def with_sides(summary: dict[str, Any], own_seat: int | None, own_side: str) -> dict[str, Any]:
+    """Return a saved result with each rower's side filled in, for results from before it was kept.
+
+    The side comes from what the athlete said when adding the clip. Sides already saved are kept.
+    """
+
+    def filled(rower: dict[str, Any] | None, alone: bool) -> dict[str, Any] | None:
+        if rower is None or rower.get("side"):
+            return rower
+        side = own_side if alone else seat_side(rower.get("seat"), own_seat, own_side)
+        return {**rower, "side": side}
+
+    crew = summary.get("crew")
+    return {
+        **summary,
+        "rower": filled(summary.get("rower"), not crew),
+        "crew": [filled(rower, False) for rower in crew] if crew else crew,
+    }
 
 
 def remeasure(summary: dict[str, Any], frames: dict[str, Any]) -> dict[str, Any]:
@@ -122,7 +156,8 @@ def remeasure(summary: dict[str, Any], frames: dict[str, Any]) -> dict[str, Any]
     facing = int(summary["facing"])
     views = saved_views(frames.get("views"), summary.get("view_deg"), count)
     kept = {key: value for key, value in summary.items() if key not in ("rower", "version")}
-    report = {**kept, "views": frames.get("views")}
+    turns = saved_turns(frames.get("turns"), count)
+    report = {**kept, "views": frames.get("views"), "turns": frames.get("turns")}
     crew = summary.get("crew")
     if not crew:
         rower = remeasure_rower(summary, frames)
@@ -133,7 +168,8 @@ def remeasure(summary: dict[str, Any], frames: dict[str, Any]) -> dict[str, Any]
         poses = (saved_crew.get(str(saved["seat"])) or {}).get("poses")
         if not poses:
             raise NoSkeleton("this result has no saved joints to measure from")
-        again.append(rower_json(_remeasure_one(summary, saved, poses, views), count, facing, views))
+        one = _remeasure_one(summary, saved, poses, views, turns)
+        again.append(rower_json(one, count, facing, views, turns))
     own = (summary.get("rower") or {}).get("seat")
     saved_summary = summary.get("crew_summary") or {}
     return {
