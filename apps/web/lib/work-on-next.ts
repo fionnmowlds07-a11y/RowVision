@@ -33,8 +33,9 @@ function wording(metric: Metric): string {
 }
 
 /** The scored measures losing the most points, or filming advice when the footage can't be trusted. */
-export function workOnNext(rower: Pick<Rower, "card" | "rating">): Advice {
-  if (rower.rating.band === "Poor") {
+export function workOnNext(rower: Pick<Rower, "card" | "rating" | "no_scores">): Advice {
+  // With no scores the reason comes first in the rating's warnings.
+  if (rower.no_scores || rower.rating.band === "Poor") {
     const notes = rower.rating.warnings.slice(0, MAX_ITEMS);
     const items = (notes.length ? notes : [FILMING_ADVICE]).map((text) => ({ text }));
     return { kind: "filming", items };

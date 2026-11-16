@@ -129,7 +129,7 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
         <div className={styles.tileMain}>
           <span>Overall</span>
           {card.overall === null ? (
-            <p>{overallGap(rower.strokes.length, card.phases, MIN_STROKES)}</p>
+            <p>{rower.no_scores ? "No scores: film side-on. These results are unreliable." : overallGap(rower.strokes.length, card.phases, MIN_STROKES)}</p>
           ) : visible ? (
             <strong>{Math.round(card.overall)}</strong>
           ) : (

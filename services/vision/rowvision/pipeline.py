@@ -59,6 +59,11 @@ FILM_CLOSER = (
     "Film closer, so that the boat fills most of the frame width."
 )
 
+FILM_SIDE_ON = (
+    "Too much of this video was filmed from in front of or behind the boat, so the results are "
+    "unreliable and no scores were given. Film side-on, from directly alongside the boat."
+)
+
 FrameReader = Callable[[int], Any]
 """Return the frame at an index."""
 
@@ -107,6 +112,8 @@ class RowerResult:
     """The angle on every frame, kept so the report need not work them out again."""
     side: str | None = None
     """The side a sweep rower rows on, kept so the rower can be measured again."""
+    no_scores: str | None = None
+    """Why no scores were given, when the footage cannot support any."""
 
 
 @dataclass(frozen=True)
@@ -315,10 +322,12 @@ def measure_rower(
     # Where enough of the clip is clear of end-on, the rower's figures come from those strokes
     # alone. On a real clip that panned round from astern, the end-on strokes read a catch angle
     # near 3 degrees for a rower who read 20 side-on, and nine of them pulled the figure down.
-    # A clip with too few clear strokes is measured whole, as its warnings already say.
-    in_clear = clear is not None and (
-        int(clear[timeline.catches[:-1]].sum()) >= MIN_CLEAR_STROKES and not bool(clear.all())
-    )
+    # A clip with too few clear strokes is measured whole. When as many of its strokes are end-on
+    # as not, the figures are shown without scores, as the owner chose on issue 213.
+    clear_strokes = 0 if clear is None else int(clear[timeline.catches[:-1]].sum())
+    end_on_strokes = max(len(timeline.catches) - 1, 0) - clear_strokes
+    in_clear = clear is not None and clear_strokes >= MIN_CLEAR_STROKES and not bool(clear.all())
+    too_end_on = clear is not None and not in_clear and end_on_strokes >= max(clear_strokes, 1)
     if clear is not None and in_clear:
         angles = _without_end_on(angles, clear)
     strokes = per_stroke(angles, timeline, fps, catch_lean_readable=readable)
@@ -340,6 +349,10 @@ def measure_rower(
     evidence = Evidence(
         trunk_px, view, spread.get("catch_lean_deg", 0.0), coverage, len(counted), agreement
     )
+    rating = _with_lean_warning(rate(evidence, calibration), readable)
+    if too_end_on:
+        card = _unscored(card)
+        rating = replace(rating, warnings=[FILM_SIDE_ON, *rating.warnings])
     return RowerResult(
         seat,
         points,
@@ -350,12 +363,25 @@ def measure_rower(
         summary,
         spread,
         card,
-        _with_lean_warning(rate(evidence, calibration), readable),
+        rating,
         evidence=evidence,
         fade=fade(counted),
         angles=angles,
         side=side,
+        no_scores=FILM_SIDE_ON if too_end_on else None,
     )
+
+
+END_ON_REASON = "Not scored, as too much of this video was filmed end-on."
+
+
+def _unscored(card: ScoreCard) -> ScoreCard:
+    """Return the card with its figures kept and every score taken off."""
+    metrics = [
+        metric if metric.score is None else replace(metric, score=None, reason=END_ON_REASON)
+        for metric in card.metrics
+    ]
+    return ScoreCard(metrics, {}, None, card.extras)
 
 
 def _without_end_on(angles: AngleSeries, clear: NDArray[np.bool_]) -> AngleSeries:
