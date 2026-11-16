@@ -1,10 +1,11 @@
 import numpy as np
-from crew import crew_detections, distant_people, two_boat_detections
+from crew import crew_detections, distant_people, side_by_side_detections, two_boat_detections
 
 from rowvision.boats import (
     Boat,
     boat_at,
     crew_agreement,
+    fill_from_spare,
     find_boats,
     fit_to_seats,
     overlap_frames,
@@ -189,3 +190,68 @@ def test_a_distant_boat_behind_does_not_count_as_crossing() -> None:
     far = Boat([Track(far_points, near[0].scores)], [Track(far_points, near[0].scores)])
     frames = len(near[0].points)
     assert overlap_frames(boats[0], [far], frames).sum() == 0
+
+
+def test_crews_side_by_side_are_not_chained_into_one_boat() -> None:
+    boats = boats_from(*side_by_side_detections())
+    # The person between them goes with one crew or the other, and the crews stay apart.
+    assert sorted(len(boat.rowers) for boat in boats if boat.confirmed) == [4, 5]
+
+
+def test_a_crew_seen_from_astern_stays_one_boat() -> None:
+    """From astern the crew shrinks along a sloping line, which is still one line."""
+    points, scores = crew_detections(4)
+    for people in points:
+        for seat in range(4):
+            centre = people[seat].mean(axis=0)
+            people[seat] = centre + (people[seat] - centre) * (1 - 0.15 * seat)
+            people[seat, :, 1] -= 60.0 * seat
+    assert [len(boat.rowers) for boat in boats_from(points, scores)] == [4]
+
+
+def test_one_person_found_twice_does_not_take_two_seats() -> None:
+    tracks = track_people(*crew_detections(3), FPS)
+    points = np.full_like(tracks[0].points, np.nan)
+    points[30:90] = tracks[0].points[30:90] + 6.0
+    twice = Track(points, np.full(points.shape[:2], 0.9))
+    assert len(fit_to_seats([*tracks, twice], 4)) == 3
+
+
+def test_a_rower_with_no_clear_rhythm_fills_an_empty_seat() -> None:
+    *crew, unclear = track_people(*crew_detections(4), FPS)
+    filled, added = fill_from_spare(crew, [unclear], 4, FPS)
+    assert len(filled) == 4 and added == [unclear]
+
+
+def test_someone_whose_hands_stay_put_is_not_given_a_seat() -> None:
+    *crew, last = track_people(*crew_detections(4), FPS)
+    still = np.broadcast_to(last.points[0], last.points.shape).copy()
+    cox = Track(still, last.scores)
+    assert fill_from_spare(crew, [cox], 4, FPS) == (crew, [])
+
+
+def test_a_full_crew_is_left_alone() -> None:
+    *crew, last = track_people(*crew_detections(5), FPS)
+    assert fill_from_spare(crew, [last], 4, FPS) == (crew, [])
+
+
+def test_a_stray_track_gives_its_seat_to_someone_seen_far_longer() -> None:
+    *crew, last = track_people(*crew_detections(5), FPS)
+    brief = crew[-1].points.copy()
+    brief[60:] = np.nan
+    stray = Track(brief, crew[-1].scores)
+    filled, added = fill_from_spare([*crew[:-1], stray], [last], 4, FPS)
+    assert added == [last] and all(person is not stray for person in filled)
+
+
+
+def test_a_stray_track_among_a_crew_is_not_a_second_boat() -> None:
+    """A smaller figure seen among the crew, too unlike them in size to be linked, is still theirs."""
+    points, scores = crew_detections(2)
+    for frame in range(240):
+        first, second = points[frame]
+        centre = first.mean(axis=0)
+        stray = (first - centre) * 0.58 + (centre + second.mean(axis=0)) / 2
+        points[frame] = np.concatenate([points[frame], stray[None]])
+        scores[frame] = np.concatenate([scores[frame], scores[frame][:1]])
+    assert len([boat for boat in boats_from(points, scores) if boat.confirmed]) == 1

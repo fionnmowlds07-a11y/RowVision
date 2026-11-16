@@ -1,6 +1,7 @@
 """Work out which tracked person sits in which seat."""
 
 import warnings
+from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import combinations
 
@@ -114,13 +115,20 @@ def _untangle(ordered: list[Track], facing: int) -> list[Track]:
     ]
 
 
-def assign_seats(tracks: list[Track], boat_seats: int, fps: float) -> SeatAssignment:
+def assign_seats(
+    tracks: list[Track], boat_seats: int, fps: float, trusted: Sequence[Track] = ()
+) -> SeatAssignment:
     """Number rowers along one boat from which way they face.
 
     Rowers face the stern, so the one furthest in the facing direction is stroke. If rowers are
-    missing from view the numbering is a best guess, and the athlete's tap decides.
+    missing from view the numbering is a best guess, and the athlete's tap decides. `trusted` are
+    people already taken for rowers, who need show no rhythm of their own.
     """
-    rowers = [track for track in tracks if is_rowing(track, fps)]
+    rowers = [
+        track
+        for track in tracks
+        if any(track is known for known in trusted) or is_rowing(track, fps)
+    ]
     if not rowers:
         return SeatAssignment({}, 0, False)
     votes = [facing_direction(track.points) for track in rowers]

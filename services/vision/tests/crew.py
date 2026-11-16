@@ -53,3 +53,49 @@ def distant_people(frame: int) -> FloatArray:
     """Return two tiny motionless people far from the camera, with no provable stroke rhythm."""
     joints = np.arange(17.0)[:, None] * np.array([0.0, 1.2]) + np.array([3000.0, 100.0])
     return np.stack([joints, joints + np.array([60.0, 0.0])])
+
+
+def side_by_side_detections() -> tuple[list[FloatArray], list[FloatArray]]:
+    """Return two fours rowing side by side, the far one under half the size, and one person
+    between them in size and height, as a real clip of two eights had."""
+    scales = [240.0] * 4 + [105.0] * 4 + [160.0]
+    clips = [
+        generate(strokes=6, pixels_per_metre=scale, pixel_noise=0.2, seed=i)
+        for i, scale in enumerate(scales)
+    ]
+    trunk = 0.55
+    across = np.concatenate([np.arange(4) * 300.0, 150 + np.arange(4) * 130.0, [1300.0]])
+    up = np.array([0.0] * 4 + [trunk * (240 + 160)] * 4 + [trunk * 240])
+    points, scores = [], []
+    for frame in range(len(clips[0].points)):
+        people = np.stack([clip.points[frame] for clip in clips])
+        people[..., 0] += across[:, None]
+        people[..., 1] -= up[:, None]
+        points.append(people)
+        scores.append(np.full(people.shape[:2], 0.9))
+    return points, scores
+
+
+def crossing_sides_detections(
+    seats: int = 4, *, second_share: float = 0.6
+) -> tuple[list[FloatArray], list[FloatArray]]:
+    """Return a crew filmed from one side, then, after a second out of view, from the other.
+
+    From the other side the crew faces the other way and the seats run the other way across the
+    picture, which is the first part mirrored.
+    """
+    points, scores = crew_detections(seats)
+    width = 2400.0
+    mirrored = []
+    for people in points[: int(len(points) * second_share)]:
+        flipped = people.copy()
+        flipped[..., 0] = width - flipped[..., 0]
+        # Left and right joints swap when a person is mirrored.
+        swapped = flipped.copy()
+        swapped[:, 1::2], swapped[:, 2::2] = flipped[:, 2::2], flipped[:, 1::2]
+        mirrored.append(swapped)
+    gap = [np.zeros((0, 17, 2))] * 30
+    return (
+        points + gap + mirrored,
+        scores + [np.zeros((0, 17))] * 30 + scores[: len(mirrored)],
+    )
