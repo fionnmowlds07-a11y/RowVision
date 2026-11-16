@@ -157,6 +157,7 @@ def rower_json(
         "card": _card(rower.card, rower.spread),
         "rating": _rating(rower.rating),
         "no_scores": getattr(rower, "no_scores", None),
+        "left_out": list(getattr(rower, "left_out", [])),
         "evidence": _evidence(rower),
         "fade": {name: _finite(change) for name, change in getattr(rower, "fade", {}).items()},
     }
