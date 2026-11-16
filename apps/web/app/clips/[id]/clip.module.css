@@ -390,15 +390,47 @@
 
 .controls {
   display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* One row for each job: step, jump, the picture, what is drawn. The name sits in a fixed column so
+   the rows line up and the eye finds a button by its row. */
+.controlRow {
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
-.wide {
+.controlRow > .group {
+  flex: none;
+  width: 58px;
+  margin: 0;
+}
+
+.controlRow :global(.button) {
+  padding: 0 14px;
+}
+
+.controlRow .play {
+  min-height: 44px;
+  min-width: 84px;
+  font-size: 14px;
+}
+
+.controlRow .speed {
+  margin-left: auto;
+  min-height: 44px;
+}
+
+.controlRow .toggle {
+  padding-right: 8px;
+}
+
+.controls .wide {
   display: none;
-  gap: 6px;
-  flex-wrap: wrap;
 }
 
 .speed,
@@ -443,8 +475,45 @@
 
   .body {
     display: grid;
-    grid-template-columns: minmax(0, 62fr) minmax(0, 38fr);
+    grid-template-columns: minmax(0, 58fr) minmax(360px, 42fr);
     align-items: start;
+  }
+
+  /* The video stays in view while the results scroll past it, so a number can be checked against
+     the footage. The picture is sized from the window's height, so the controls never fall below
+     the bottom edge. */
+  .videoColumn {
+    position: sticky;
+    top: var(--toolbar-height);
+  }
+
+  .viewer .stage {
+    width: min(100%, calc(max(200px, 100dvh - var(--toolbar-height) - 392px) * var(--ratio, 1.78)));
+    align-self: center;
+  }
+
+  .statsOnly {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .statsOnly .videoColumn {
+    position: static;
+  }
+
+  .statsOnly .side {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 10px 16px;
+  }
+
+  .statsOnly .across {
+    grid-column: 1 / -1;
+  }
+
+  /* A table stretched across the whole page puts each number a long way from its stroke. */
+  .statsOnly .strokeTable {
+    max-width: 820px;
   }
 
   .openVideo,
@@ -456,7 +525,7 @@
     display: block;
   }
 
-  .wide {
+  .controls .wide {
     display: inline-flex;
   }
 
@@ -752,4 +821,129 @@
   text-align: right;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+/* Results toolbar: links to each part of the results, and the choice of video with stats or stats
+   alone. It stays at the top while the page scrolls. */
+.toolbar {
+  --toolbar-height: 60px;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  min-height: var(--toolbar-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+  padding: 6px 0;
+  background: var(--ground);
+  color: var(--on-ground);
+}
+
+.toolbar + .body {
+  --toolbar-height: 68px;
+}
+
+.sectionLinks {
+  margin: 0 0 0 -10px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 2px;
+}
+
+.sectionLinks button {
+  appearance: none;
+  border: 0;
+  border-radius: var(--radius-field);
+  background: none;
+  color: var(--on-ground-soft);
+  font: 500 14px var(--font-text);
+  min-height: 44px;
+  padding: 0 10px;
+  cursor: pointer;
+  transition: color 150ms, background-color 150ms;
+}
+
+.sectionLinks button:hover {
+  color: var(--on-ground);
+  background: color-mix(in srgb, var(--on-ground) 8%, transparent);
+}
+
+.viewSwitch {
+  display: none;
+  padding: 3px;
+  gap: 3px;
+  border-radius: var(--radius-button);
+  background: var(--quiet);
+}
+
+.viewSwitch button {
+  appearance: none;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--ink-soft);
+  font: 500 14px var(--font-text);
+  min-height: 44px;
+  padding: 0 16px;
+  cursor: pointer;
+  transition: color 150ms, background-color 150ms;
+}
+
+.viewSwitch button:hover {
+  color: var(--ink);
+}
+
+.viewSwitch button[aria-pressed="true"] {
+  background: var(--highlight);
+  color: var(--on-highlight);
+  font-weight: 700;
+}
+
+.videoAway {
+  display: none;
+}
+
+/* Parts of the results that belong together, kept as close as cards in one list. */
+.cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.section {
+  min-width: 0;
+  scroll-margin-top: 76px;
+}
+
+.cluster[id] {
+  scroll-margin-top: 76px;
+}
+
+.section:empty {
+  display: none;
+}
+
+/* Charts sit side by side once the card is wide enough for two, as it is with the video put away. */
+.strokeCharts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+  gap: 12px 28px;
+}
+
+@media (min-width: 900px) {
+  .viewSwitch {
+    display: flex;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sectionLinks button,
+  .viewSwitch button {
+    transition: none;
+  }
 }
