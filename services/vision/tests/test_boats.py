@@ -1,5 +1,5 @@
 import numpy as np
-from crew import crew_detections, distant_people, two_boat_detections
+from crew import crew_detections, distant_people, side_by_side_detections, two_boat_detections
 
 from rowvision.boats import (
     Boat,
@@ -189,3 +189,20 @@ def test_a_distant_boat_behind_does_not_count_as_crossing() -> None:
     far = Boat([Track(far_points, near[0].scores)], [Track(far_points, near[0].scores)])
     frames = len(near[0].points)
     assert overlap_frames(boats[0], [far], frames).sum() == 0
+
+
+def test_crews_side_by_side_are_not_chained_into_one_boat() -> None:
+    boats = boats_from(*side_by_side_detections())
+    # The person between them goes with one crew or the other, and the crews stay apart.
+    assert sorted(len(boat.rowers) for boat in boats if boat.confirmed) == [4, 5]
+
+
+def test_a_crew_seen_from_astern_stays_one_boat() -> None:
+    """From astern the crew shrinks along a sloping line, which is still one line."""
+    points, scores = crew_detections(4)
+    for people in points:
+        for seat in range(4):
+            centre = people[seat].mean(axis=0)
+            people[seat] = centre + (people[seat] - centre) * (1 - 0.15 * seat)
+            people[seat, :, 1] -= 60.0 * seat
+    assert [len(boat.rowers) for boat in boats_from(points, scores)] == [4]

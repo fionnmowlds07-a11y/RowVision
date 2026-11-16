@@ -31,6 +31,11 @@ OUT_OF_TIME_MARGIN = 0.25
 DISTANT_LINE_TRUNKS = 2.5
 MIN_DISTANT_PEOPLE = 2
 MIN_DISTANT_SECONDS = 5.0
+OFF_LINE_TRUNKS = 1.0
+"""Most that anyone in a boat sits off the straight line through its people, in trunk lengths.
+On 16 real clips of one boat the furthest person was within 0.3. Two eights side by side, joined
+through three short tracks between them, came to 4.7."""
+MIN_LINE_PEOPLE = 3
 
 
 @dataclass
@@ -234,17 +239,66 @@ def _merge_to_fit(rowers: list[Track], seats: int) -> list[Track]:
     return crew
 
 
-def _same_boat(first: Track, second: Track, fps: float) -> bool:
-    """Return True if two people are seen together, at a similar size, on the same line."""
+def _line_gap(first: Track, second: Track, fps: float) -> float | None:
+    """Return how far apart in height two people of one boat sit, in trunk lengths, or None if
+    they are not seen together, at a similar size, on the same line."""
     a, b = first.centre(), second.centre()
     shared = np.isfinite(a[:, 0]) & np.isfinite(b[:, 0])
     if shared.sum() < MIN_SHARED_SECONDS * fps:
-        return False
+        return None
     sizes = first.trunk(), second.trunk()
     if max(sizes) / min(sizes) > MAX_SIZE_RATIO:
-        return False
-    height_gap = float(np.median(np.abs(a[shared, 1] - b[shared, 1])))
-    return height_gap <= SAME_LINE_TRUNKS * max(sizes)
+        return None
+    gap = float(np.median(np.abs(a[shared, 1] - b[shared, 1]))) / max(sizes)
+    return gap if gap <= SAME_LINE_TRUNKS else None
+
+
+def _same_boat(first: Track, second: Track, fps: float) -> bool:
+    """Return True if two people are seen together, at a similar size, on the same line."""
+    return _line_gap(first, second, fps) is not None
+
+
+def _off_line(people: list[Track]) -> float:
+    """Return how far the furthest person sits from the straight line through everyone, in trunk
+    lengths, as the median over frames showing enough people. Zero when no frame shows enough.
+
+    A crew sits along its boat, so its people fall on one line from any camera position. Two boats
+    side by side make two lines.
+    """
+    centres = np.array([track.centre() for track in people])
+    trunks = np.array([_frame_trunks(track) for track in people])
+    seen = np.isfinite(centres[:, :, 0]) & np.isfinite(trunks)
+    furthest = []
+    for frame in np.where(seen.sum(axis=0) >= MIN_LINE_PEOPLE)[0]:
+        points = centres[seen[:, frame], frame]
+        offsets = points - points.mean(axis=0)
+        across = np.linalg.svd(offsets, full_matrices=False)[2][1]
+        furthest.append(np.abs(offsets @ across).max() / np.median(trunks[seen[:, frame], frame]))
+    return float(np.median(furthest)) if furthest else 0.0
+
+
+def _boat_groups(tracks: list[Track], fps: float) -> list[list[int]]:
+    """Group people into boats, joining the closest pairs first.
+
+    A pair is only joined while everyone in the two groups still sits on one line. Without this, a
+    few short tracks between two crews rowing side by side chained them into one boat.
+    """
+    gaps = []
+    for first, second in combinations(range(len(tracks)), 2):
+        gap = _line_gap(tracks[first], tracks[second], fps)
+        if gap is not None:
+            gaps.append((gap, first, second))
+    group_of = {index: [index] for index in range(len(tracks))}
+    for _, first, second in sorted(gaps):
+        one, other = group_of[first], group_of[second]
+        if one is other:
+            continue
+        joined = one + other
+        if _off_line([tracks[index] for index in joined]) > OFF_LINE_TRUNKS:
+            continue
+        for index in joined:
+            group_of[index] = joined
+    return list({id(group): group for group in group_of.values()}.values())
 
 
 def _components(count: int, links: list[tuple[int, int]]) -> list[list[int]]:
@@ -301,13 +355,8 @@ def _distant_groups(tracks: list[Track], fps: float) -> list[Boat]:
 
 def find_boats(tracks: list[Track], fps: float) -> list[Boat]:
     """Return confirmed boats, the most visible first, then any distant unconfirmed boats."""
-    links = [
-        (first, second)
-        for first, second in combinations(range(len(tracks)), 2)
-        if _same_boat(tracks[first], tracks[second], fps)
-    ]
     boats = []
-    for group in _components(len(tracks), links):
+    for group in _boat_groups(tracks, fps):
         people = [tracks[index] for index in group]
         rowers = [track for track in people if is_rowing(track, fps)]
         if rowers:
