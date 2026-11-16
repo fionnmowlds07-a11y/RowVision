@@ -212,3 +212,19 @@ def test_a_job_can_ask_for_the_whole_crew() -> None:
     assert job_in(Path("clip")).setup.scope == "seat"
     assert job_in(Path("clip"), scope="crew").setup.scope == "crew"
     assert job_in(Path("clip"), scope="everyone").setup.scope == "seat"
+
+
+def test_measuring_again_takes_the_rowers_side_from_the_job(
+    tmp_path: Path, copies: list[Path]
+) -> None:
+    finished(tmp_path, copies)
+    (tmp_path / "job.json").write_text(json.dumps({"seat": 2, "side": "bow"}))
+    assert desktop.measure_again(tmp_path, lambda event: None) == desktop.FINISHED
+    assert json.loads((tmp_path / "summary.json").read_text())["rower"]["side"] == "bow"
+
+
+def test_measuring_again_works_without_a_job_file(tmp_path: Path, copies: list[Path]) -> None:
+    finished(tmp_path, copies)
+    (tmp_path / "job.json").unlink(missing_ok=True)
+    assert desktop.measure_again(tmp_path, lambda event: None) == desktop.FINISHED
+    assert json.loads((tmp_path / "summary.json").read_text())["rower"].get("side") is None

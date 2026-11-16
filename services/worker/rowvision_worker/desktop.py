@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TextIO
 
-from rowvision.remeasure import NoSkeleton, remeasure
+from rowvision.remeasure import NoSkeleton, remeasure, with_sides
 from rowvision.version import code_version
 
 from rowvision_worker import media, models
@@ -152,13 +152,23 @@ def save(folder: Path, done: Done, send: Send) -> None:
     send({"event": "done", "version": done.version, "accuracy": accuracy, "band": band, "overall": overall})
 
 
+def _with_job_sides(folder: Path, summary: dict[str, Any]) -> dict[str, Any]:
+    """Fill in each rower's side from the job, for clips analysed before the side was kept."""
+    try:
+        job = json.loads((folder / "job.json").read_text())
+        filled: dict[str, Any] = with_sides(summary, int(job["seat"]), str(job["side"]))
+        return filled
+    except (OSError, ValueError, KeyError, TypeError):
+        return summary
+
+
 def measure_again(folder: Path, send: Send) -> int:
     """Measure a finished clip again from its saved joints, which takes seconds, not minutes."""
     try:
         summary = json.loads((folder / "summary.json").read_text())
         saved = folder / "frames.json"
         frames = json.loads(saved.read_text()) if saved.exists() else {}
-        report = remeasure(summary, frames)
+        report = remeasure(_with_job_sides(folder, summary), frames)
     except NoSkeleton:
         send({"event": "failed", "message": NO_SKELETON_MESSAGE})
         return FAILED

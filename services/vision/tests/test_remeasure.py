@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from rowvision.pipeline import Analysis, measure_rower
-from rowvision.remeasure import NoSkeleton, remeasure, saved_points, saved_views
+from rowvision.remeasure import NoSkeleton, remeasure, saved_points, saved_views, with_sides
 from rowvision.report import analysis_json
 from rowvision.synthetic import generate
 from rowvision.timing import FollowTiming
@@ -174,3 +174,23 @@ def test_a_sweep_crew_stays_compared_along_each_side_when_measured_again() -> No
     again = remeasure(summary, frames)["crew_summary"]
     assert again["along_sides"]
     assert again["catch_lean_range_deg"] is None
+
+
+def test_sides_are_filled_in_for_results_from_before_they_were_kept() -> None:
+    summary, _ = saved()
+    assert with_sides(summary, 3, "bow")["rower"]["side"] == "bow"
+    crew, _ = saved_crew()
+    filled = with_sides(crew, 2, "bow")
+    assert [seat["side"] for seat in filled["crew"]] == ["stroke", "bow"]
+    assert filled["rower"]["side"] == "bow"
+    kept = with_sides({**summary, "rower": {**summary["rower"], "side": "stroke"}}, 3, "bow")
+    assert kept["rower"]["side"] == "stroke"
+
+
+def test_a_sweep_rower_keeps_their_side_and_the_camera_turn_when_measured_again() -> None:
+    summary, frames = saved()
+    turned = {**frames, "turns": [1.0] * summary["frames"]}
+    again = remeasure(with_sides(summary, 3, "stroke"), turned)
+    assert again["rower"]["side"] == "stroke"
+    assert again["turns"] == turned["turns"]
+    assert remeasure(summary, frames)["rower"]["side"] is None
