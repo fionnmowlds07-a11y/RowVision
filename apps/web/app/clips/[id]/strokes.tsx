@@ -9,7 +9,13 @@ const PAD = 12;
 const LEFT = 46;
 const MIN_STROKES = 2;
 
-type Props = { rower: Rower; fps: number; onPick: ((frame: number) => void) | null };
+type Props = {
+  rower: Rower;
+  fps: number;
+  onPick: ((frame: number) => void) | null;
+  /** Start with the table of numbers open, as when the stats have the whole page. */
+  numbersOpen?: boolean;
+};
 
 function Chart({ series, onPick }: { series: StrokeSeries; onPick: Props["onPick"] }) {
   const drawn = plot(series, WIDTH, HEIGHT, PAD, LEFT);
@@ -48,7 +54,7 @@ function Chart({ series, onPick }: { series: StrokeSeries; onPick: Props["onPick
 }
 
 /** Every stroke of the clip: a small chart a measure, and the same numbers in a table. */
-export function Strokes({ rower, fps, onPick }: Props) {
+export function Strokes({ rower, fps, onPick, numbersOpen = false }: Props) {
   const all = useMemo(() => strokeSeries(rower, fps), [rower, fps]);
   if (rower.strokes.length < MIN_STROKES || all.length === 0) return null;
   const fades = all.some((series) => series.fade !== null);
@@ -59,8 +65,10 @@ export function Strokes({ rower, fps, onPick }: Props) {
         The green band is your target.{onPick ? " Press a stroke to see it in the video." : ""}
         {fades ? "" : " With 6 strokes or more, this also says whether you fade in the second half."}
       </p>
-      {all.map((series) => <Chart key={series.name} series={series} onPick={onPick} />)}
-      <details>
+      <div className={styles.strokeCharts}>
+        {all.map((series) => <Chart key={series.name} series={series} onPick={onPick} />)}
+      </div>
+      <details open={numbersOpen}>
         <summary>See the numbers</summary>
         <div className={styles.scroll}>
           <table className={styles.strokeTable}>

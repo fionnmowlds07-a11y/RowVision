@@ -219,6 +219,36 @@ test("the results show the extra numbers, and every stroke as a chart and a tabl
   await page.evaluate(() => { window.location.hash = "#/"; });
 });
 
+test("the video stays in view while the results scroll, and can be put away for stats only", async () => {
+  await page.evaluate(() => { window.location.hash = "#/clip/test-clip"; });
+  const viewer = page.getByRole("region", { name: "Frame viewer" });
+  const results = page.getByRole("navigation", { name: "Results" });
+  await expect(viewer).toBeVisible();
+  await results.getByRole("button", { name: "Stroke by stroke" }).click();
+  await expect(page.getByRole("heading", { name: "Stroke by stroke" })).toBeInViewport();
+  await expect(viewer.getByRole("button", { name: "Play" })).toBeInViewport();
+  await expect(viewer.getByRole("button", { name: "Zoom to rower" })).toBeInViewport();
+
+  const statsOnly = results.getByRole("button", { name: "Stats only" });
+  await statsOnly.click();
+  await expect(statsOnly).toHaveAttribute("aria-pressed", "true");
+  await expect(viewer).toBeHidden();
+
+  // A stroke still opens in the video, over the page, and closes back to the stats.
+  await page.getByRole("button", { name: "Go to stroke 2" }).click();
+  await expect(viewer).toBeVisible();
+  await viewer.getByRole("button", { name: "Back to results" }).click();
+  await expect(viewer).toBeHidden();
+
+  // The choice is kept for the next clip opened.
+  await page.evaluate(() => { window.location.hash = "#/"; });
+  await page.evaluate(() => { window.location.hash = "#/clip/test-clip"; });
+  await expect(page.getByRole("navigation", { name: "Results" }).getByRole("button", { name: "Stats only" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("navigation", { name: "Results" }).getByRole("button", { name: "Video and stats" }).click();
+  await expect(page.getByRole("region", { name: "Frame viewer" })).toBeVisible();
+  await page.evaluate(() => { window.location.hash = "#/"; });
+});
+
 test("two clips are compared side by side, the earlier one first", async () => {
   await page.evaluate(() => { window.location.hash = "#/clip/test-clip"; });
   const pick = page.getByRole("region", { name: "Compare with another clip" });
