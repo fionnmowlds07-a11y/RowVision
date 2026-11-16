@@ -115,3 +115,24 @@ def test_sides_alternate_along_a_sweep_boat(
     seat: int | None, own_seat: int | None, own_side: str, side: str
 ) -> None:
     assert seat_side(seat, own_seat, own_side) == side
+
+
+def test_a_gap_too_big_to_be_one_stroke_gives_no_figure() -> None:
+    """Half a stroke out matches best at the edge of the search, which is no match."""
+    clip = generate(strokes=10, rate_spm=24)
+    half_a_stroke = round(60 * clip.fps / 24 / 2)
+    mine = np.roll(clip.points, half_a_stroke, axis=0)
+    assert follow_timing(mine, clip.points, 8, -1, clip.fps) is None
+
+
+def test_strokes_filmed_end_on_are_not_timed_against_the_leader() -> None:
+    """The second half is end-on, where the rower seems 5 frames late. Only the first half counts."""
+    mine, leader, fps = delayed(0)
+    half = len(mine) // 2
+    mine[half:] = np.roll(leader, 5, axis=0)[half:]
+    clear = np.arange(len(mine)) < half
+    whole = follow_timing(mine, leader, 8, -1, fps)
+    timing = follow_timing(mine, leader, 8, -1, fps, clear)
+    assert whole is not None and whole.strokes > 6
+    assert timing is not None and timing.catch_ms == 0
+    assert timing.strokes < whole.strokes

@@ -643,7 +643,7 @@ def analyse(
         )
         if seat in leaders:
             leader = leaders[seat]
-            timing = follow_timing(points, fine[leader][0], leader, assignment.facing, fps)
+            timing = follow_timing(points, fine[leader][0], leader, assignment.facing, fps, clear)
             rower = replace(rower, timing=timing)
         results.append(rower)
 
