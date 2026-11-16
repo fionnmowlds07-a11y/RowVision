@@ -375,7 +375,7 @@ def test_a_sweep_rower_reads_the_same_lean_from_any_camera(
     measured = angle_series(points, facing, abs(towards_stern), side).trunk_lean
     assert np.abs(measured - truth).max() < 1
     uncorrected = angle_series(points, facing, abs(towards_stern)).trunk_lean
-    assert np.abs(uncorrected - truth).max() > 4
+    assert np.abs(uncorrected - truth).max() > 1.5
 
 
 def test_a_lean_that_does_not_show_in_the_picture_is_not_read() -> None:

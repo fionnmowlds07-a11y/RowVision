@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 
 import numpy as np
+from numpy.typing import NDArray
 
 from rowvision import skeleton as sk
 from rowvision.skeleton import FloatArray
@@ -214,29 +215,47 @@ def crew_reach(signals: list[FloatArray]) -> FloatArray:
     return combined
 
 
-def continuous_runs(reach: FloatArray, fps: float) -> list[tuple[int, int]]:
-    """Return (start, end) for stretches of footage, allowing only short gaps inside a stretch."""
+def continuous_runs(
+    reach: FloatArray, fps: float, clear: NDArray[np.bool_] | None = None
+) -> list[tuple[int, int]]:
+    """Return (start, end) for stretches of footage, allowing only short gaps inside a stretch.
+
+    `clear` says on which frames movement along the boat shows in the picture. A stretch is also
+    cut wherever that changes, so a stretch is all clear or all not.
+    """
     seen = np.where(np.isfinite(reach))[0]
     if len(seen) == 0:
         return []
-    breaks = np.where(np.diff(seen) > MAX_GAP_SECONDS * fps)[0]
+    apart = np.diff(seen) > MAX_GAP_SECONDS * fps
+    if clear is not None:
+        apart |= clear[seen[1:]] != clear[seen[:-1]]
+    breaks = np.where(apart)[0]
     starts = [int(seen[0]), *(int(seen[index + 1]) for index in breaks)]
     ends = [*(int(seen[index]) + 1 for index in breaks), int(seen[-1]) + 1]
     return list(zip(starts, ends, strict=True))
 
 
-def detect_strokes(reach: FloatArray, fps: float) -> StrokeTimeline:
+def detect_strokes(
+    reach: FloatArray, fps: float, clear: NDArray[np.bool_] | None = None
+) -> StrokeTimeline:
     """Find catches (maximum reach) and finishes (minimum reach) in a reach signal.
 
     Each continuous stretch is analysed separately, because interpolating across a long gap would
     invent motion. Rate and regularity come from the longest stretch.
+
+    `clear` is False on frames filmed from so near the bow or stern that reach along the boat
+    barely shows. Those frames are timed on their own. Each stroke is placed by matching it to the
+    average stroke of its stretch, and on a real clip that panned from side-on to the bow, the
+    shapeless end-on strokes blurred that average until every catch landed on a finish. Rate and
+    regularity come from the longest clear stretch when there is one.
     """
-    runs = continuous_runs(reach, fps)
+    runs = continuous_runs(reach, fps, clear)
     if not runs:
         raise ValueError("no usable frames in signal")
     catches: list[int] = []
     finishes: list[int] = []
-    longest = max(runs, key=lambda run: run[1] - run[0])
+    trusted = [run for run in runs if clear is None or clear[run[0]]]
+    longest = max(trusted or runs, key=lambda run: run[1] - run[0])
     main = StrokeTimeline([], [], 0.0, 0.0)
     for start, end in runs:
         timeline = _detect_run(reach[start:end], fps)
