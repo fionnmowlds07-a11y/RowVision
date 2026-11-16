@@ -36,6 +36,8 @@ OFF_LINE_TRUNKS = 1.0
 On 16 real clips of one boat the furthest person was within 0.3. Two eights side by side, joined
 through three short tracks between them, came to 4.7."""
 MIN_LINE_PEOPLE = 3
+STRAY_MARGIN_TRUNKS = 1.5
+STRAY_SIZE_RATIO = 2.5
 DOUBLE_TRUNKS = 0.6
 """Two tracks this close along the boat while both are in view are one person found twice.
 Neighbours in a boat sit about 2.5 trunk lengths apart."""
@@ -431,6 +433,51 @@ def _merge_separate_shots(boats: list[Boat]) -> list[Boat]:
     return merged
 
 
+def _inside(person: Track, group: list[Track]) -> bool:
+    """Return True if someone is seen among a group's people: of a like size, and within the box
+    round them, with a trunk length and a half to spare, on most of the frames they share."""
+    centres = np.array([track.centre() for track in group])
+    seen = np.isfinite(centres[:, :, 0]).any(axis=0) & np.isfinite(person.centre()[:, 0])
+    if seen.sum() < MIN_SHARED_FRAMES:
+        return False
+    size = float(np.median([track.trunk() for track in group]))
+    if max(size, person.trunk()) / min(size, person.trunk()) > STRAY_SIZE_RATIO:
+        return False
+    margin = STRAY_MARGIN_TRUNKS * max(size, person.trunk())
+    low = np.nanmin(centres[:, seen], axis=0) - margin
+    high = np.nanmax(centres[:, seen], axis=0) + margin
+    place = person.centre()[seen]
+    return bool(np.mean(np.all((place >= low) & (place <= high), axis=1)) > 0.5)
+
+
+def _absorb_strays(groups: list[list[int]], tracks: list[Track]) -> list[list[int]]:
+    """Put a stray track or two back with the boat they are seen inside.
+
+    A line cannot be judged from one or two people, and a stray track left on its own would count
+    as a second boat and make the athlete choose between them.
+    """
+    hosts = [group for group in groups if len(group) >= MIN_LINE_PEOPLE - 1]
+    kept = []
+    for group in sorted(groups, key=len, reverse=True):
+        host = next(
+            (
+                other
+                for other in hosts
+                if other is not group
+                and len(other) > len(group)
+                and all(_inside(tracks[i], [tracks[j] for j in other]) for i in group)
+            ),
+            None,
+        )
+        if host is None or len(group) >= MIN_LINE_PEOPLE:
+            kept.append(group)
+        else:
+            host.extend(group)
+            if group in hosts:
+                hosts.remove(group)
+    return kept
+
+
 def _distant_groups(tracks: list[Track], fps: float) -> list[Boat]:
     """Group people too small to prove a rhythm, by size and height in the frame."""
     small = [track for track in tracks if track.trunk() < MIN_ANALYSIS_TRUNK_PX]
@@ -452,7 +499,7 @@ def _distant_groups(tracks: list[Track], fps: float) -> list[Boat]:
 def find_boats(tracks: list[Track], fps: float) -> list[Boat]:
     """Return confirmed boats, the most visible first, then any distant unconfirmed boats."""
     boats = []
-    for group in _boat_groups(tracks, fps):
+    for group in _absorb_strays(_boat_groups(tracks, fps), tracks):
         people = [tracks[index] for index in group]
         rowers = [track for track in people if is_rowing(track, fps)]
         if rowers:

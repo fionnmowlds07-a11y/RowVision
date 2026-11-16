@@ -242,3 +242,16 @@ def test_a_stray_track_gives_its_seat_to_someone_seen_far_longer() -> None:
     stray = Track(brief, crew[-1].scores)
     filled, added = fill_from_spare([*crew[:-1], stray], [last], 4, FPS)
     assert added == [last] and all(person is not stray for person in filled)
+
+
+
+def test_a_stray_track_among_a_crew_is_not_a_second_boat() -> None:
+    """A smaller figure seen among the crew, too unlike them in size to be linked, is still theirs."""
+    points, scores = crew_detections(2)
+    for frame in range(240):
+        first, second = points[frame]
+        centre = first.mean(axis=0)
+        stray = (first - centre) * 0.58 + (centre + second.mean(axis=0)) / 2
+        points[frame] = np.concatenate([points[frame], stray[None]])
+        scores[frame] = np.concatenate([scores[frame], scores[frame][:1]])
+    assert len([boat for boat in boats_from(points, scores) if boat.confirmed]) == 1
