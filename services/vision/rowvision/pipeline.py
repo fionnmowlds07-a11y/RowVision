@@ -149,6 +149,8 @@ class Analysis:
     frame_views: FloatArray | None = None
     """The camera angle used to correct each frame."""
     own_seat: int | None = None
+    sweep: bool = False
+    """True for a sweep crew, whose two sides look different to a camera off side-on."""
     """The athlete's own seat, when a whole crew was measured."""
 
 
@@ -455,9 +457,12 @@ def analyse(
     in_view = boat.seen()[np.minimum(np.arange(frames) // COARSE_STEP, coarse_frames - 1)]
 
     leaders: dict[int | None, int] = {}
+    stroke_side = seat_side(request.boat_seats, own_seat, request.side)
     for seat, _ in targets:
         side = seat_side(seat, own_seat, request.side)
-        leader = None if seat is None else leader_seat(seat, request.boat_seats, side)
+        leader = (
+            None if seat is None else leader_seat(seat, request.boat_seats, side, stroke_side)
+        )
         if leader is not None and leader in assignment.seats:
             leaders[seat] = leader
     wanted = dict(targets)
@@ -514,4 +519,5 @@ def analyse(
         overlap_share=overlap_share,
         frame_views=frame_views,
         own_seat=own_seat if request.scope is Scope.CREW else None,
+        sweep=request.side != "scull",
     )
