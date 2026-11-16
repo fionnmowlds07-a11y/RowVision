@@ -421,3 +421,9 @@ def test_a_clip_filmed_end_on_throughout_is_measured_as_before() -> None:
     points, _, timeline = panned_to_end_on()
     whole = np.zeros(len(points), dtype=bool)
     assert measured(points, whole, timeline).summary == measured(points, None, timeline).summary
+
+
+def test_a_clip_with_too_few_clear_strokes_is_measured_whole() -> None:
+    points, clear, timeline = panned_to_end_on()
+    barely = clear & (np.arange(len(points)) < timeline.catches[2])
+    assert measured(points, barely, timeline).summary == measured(points, None, timeline).summary
