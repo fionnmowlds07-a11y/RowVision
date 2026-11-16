@@ -52,3 +52,6 @@ apps/desktop/engine/
 
 # Site footage and stills cut from it (see apps/site/pipeline/make_media.sh)
 apps/site/public/media/
+
+# Vite cache for the marketing site
+apps/site/.vite/
