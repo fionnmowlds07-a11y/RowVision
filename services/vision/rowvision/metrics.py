@@ -32,14 +32,19 @@ position. Their median was steadier than one frame for the elbow on real clips. 
 body angle or the knee, which are still read on the finish frame alone."""
 
 
-LEAN_OUT_SHARE = 0.65
+LEAN_OUT_SHARE = 0.25
 """How far a sweep rower's shoulders move out towards their rigger for each unit they move forward
-of the hips. Found on two real crews (a pair filmed 27 degrees off side-on and a four at 55): with
-this share, rowers on the two sides of the pair read the same forward lean, 18 degrees each, where
-they had read 13 and 24. Rowers differ, so this is a typical figure and not a measurement."""
-MIN_FORWARD_GAIN = 0.45
-"""Below this, leaning forward barely moves the shoulders in the picture, so the lean cannot be
-read. It happens to the side whose riggers face a camera turned well towards the stern."""
+of the hips. Found on an eight filmed by a drone that swung from astern round to side-on, on both
+sides of the boat: about 300 catches, each rower compared with their own side-on reading. Shares
+from 0.2 to 0.3 fitted equally well, and rower by rower the best share ran from 0 to 0.5, so this is
+a typical figure and not a measurement. It was 0.65 at first, chosen so that the two rowers of a
+pair read the same forward lean. On the eight that read the side with riggers towards the camera
+about 10 degrees too far forward at 25 to 45 degrees off side-on."""
+MIN_FORWARD_GAIN = 0.55
+"""Below this, leaning forward moves the shoulders too little in the picture for the lean to be
+read. It happens to the side whose riggers face a camera turned well towards the stern, from about
+44 degrees off side-on. On the eight, that side read within about 7 degrees of its side-on figure
+at 30 to 40 degrees off, and 10 or more out beyond that."""
 
 
 MAX_LENGTH_VIEW_DEG = 45.0

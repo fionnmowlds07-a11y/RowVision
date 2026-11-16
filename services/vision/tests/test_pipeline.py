@@ -7,14 +7,18 @@ from rowvision.pipeline import (
     FILM_CLOSER,
     Analysis,
     Request,
+    RowerResult,
     Scope,
     _boxes_for,
     analyse,
     correction_views,
+    measure_rower,
 )
 from rowvision.report import analysis_json
 from rowvision.shots import ShotKind
 from rowvision.skeleton import FloatArray
+from rowvision.strokes import StrokeTimeline, detect_strokes, reach_signal
+from rowvision.synthetic import generate
 from rowvision.tracking import Track
 
 FPS = 30.0
@@ -367,3 +371,59 @@ def test_a_single_rower_report_has_no_crew() -> None:
     assert report["rower"]["seat"] == 3
     assert report["crew"] is None
     assert report["crew_summary"] is None
+
+
+def test_a_tap_on_someone_without_a_seat_still_tells_the_two_sides_apart() -> None:
+    # Five people in a four: one holds no seat, as a cox would not.
+    backend = FakeBackend(5)
+    sides = []
+    for person in backend.points[0]:
+        x, y = person.mean(axis=0)
+        request = Request(boat_seats=4, scope=Scope.CREW, seat=2, side="bow", tap=(0, float(x), float(y)))
+        result = analyse(lambda index: index, len(backend.points), FPS, request, backend)
+        sides.append({rower.seat: rower.side for rower in result.rowers})
+    assert all(set(found.values()) == {"bow", "stroke"} for found in sides)
+
+
+def panned_to_end_on() -> tuple[FloatArray, np.ndarray, StrokeTimeline]:
+    """Ten strokes, the last six filmed from astern, where the body shows almost no lean.
+
+    The strokes are timed before the camera moves, as a crew's shared timing would be.
+    """
+    clip = generate(strokes=10, facing=1, pixel_noise=0.5, seed=5)
+    timeline = detect_strokes(reach_signal(clip.points, 1), FPS)
+    points = clip.points.copy()
+    clear = np.arange(len(points)) < len(points) * 4 // 10
+    hips = points[~clear][:, [11, 12], 0].mean(axis=1)[:, None]
+    points[~clear, :, 0] = hips + 0.1 * (points[~clear, :, 0] - hips)
+    return points, clear, timeline
+
+
+def measured(points: FloatArray, clear: np.ndarray | None, timeline: StrokeTimeline) -> RowerResult:
+    frames = len(points)
+    return measure_rower(
+        1, points, np.full((frames, 17), 0.9), 1, 0.0, np.zeros(frames), FPS, timeline,
+        trunk_px=60.0, coverage=1.0, clear=clear,
+    )  # fmt: skip
+
+
+def test_strokes_filmed_end_on_do_not_count_towards_body_angles() -> None:
+    points, clear, timeline = panned_to_end_on()
+    assert measured(points, None, timeline).summary["catch_lean_deg"] < 18
+    rower = measured(points, clear, timeline)
+    assert rower.summary["catch_lean_deg"] == pytest.approx(25, abs=4)
+    end_on = [stroke for stroke in rower.strokes if not clear[stroke.catch_frame]]
+    assert end_on and all(np.isnan(stroke.catch_lean_deg) for stroke in end_on)
+    assert rower.evidence is not None and rower.evidence.strokes == len(rower.strokes) - len(end_on)
+
+
+def test_a_clip_filmed_end_on_throughout_is_measured_as_before() -> None:
+    points, _, timeline = panned_to_end_on()
+    whole = np.zeros(len(points), dtype=bool)
+    assert measured(points, whole, timeline).summary == measured(points, None, timeline).summary
+
+
+def test_a_clip_with_too_few_clear_strokes_is_measured_whole() -> None:
+    points, clear, timeline = panned_to_end_on()
+    barely = clear & (np.arange(len(points)) < timeline.catches[2])
+    assert measured(points, barely, timeline).summary == measured(points, None, timeline).summary

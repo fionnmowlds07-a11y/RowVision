@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 import numpy as np
+from numpy.typing import NDArray
 
 from rowvision.skeleton import FloatArray
 
@@ -71,3 +72,12 @@ def split_shots(view_deg: FloatArray, fps: float) -> list[Shot]:
         neighbours = shots[max(position - 1, 0) : position] + shots[position + 1 : position + 2]
         replacement = max(neighbours, key=lambda item: item.frames).kind
         kinds[shot.start : shot.end] = [replacement] * shot.frames
+
+
+def clear_frames(shots: list[Shot], frames: int) -> NDArray[np.bool_]:
+    """Return which frames show movement along the boat: every frame outside an end-on shot."""
+    clear = np.ones(frames, dtype=bool)
+    for shot in shots:
+        if shot.kind is ShotKind.END_ON:
+            clear[shot.start : shot.end] = False
+    return clear
