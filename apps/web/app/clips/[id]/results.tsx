@@ -102,7 +102,7 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
   const scene = useMemo(() => {
     if (!data) return null;
     const seat = crewSeat === null ? undefined : data.crew?.[String(crewSeat)];
-    return makeScene(rower, seat ? { ...data, ...seat } : data, summary.facing, summary.view_deg);
+    return makeScene(rower, seat ? { ...data, ...seat } : data, summary.facing, summary.view_deg, summary.other_side ?? []);
   }, [data, rower, summary, crewSeat]);
   const advice = workOnNext(rower);
   const { card, rating } = rower;

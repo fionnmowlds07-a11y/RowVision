@@ -18,6 +18,7 @@ from rowvision.pipeline import RowerResult, measure_rower
 from rowvision.reliability import Band, Rating
 from rowvision.report import crew_summary, own_rower, rower_json
 from rowvision.shots import ShotKind
+from rowvision.sides import as_one_side
 from rowvision.skeleton import FloatArray
 from rowvision.strokes import StrokeTimeline
 from rowvision.timing import FollowTiming, seat_side
@@ -88,6 +89,16 @@ def saved_clear(shots: list[dict[str, Any]] | None, frames: int) -> NDArray[np.b
     return clear
 
 
+def saved_other_side(ranges: list[list[int]] | None, frames: int) -> NDArray[np.bool_] | None:
+    """Return which frames were filmed from the other side of the boat, or None if none were."""
+    if not ranges:
+        return None
+    flipped = np.zeros(frames, dtype=bool)
+    for start, end in ranges:
+        flipped[int(start) : int(end)] = True
+    return flipped
+
+
 def saved_turns(turns: list[float | None] | None, frames: int) -> FloatArray | None:
     """Return which way the camera was turned on each frame, or None for results from before it
     was kept, which work it out from the rower's own shoulders."""
@@ -109,7 +120,7 @@ def _remeasure_one(
     evidence = saved.get("evidence")
     result = measure_rower(
         saved.get("seat"),
-        points,
+        as_one_side(points, saved_other_side(summary.get("other_side"), count)),
         scores,
         int(summary["facing"]),
         float(summary.get("view_deg") or 0.0),
@@ -123,7 +134,8 @@ def _remeasure_one(
         turns=turns,
         clear=saved_clear(summary.get("shots"), count),
     )
-    result = replace(result, timing=_saved_timing(saved.get("timing")))
+    # The joints are kept as filmed, for drawing over the picture.
+    result = replace(result, timing=_saved_timing(saved.get("timing")), points=points)
     if evidence:
         return result
     # Older results did not save what the rating came from, so the rating itself is kept.

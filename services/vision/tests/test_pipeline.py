@@ -463,15 +463,60 @@ def crossing_backend() -> FakeBackend:
     return backend
 
 
-def test_a_camera_that_crosses_sides_has_the_better_part_measured() -> None:
+def test_a_camera_that_crosses_sides_has_both_parts_measured_as_one() -> None:
     backend = crossing_backend()
     first = len(crew_detections(4)[0])
     result = run(backend, Request(boat_seats=4, scope=Scope.CREW))
-    assert OTHER_SIDE in result.warnings
+    alone = run(FakeBackend(4), Request(boat_seats=4, scope=Scope.CREW))
+    assert OTHER_SIDE not in result.warnings
     assert [rower.seat for rower in result.rowers] == [1, 2, 3, 4] and result.facing == -1
+    assert result.flipped is not None
+    assert not result.flipped[: first - 5].any() and result.flipped[first + 35 : -5].all()
+    for rower, before in zip(result.rowers, alone.rowers, strict=True):
+        # Seen and measured in both parts, with the strokes of the second added to the first.
+        assert np.isfinite(rower.points[10:first, 5, 0]).mean() > 0.9
+        assert np.isfinite(rower.points[first + 35 : -5, 5, 0]).mean() > 0.9
+        assert len(rower.strokes) > len(before.strokes)
+        assert any(stroke.catch_frame > first for stroke in rower.strokes)
+        assert rower.summary["catch_lean_deg"] == pytest.approx(25, abs=4)
+        assert rower.summary["finish_lean_deg"] == pytest.approx(-20, abs=4)
+        # The joints are kept as filmed, so they still sit on the rower in the picture.
+        shown = backend.points[first + 60]
+        gaps = np.linalg.norm(shown.mean(axis=1) - rower.points[first + 60].mean(axis=0), axis=1)
+        assert gaps.min() < 5
+
+
+def test_the_seats_keep_their_people_from_one_side_to_the_other() -> None:
+    """Seat 1 is bow from either side, though it is at the other end of the picture."""
+    backend = crossing_backend()
+    first = len(crew_detections(4)[0])
+    result = run(backend, Request(boat_seats=4, scope=Scope.CREW))
+    bow, stroke = result.rowers[0], result.rowers[-1]
+    assert bow.points[60, :, 0].mean() > stroke.points[60, :, 0].mean()
+    assert bow.points[first + 60, :, 0].mean() < stroke.points[first + 60, :, 0].mean()
+
+
+def test_a_part_missing_a_rower_is_left_out_and_the_rower_is_told() -> None:
+    backend = crossing_backend()
+    first = len(crew_detections(4)[0])
+    for frame in range(first, len(backend.points)):
+        if len(backend.points[frame]):
+            backend.points[frame] = backend.points[frame][:3]
+            backend.scores[frame] = backend.scores[frame][:3]
+    result = run(backend, Request(boat_seats=4, scope=Scope.CREW))
+    assert OTHER_SIDE in result.warnings and result.flipped is None
     for rower in result.rowers:
         assert not np.isfinite(rower.points[first:, 5, 0]).any()
         assert rower.summary["catch_lean_deg"] == pytest.approx(25, abs=4)
+
+
+def test_the_report_says_which_frames_were_from_the_other_side() -> None:
+    backend = crossing_backend()
+    first = len(crew_detections(4)[0])
+    result = run(backend, Request(boat_seats=4, scope=Scope.CREW))
+    (start, end), = analysis_json(result)["other_side"]
+    assert first <= start <= first + 35 and end > start + 100
+    assert analysis_json(run(FakeBackend(4), Request(boat_seats=4, seat=2)))["other_side"] == []
 
 
 def test_a_tap_after_the_camera_crosses_sides_measures_that_part() -> None:
@@ -485,3 +530,21 @@ def test_a_tap_after_the_camera_crosses_sides_measures_that_part() -> None:
 
 def test_a_clip_from_one_side_gets_no_other_side_warning() -> None:
     assert OTHER_SIDE not in run(FakeBackend(4), Request(boat_seats=4, seat=2)).warnings
+
+
+def test_measuring_again_keeps_both_sides_of_the_boat() -> None:
+    from rowvision.remeasure import remeasure
+
+    report = analysis_json(run(crossing_backend(), Request(boat_seats=4, scope=Scope.CREW)))
+    frames = {
+        "views": report["views"],
+        "turns": report["turns"],
+        "crew": {str(rower["seat"]): {"poses": rower["poses"]} for rower in report["crew"]},
+    }
+    again = remeasure(report, frames)
+    assert again["other_side"] == report["other_side"]
+    for before, after in zip(report["crew"], again["crew"], strict=True):
+        assert after["poses"] == before["poses"]
+        assert len(after["strokes"]) == len(before["strokes"])
+        for was, now in zip(before["card"]["metrics"], after["card"]["metrics"], strict=True):
+            assert now["value"] == pytest.approx(was["value"], abs=0.5), was["name"]

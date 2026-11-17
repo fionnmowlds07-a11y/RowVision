@@ -149,7 +149,8 @@ def _positions_along_boat(rowers: list[Track]) -> FloatArray:
     return np.linalg.lstsq(np.array(rows), np.array(gaps), rcond=None)[0]
 
 
-def _joined(first: Track, second: Track) -> Track:
+def joined(first: Track, second: Track) -> Track:
+    """Return one track holding the first wherever it was seen, and the second elsewhere."""
     points, scores = first.points.copy(), first.scores.copy()
     missing = ~np.isfinite(points[:, 5, 0]) & np.isfinite(second.points[:, 5, 0])
     points[missing] = second.points[missing]
@@ -178,7 +179,7 @@ def _merge_same_seat(rowers: list[Track]) -> list[Track]:
                 shortest = min(existing.coverage, track.coverage) * len(track.points)
                 close = abs(position - positions[index]) <= SAME_SEAT_TRUNKS
                 if close and overlap <= MAX_DISJOINT_OVERLAP * shortest:
-                    slots[slot] = (position, _joined(existing, track))
+                    slots[slot] = (position, joined(existing, track))
                     break
             else:
                 slots.append((float(positions[index]), track))
@@ -330,9 +331,9 @@ def _merge_to_fit(rowers: list[Track], seats: int) -> list[Track]:
         if best is None:
             return crew
         _, first, second = best
-        joined = _joined(crew[first], crew[second])
+        both = joined(crew[first], crew[second])
         crew = [track for index, track in enumerate(crew) if index not in (first, second)]
-        crew.append(joined)
+        crew.append(both)
     return crew
 
 

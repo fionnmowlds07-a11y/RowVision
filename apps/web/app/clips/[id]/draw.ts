@@ -1,4 +1,4 @@
-import { angleMarks, arcBetween, labelSpot, legsUnsure, limbSegments, targetMarks, viewAt } from "@/lib/logic";
+import { angleMarks, arcBetween, facingAt, labelSpot, legsUnsure, limbSegments, targetMarks, viewAt } from "@/lib/logic";
 import type { FrameData, Pose, Rower, Series } from "@/lib/result";
 
 const COLOURS = { left: "#22d3ee", right: "#e879f9", centre: "#fde047" };
@@ -12,11 +12,13 @@ export type Scene = {
   views: Series | null;
   viewDeg: number | null;
   facing: number;
+  /** Stretches of frames filmed from the other side of the boat, where the rower faces the other way. */
+  otherSide: number[][];
 };
 
-export function makeScene(rower: Rower, data: FrameData, facing: number, viewDeg: number | null): Scene | null {
+export function makeScene(rower: Rower, data: FrameData, facing: number, viewDeg: number | null, otherSide: number[][] = []): Scene | null {
   if (!data.poses || !data.angles) return null;
-  return { rower, poses: data.poses, angles: data.angles, views: data.views, viewDeg, facing };
+  return { rower, poses: data.poses, angles: data.angles, views: data.views, viewDeg, facing, otherSide };
 }
 
 function viewOf(scene: Scene, frame: number): number {
@@ -70,7 +72,7 @@ export function drawAngles(target: CanvasRenderingContext2D, scene: Scene, frame
 
 export function drawTargets(target: CanvasRenderingContext2D, scene: Scene, frame: number, size: number, only?: string) {
   const rower = { ...scene.rower, angles: scene.angles };
-  for (const item of targetMarks(scene.poses[frame], frame, rower, scene.facing, viewOf(scene, frame))) {
+  for (const item of targetMarks(scene.poses[frame], frame, rower, facingAt(scene.facing, scene.otherSide, frame), viewOf(scene, frame))) {
     if (only && item.kind !== only) continue;
     const colour = TARGET_COLOURS[item.inside ? "inside" : "outside"];
     target.beginPath();

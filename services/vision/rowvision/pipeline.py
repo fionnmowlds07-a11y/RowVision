@@ -17,6 +17,7 @@ from rowvision.boats import (
     fill_from_spare,
     find_boats,
     fit_to_seats,
+    joined,
     overlap_frames,
     preview_frame,
 )
@@ -34,9 +35,9 @@ from rowvision.pose import PoseBackend
 from rowvision.reference import Targets, load_targets
 from rowvision.reliability import Calibration, Evidence, Rating, load_calibration, rate
 from rowvision.scoring import ScoreCard, score_stroke
-from rowvision.seats import assign_seats, seat_holding, track_at
+from rowvision.seats import SeatAssignment, assign_seats, seat_holding, track_at
 from rowvision.shots import OBLIQUE_LIMIT_DEG, Shot, ShotKind, clear_frames, split_shots
-from rowvision.sides import side_changes, split_at
+from rowvision.sides import as_one_side, side_changes, split_at
 from rowvision.skeleton import FloatArray
 from rowvision.strokes import StrokeTimeline, crew_reach, detect_strokes, reach_signal
 from rowvision.timing import FollowTiming, follow_timing, leader_seat, seat_side
@@ -178,6 +179,8 @@ class Analysis:
     """The athlete's own seat, when a whole crew was measured."""
     sweep: bool = False
     """True for a sweep crew, whose two sides look different to a camera off side-on."""
+    flipped: NDArray[np.bool_] | None = None
+    """Frames filmed from the other side of the boat, where the crew faces the other way."""
 
 
 def coarse_pass(
@@ -432,6 +435,15 @@ def _seen_together(first: Track, second: Track) -> bool:
     return bool((np.isfinite(first.centre()[:, 0]) & np.isfinite(second.centre()[:, 0])).any())
 
 
+def _seats_of(crew: list[Track], boat: Boat, seats: int, fps: float) -> SeatAssignment:
+    """Fit one shot's rowers to the boat's seats and number them."""
+    spare = [
+        person for person in boat.spare if any(_seen_together(person, rower) for rower in crew)
+    ]
+    fitted, added = fill_from_spare(fit_to_seats(crew, seats), spare, seats, fps)
+    return assign_seats(fitted, seats, fps, added)
+
+
 def _crew_to_measure(boat: Boat, seats: int, fps: float, tap_frame: int | None) -> list[Track]:
     """Choose which shot of the boat to take the crew from.
 
@@ -524,14 +536,25 @@ def analyse(
     coarse_fps = fps / COARSE_STEP
     tap_frame = None if request.tap is None else request.tap[0] // COARSE_STEP
     crew = _crew_to_measure(boat, request.boat_seats, coarse_fps, tap_frame)
-    spare = [
-        person for person in boat.spare if any(_seen_together(person, rower) for rower in crew)
-    ]
-    fitted, added = fill_from_spare(
-        fit_to_seats(crew, request.boat_seats), spare, request.boat_seats, coarse_fps
-    )
-    assignment = assign_seats(fitted, request.boat_seats, coarse_fps, added)
+    assignment = _seats_of(crew, boat, request.boat_seats, coarse_fps)
+    # Other shots of the same boat are joined on seat by seat, when every seat is found in them
+    # too. A shot from the other side of the boat is mirrored for measuring, so the crew faces one
+    # way throughout.
+    coarse_flipped = np.zeros(len(boat.seen()), dtype=bool)
+    for other in boat.crews():
+        if other is crew or not assignment.complete:
+            continue
+        also = _seats_of(other, boat, request.boat_seats, coarse_fps)
+        if not also.complete:
+            continue
+        if also.facing != assignment.facing:
+            coarse_flipped |= np.any([np.isfinite(t.centre()[:, 0]) for t in also.seats.values()], axis=0)
+        assignment = replace(
+            assignment,
+            seats={seat: joined(track, also.seats[seat]) for seat, track in assignment.seats.items()},
+        )
     rowers = list(assignment.seats.values())
+    level = [Track(as_one_side(track.points, coarse_flipped), track.scores) for track in rowers]
 
     coarse_views = view_by_frame(rowers, coarse_fps)
     nearest = np.minimum(np.arange(frames) // COARSE_STEP, max(len(coarse_views) - 1, 0))
@@ -543,7 +566,10 @@ def analyse(
     warnings = _boat_warnings(
         boat, assignment.surplus, request.boat_seats, found.boats, request.boats_in_video
     )
-    if any(boat.seen()[:change].any() and boat.seen()[change:].any() for change in found.side_changes):
+    changed_side = any(
+        boat.seen()[:change].any() and boat.seen()[change:].any() for change in found.side_changes
+    )
+    if changed_side and not coarse_flipped.any():
         warnings.append(OTHER_SIDE)
     if rowers and not assignment.complete and request.tap is None:
         warnings.append(
@@ -555,9 +581,13 @@ def analyse(
         view = 0.0 if not np.isfinite(view) else UNCORRECTABLE_VIEW_DEG
     frame_views = correction_views(views, view)
     coarse_turns = camera_turn(
-        [track.points for track in rowers], assignment.facing, TURN_WINDOW_FRAMES // COARSE_STEP | 1
+        [track.points for track in level], assignment.facing, TURN_WINDOW_FRAMES // COARSE_STEP | 1
     )
+    # A sweep rower in mirrored frames appears to row on the other side. The lean-out correction
+    # is the turn times the side, so turning the sign here corrects them as the side they are on.
+    coarse_turns = np.where(coarse_flipped[: len(coarse_turns)], -coarse_turns, coarse_turns)
     frame_turns = coarse_turns[nearest] if len(coarse_turns) else np.zeros(frames)
+    flipped = coarse_flipped[nearest] if len(coarse_flipped) else np.zeros(frames, dtype=bool)
 
     targets: list[tuple[int | None, Track]] = []
     own_seat = request.seat
@@ -593,8 +623,8 @@ def analyse(
             "Those frames were left out."
         )
 
-    shared = crew_timeline(rowers, assignment.facing, frames, fps, clear)
-    agreements = dict(zip(map(id, rowers), crew_agreement(rowers), strict=True))
+    shared = crew_timeline(level, assignment.facing, frames, fps, clear)
+    agreements = dict(zip(map(id, rowers), crew_agreement(level), strict=True))
     in_view = boat.seen()[np.minimum(np.arange(frames) // COARSE_STEP, coarse_frames - 1)]
 
     leaders: dict[int | None, int] = {}
@@ -616,6 +646,7 @@ def analyse(
         points[dropped] = np.nan
         scores[dropped] = 0
         fine[seat] = points, scores
+    one_side = {seat: as_one_side(points, flipped) for seat, (points, _) in fine.items()}
 
     targets_file, calibration = load_targets(), load_calibration()
     results = []
@@ -625,7 +656,7 @@ def analyse(
         agreement = agreements.get(id(track))
         rower = measure_rower(
             seat,
-            points,
+            one_side[seat],
             scores,
             assignment.facing,
             view,
@@ -643,9 +674,12 @@ def analyse(
         )
         if seat in leaders:
             leader = leaders[seat]
-            timing = follow_timing(points, fine[leader][0], leader, assignment.facing, fps, clear)
+            timing = follow_timing(
+                one_side[seat], one_side[leader], leader, assignment.facing, fps, clear
+            )
             rower = replace(rower, timing=timing)
-        results.append(rower)
+        # The joints are kept as filmed, for drawing over the picture.
+        results.append(replace(rower, points=points))
 
     if results and not any(rower.strokes for rower in results):
         warnings.append(
@@ -665,4 +699,5 @@ def analyse(
         frame_turns=frame_turns,
         own_seat=own_seat if request.scope is Scope.CREW else None,
         sweep=request.side != "scull",
+        flipped=flipped if flipped.any() else None,
     )

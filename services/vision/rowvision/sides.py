@@ -8,6 +8,7 @@ picture reverses with it. Each stretch has to be worked out apart.
 from itertools import groupby, pairwise
 
 import numpy as np
+import numpy.typing as npt
 
 from rowvision import skeleton as sk
 from rowvision.skeleton import FloatArray
@@ -81,3 +82,24 @@ def split_at(tracks: list[Track], changes: list[int]) -> list[Track]:
             points[start:end], scores[start:end] = track.points[start:end], track.scores[start:end]
             pieces.append(Track(points, scores))
     return pieces
+
+
+LEFT_RIGHT = [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15]
+"""Each joint's partner on the other side of the body."""
+
+
+def as_one_side(points: FloatArray, flipped: npt.NDArray[np.bool_] | None) -> FloatArray:
+    """Return the joints as they would look if the whole clip had been filmed from one side.
+
+    On `flipped` frames the picture is mirrored: left and right swap places and swap names. The
+    crew then faces the same way throughout, so the frames can be measured as one clip. Angles and
+    distances within a body are unchanged by this. A sweep rower in the mirrored frames appears to
+    row on the other side, which whoever measures them has to allow for.
+    """
+    if flipped is None or not flipped.any():
+        return points
+    turned = flipped[: len(points)]
+    out = points.copy()
+    out[turned] = points[turned][:, LEFT_RIGHT]
+    out[turned, :, 0] = -out[turned, :, 0]
+    return out
