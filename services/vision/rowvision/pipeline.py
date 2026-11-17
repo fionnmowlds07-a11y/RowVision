@@ -34,7 +34,7 @@ from rowvision.metrics import (
 from rowvision.pose import PoseBackend
 from rowvision.reference import Targets, load_targets
 from rowvision.reliability import Calibration, Evidence, Rating, load_calibration, rate
-from rowvision.scoring import ScoreCard, score_stroke
+from rowvision.scoring import MIN_STROKES, ScoreCard, score_stroke, without_scores
 from rowvision.seats import SeatAssignment, assign_seats, seat_holding, track_at
 from rowvision.shots import OBLIQUE_LIMIT_DEG, Shot, ShotKind, clear_frames, split_shots
 from rowvision.sides import as_one_side, side_changes, split_at
@@ -42,7 +42,12 @@ from rowvision.skeleton import FloatArray
 from rowvision.strokes import StrokeTimeline, crew_reach, detect_strokes, reach_signal
 from rowvision.timing import FollowTiming, follow_timing, leader_seat, seat_side
 from rowvision.tracking import Track, track_people
-from rowvision.view import TURN_WINDOW_FRAMES, camera_turn, estimate_view_deg
+from rowvision.view import (
+    TURN_WINDOW_FRAMES,
+    camera_turn,
+    estimate_view_deg,
+    rigger_towards_camera,
+)
 
 COARSE_STEP = 5
 BOX_MARGIN = 0.25
@@ -66,6 +71,18 @@ FILM_SIDE_ON = (
     "Too much of this video was filmed from in front of or behind the boat, so the results are "
     "unreliable and no scores were given. Film side-on, from directly alongside the boat."
 )
+
+BOTH_SIDES = (
+    "The camera moved to the other side of the boat during this video. Every stroke was used for "
+    "timing, and body angles were taken from one side only. Film from one side for the best results."
+)
+OFF_OAR_SIDE = (
+    "Not scored, as most of this video was filmed from the side away from your oar, where your body "
+    "is turned from the camera. Film from your oar side."
+)
+TOO_FEW_ON_ONE_SIDE = "Not scored, as too few strokes were filmed from one side of the boat."
+TIMING_MEASURES = frozenset({"drive_share", "drive_s", "recovery_s", "ratio", "rate_steadiness"})
+"""Measures read from when the catch and finish happen, which look the same from either side."""
 
 OTHER_SIDE = (
     "The camera moved to the other side of the boat during this video, "
@@ -320,6 +337,8 @@ def measure_rower(
     side: str | None = None,
     turns: FloatArray | None = None,
     clear: NDArray[np.bool_] | None = None,
+    angle_frames: NDArray[np.bool_] | None = None,
+    angle_note: str | None = None,
 ) -> RowerResult:
     """Measure one rower's strokes from their joints, and score and rate the result.
 
@@ -346,12 +365,18 @@ def measure_rower(
         angles = _without_end_on(angles, clear)
     strokes = per_stroke(angles, timeline, fps, catch_lean_readable=readable)
     counted = [s for s in strokes if clear is None or not in_clear or clear[s.catch_frame]] or strokes
+    # When the camera crossed the boat, body angles come only from strokes on one side, where the
+    # body is seen the same way. Timing reads the same from either side, so it uses every stroke.
+    angled = counted if angle_frames is None else [s for s in counted if angle_frames[s.catch_frame]]
     summary: dict[str, float] = {}
     spread: dict[str, float] = {}
     for name in MEASURES:
-        values = np.array([getattr(stroke, name) for stroke in counted], dtype=float)
+        source = counted if name in TIMING_MEASURES else angled
+        if not source:
+            continue
+        values = np.array([getattr(stroke, name) for stroke in source], dtype=float)
         values = values[np.isfinite(values)]
-        if len(values) and len(values) >= MIN_KNOWN_SHARE * len(counted):
+        if len(values) and len(values) >= MIN_KNOWN_SHARE * len(source):
             summary[name] = float(np.median(values))
             spread[name] = float(np.subtract(*np.percentile(values, [75, 25])))
     steadiness = rate_steadiness(counted)
@@ -360,6 +385,9 @@ def measure_rower(
     card = score_stroke(
         summary, spread, len(counted), timeline.rate_spm, targets if targets is not None else load_targets()
     )
+    if angle_frames is not None and (angle_note or len(angled) < MIN_STROKES):
+        body = {metric.name for metric in card.metrics} - TIMING_MEASURES
+        card = without_scores(card, body, angle_note or TOO_FEW_ON_ONE_SIDE)
     evidence = Evidence(
         trunk_px, view, spread.get("catch_lean_deg", 0.0), coverage, len(counted), agreement
     )
@@ -385,6 +413,31 @@ def measure_rower(
         no_scores=FILM_SIDE_ON if too_end_on else None,
         left_out=[s.catch_frame for s in strokes if all(s is not kept for kept in counted)],
     )
+
+
+def angle_side(
+    flipped: NDArray[np.bool_] | None, measured: NDArray[np.bool_], side: str | None, facing: int
+) -> tuple[NDArray[np.bool_] | None, str | None]:
+    """Choose the frames a rower's body angles come from when the camera crossed the boat.
+
+    Returns None when it did not. A sweep rower is measured from their oar side, where the body
+    opens towards the camera, as long as most of their video is from that side. Otherwise their
+    body angles are taken from the side filmed most and left unscored, as the owner chose. A
+    sculler has an oar on each side, so the side filmed most is used.
+    """
+    if flipped is None or not flipped.any():
+        return None, None
+    turned = flipped[: len(measured)]
+    near, far = measured & ~turned, measured & turned
+    most = ~turned if near.sum() >= far.sum() else turned
+    towards = rigger_towards_camera(side, facing)
+    if towards == 0:
+        return most, None
+    oar = ~turned if towards > 0 else turned
+    oar_seen = near if towards > 0 else far
+    if oar_seen.sum() * 2 >= measured.sum():
+        return oar, None
+    return most, OFF_OAR_SIDE
 
 
 END_ON_REASON = "Not scored, as too much of this video was filmed end-on."
@@ -580,6 +633,8 @@ def analyse(
     )
     if changed_side and not coarse_flipped.any():
         warnings.append(OTHER_SIDE)
+    elif coarse_flipped.any():
+        warnings.append(BOTH_SIDES)
     if rowers and not assignment.complete and request.tap is None:
         warnings.append(
             f"Only {len(rowers)} of {request.boat_seats} rowers were seen, "
@@ -663,6 +718,8 @@ def analyse(
         points, scores = fine[seat]
         measured = np.isfinite(points[:, sk.LEFT_SHOULDER, 0])
         agreement = agreements.get(id(track))
+        own_side = seat_side(seat, own_seat, request.side)
+        angle_frames, angle_note = angle_side(flipped, measured, own_side, assignment.facing)
         rower = measure_rower(
             seat,
             one_side[seat],
@@ -677,9 +734,11 @@ def analyse(
             agreement=None if agreement is None or np.isnan(agreement) else agreement,
             targets=targets_file,
             calibration=calibration,
-            side=seat_side(seat, own_seat, request.side),
+            side=own_side,
             turns=frame_turns,
             clear=clear,
+            angle_frames=angle_frames,
+            angle_note=angle_note,
         )
         if seat in leaders:
             leader = leaders[seat]

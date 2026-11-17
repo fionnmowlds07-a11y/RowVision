@@ -548,3 +548,53 @@ def test_measuring_again_keeps_both_sides_of_the_boat() -> None:
         assert len(after["strokes"]) == len(before["strokes"])
         for was, now in zip(before["card"]["metrics"], after["card"]["metrics"], strict=True):
             assert now["value"] == pytest.approx(was["value"], abs=0.5), was["name"]
+
+
+def _halves(first: int, second: int) -> tuple[np.ndarray, np.ndarray]:
+    """A clip whose first `first` frames are from one side and next `second` from the other."""
+    flipped = np.r_[np.zeros(first, dtype=bool), np.ones(second, dtype=bool)]
+    return flipped, np.ones(first + second, dtype=bool)
+
+
+def test_angle_side_is_none_when_the_camera_stays_on_one_side() -> None:
+    from rowvision.pipeline import angle_side
+
+    assert angle_side(None, np.ones(10, dtype=bool), "stroke", 1) == (None, None)
+
+
+def test_a_sculler_is_measured_from_the_side_filmed_most() -> None:
+    from rowvision.pipeline import angle_side
+
+    flipped, measured = _halves(3, 7)
+    frames, note = angle_side(flipped, measured, "scull", 1)
+    assert note is None and frames is not None and frames.tolist() == flipped.tolist()
+
+
+def test_a_sweep_rower_is_measured_from_their_oar_side_when_most_video_is_there() -> None:
+    from rowvision.pipeline import angle_side
+
+    # Stroke side facing image-right has the rigger towards the camera on unflipped frames.
+    flipped, measured = _halves(7, 3)
+    frames, note = angle_side(flipped, measured, "stroke", 1)
+    assert note is None and frames is not None and frames.tolist() == (~flipped).tolist()
+
+
+def test_a_sweep_rower_filmed_mostly_away_from_their_oar_gets_no_angle_scores() -> None:
+    from rowvision.pipeline import OFF_OAR_SIDE, angle_side
+
+    flipped, measured = _halves(3, 7)
+    frames, note = angle_side(flipped, measured, "stroke", 1)
+    assert note == OFF_OAR_SIDE and frames is not None and frames.tolist() == flipped.tolist()
+
+
+def test_without_scores_keeps_timing_and_drops_the_overall() -> None:
+    from rowvision.reference import load_targets
+    from rowvision.scoring import score_stroke, without_scores
+
+    summary = {"catch_lean_deg": 25.0, "finish_lean_deg": -20.0, "drive_share": 0.4}
+    card = score_stroke(summary, {}, 10, 20.0, load_targets())
+    assert card.overall is not None
+    off = without_scores(card, {"catch_lean_deg", "finish_lean_deg"}, "why")
+    assert off.overall is None
+    assert {m.name: m.score for m in off.metrics}["drive_share"] is not None
+    assert {m.name: m.reason for m in off.metrics}["catch_lean_deg"] == "why"
