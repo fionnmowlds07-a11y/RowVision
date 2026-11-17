@@ -22,9 +22,15 @@ const D = CLIPS.pair, A = CLIPS['single-a'];
 const clipUrl = k => `${import.meta.env.VITE_MEDIA_BASE ?? ''}/media/${k}.mp4`;
 function fill(k) {
   const c = CLIPS[k];
+  if (!c.v.src) c.v.src = clipUrl(k);   // starts playing while it streams in
   return c.ready = fetch(clipUrl(k)).then(r => { if (!r.ok) throw r; return r.blob(); })
-    .then(b => { c.v.src = URL.createObjectURL(b); })
-    .catch(() => { c.v.src = clipUrl(k); });
+    .then(b => {
+      // Swap to the copy in memory without a jump: same moment, same playing state.
+      const v = c.v, t = v.currentTime, playing = !v.paused;
+      v.src = URL.createObjectURL(b);
+      v.addEventListener('loadedmetadata', () => { v.currentTime = t; if (playing) v.play().catch(() => {}); }, { once: true });
+    })
+    .catch(() => {});
 }
 const warm = k => { const c = CLIPS[k]; if (!c.warm) { c.warm = true; fill(k); } };
 // The pair opens the film; the rest follow one at a time behind it so they are in memory before they are reached.
