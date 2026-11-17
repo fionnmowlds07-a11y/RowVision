@@ -435,13 +435,20 @@ def _seen_together(first: Track, second: Track) -> bool:
     return bool((np.isfinite(first.centre()[:, 0]) & np.isfinite(second.centre()[:, 0])).any())
 
 
-def _seats_of(crew: list[Track], boat: Boat, seats: int, fps: float) -> SeatAssignment:
-    """Fit one shot's rowers to the boat's seats and number them."""
+def _seats_of(
+    crew: list[Track], boat: Boat, seats: int, fps: float
+) -> tuple[SeatAssignment, bool]:
+    """Fit one shot's rowers to the boat's seats and number them.
+
+    Also returns whether every seat went to someone with a clear rhythm of their own, with nobody
+    brought in to make up the number.
+    """
     spare = [
         person for person in boat.spare if any(_seen_together(person, rower) for rower in crew)
     ]
     fitted, added = fill_from_spare(fit_to_seats(crew, seats), spare, seats, fps)
-    return assign_seats(fitted, seats, fps, added)
+    assignment = assign_seats(fitted, seats, fps, added)
+    return assignment, assignment.complete and not added and not assignment.surplus
 
 
 def _crew_to_measure(boat: Boat, seats: int, fps: float, tap_frame: int | None) -> list[Track]:
@@ -536,16 +543,18 @@ def analyse(
     coarse_fps = fps / COARSE_STEP
     tap_frame = None if request.tap is None else request.tap[0] // COARSE_STEP
     crew = _crew_to_measure(boat, request.boat_seats, coarse_fps, tap_frame)
-    assignment = _seats_of(crew, boat, request.boat_seats, coarse_fps)
-    # Other shots of the same boat are joined on seat by seat, when every seat is found in them
-    # too. A shot from the other side of the boat is mirrored for measuring, so the crew faces one
-    # way throughout.
+    assignment, sure = _seats_of(crew, boat, request.boat_seats, coarse_fps)
+    # Other shots of the same boat are joined on seat by seat, but only when every seat in both
+    # is held by someone with a clear rhythm of their own. On a real four, a second shot that
+    # reached four seats by bringing in an unclear track put people in the wrong seats, and joining
+    # it left almost nothing measurable. A shot from the other side of the boat is mirrored for
+    # measuring, so the crew faces one way throughout.
     coarse_flipped = np.zeros(len(boat.seen()), dtype=bool)
     for other in boat.crews():
-        if other is crew or not assignment.complete:
+        if other is crew or not sure:
             continue
-        also = _seats_of(other, boat, request.boat_seats, coarse_fps)
-        if not also.complete:
+        also, also_sure = _seats_of(other, boat, request.boat_seats, coarse_fps)
+        if not also_sure:
             continue
         if also.facing != assignment.facing:
             coarse_flipped |= np.any([np.isfinite(t.centre()[:, 0]) for t in also.seats.values()], axis=0)
