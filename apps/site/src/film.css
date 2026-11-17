@@ -41,7 +41,7 @@
 .phone { position: relative; background: #000; border-radius: 4.2% / 8.4%; padding: 1.6% 5.2%; transform-style: preserve-3d; box-shadow: 0 0 0 1px rgba(255, 255, 255, .1), 0 50px 120px -30px rgba(75, 227, 138, .22), 0 30px 60px -20px #000; }
 .phone::before { content: ''; position: absolute; left: 2.3%; top: 50%; width: 1.1%; aspect-ratio: 1; border-radius: 50%; background: #16211b; transform: translateY(-50%); }
 .phone canvas { display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 1.2% / 2.2%; background: #000 center / cover no-repeat; }
-#cv { background-image: url('/media/pair-poster.jpg'); }
+#cv { background-image: url('https://downloads.rowvision.app/media/pair-poster.jpg'); }
 .card { opacity: 0; }
 .fan { position: absolute; inset: 0; transform-style: preserve-3d; pointer-events: none; }
 .fan canvas { position: absolute; left: 12%; top: 3%; width: 76%; height: auto; aspect-ratio: 600 / 420; border-radius: 0; background: none; will-change: transform, opacity; opacity: 0; }
