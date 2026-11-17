@@ -14,11 +14,21 @@ const lerp = (a, b, u) => a + (b - a) * u, win = (x, a, b, f = .3) => Math.min(s
 const NAMES = ['pair', 'single-a', 'single-b', 'bank', 'astern', 'far'], TRACKED = NAMES.slice(0, 4);
 const CLIPS = {};
 await Promise.all(NAMES.map(async k => {
-  const v = document.createElement('video'); v.muted = true; v.loop = true; v.playsInline = true; v.preload = k == 'pair' ? 'auto' : 'none'; v.src = `${import.meta.env.VITE_MEDIA_BASE ?? ""}/media/${k}.mp4`;
+  const v = document.createElement('video'); v.muted = true; v.loop = true; v.playsInline = true; v.preload = 'auto';
   CLIPS[k] = { v, want: false, warm: k == 'pair', pose: TRACKED.includes(k) ? await loadPose(`/data/pose-${k}.json`) : null };
 }));
 const D = CLIPS.pair, A = CLIPS['single-a'];
-const warm = k => { const c = CLIPS[k]; if (!c.warm) { c.warm = true; c.v.preload = 'auto'; c.v.load(); } };
+// Each clip is fetched whole and played from memory, so scrubbing never waits on the network for a seek.
+const clipUrl = k => `${import.meta.env.VITE_MEDIA_BASE ?? ''}/media/${k}.mp4`;
+function fill(k) {
+  const c = CLIPS[k];
+  return c.ready = fetch(clipUrl(k)).then(r => { if (!r.ok) throw r; return r.blob(); })
+    .then(b => { c.v.src = URL.createObjectURL(b); })
+    .catch(() => { c.v.src = clipUrl(k); });
+}
+const warm = k => { const c = CLIPS[k]; if (!c.warm) { c.warm = true; fill(k); } };
+// The pair opens the film; the rest follow one at a time behind it so they are in memory before they are reached.
+fill('pair').then(async () => { for (const k of NAMES) if (!CLIPS[k].warm) { CLIPS[k].warm = true; await fill(k); } });
 function use(k, at) {
   const c = CLIPS[k], v = c.v; c.want = true; warm(k);
   if (at != null) { if (!v.paused) v.pause(); if (!v.seeking && Math.abs(v.currentTime - at) > .02) v.currentTime = at; }
@@ -193,6 +203,7 @@ if (still) {
   const SCRUB = { frames: [], n: stroke[1] - stroke[0] + 1, on: false, fade: 0, snap: document.createElement('canvas') };
   SCRUB.snap.width = cv.width; SCRUB.snap.height = cv.height;
   (async () => {
+    await D.ready;
     const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = D.v.src;
     await new Promise(r => v.addEventListener('loadeddata', r, { once: true }));
     const step = phone() ? 2 : 1;      // a phone keeps every other frame: half the memory, and the blend between frames hides it
