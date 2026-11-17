@@ -14,7 +14,7 @@ const lerp = (a, b, u) => a + (b - a) * u, win = (x, a, b, f = .3) => Math.min(s
 const NAMES = ['pair', 'single-a', 'single-b', 'bank', 'astern', 'far'], TRACKED = NAMES.slice(0, 4);
 const CLIPS = {};
 await Promise.all(NAMES.map(async k => {
-  const v = document.createElement('video'); v.muted = true; v.loop = true; v.playsInline = true; v.preload = k == 'pair' ? 'auto' : 'none'; v.src = `/media/${k}.mp4`;
+  const v = document.createElement('video'); v.muted = true; v.loop = true; v.playsInline = true; v.preload = k == 'pair' ? 'auto' : 'none'; v.src = `${import.meta.env.VITE_MEDIA_BASE ?? ""}/media/${k}.mp4`;
   CLIPS[k] = { v, want: false, warm: k == 'pair', pose: TRACKED.includes(k) ? await loadPose(`/data/pose-${k}.json`) : null };
 }));
 const D = CLIPS.pair, A = CLIPS['single-a'];
