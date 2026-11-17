@@ -36,8 +36,25 @@ function fill(k) {
     .catch(() => {});
 }
 const warm = k => { const c = CLIPS[k]; if (!c.warm) { c.warm = true; fill(k); } };
+// A slow connection gets a quiet note: if the opening clip has not fully arrived within 5 s (about 6 Mbit/s or less),
+// or the browser already says the link is slow or data saving is on. Nothing is downloaded just to measure.
+function netCheck(ready) {
+  const n = navigator.connection, slowHint = n && (n.saveData || /(^|-)(2g|3g)$/.test(n.effectiveType || ''));
+  let done = false;
+  const warn = () => {
+    if (done || document.querySelector('.netnote')) return;
+    const el = document.createElement('div'); el.className = 'netnote'; el.setAttribute('role', 'status');
+    el.innerHTML = '<span>Your connection looks slow, so the videos and animations may not run smoothly until they finish loading.</span><button type="button" aria-label="Dismiss">×</button>';
+    el.querySelector('button').onclick = () => el.remove();
+    document.body.append(el);
+  };
+  if (slowHint) warn();
+  const timer = setTimeout(warn, 5000);
+  ready.then(() => { done = true; clearTimeout(timer); setTimeout(() => document.querySelector('.netnote')?.remove(), 4000); });
+  return ready;
+}
 // The pair opens the film; the rest follow one at a time behind it so they are in memory before they are reached.
-fill('pair').then(async () => { for (const k of NAMES) if (!CLIPS[k].warm) { CLIPS[k].warm = true; await fill(k); } });
+netCheck(fill('pair')).then(async () => { for (const k of NAMES) if (!CLIPS[k].warm) { CLIPS[k].warm = true; await fill(k); } });
 function use(k, at) {
   const c = CLIPS[k], v = c.v; c.want = true; warm(k);
   if (at != null) { if (!v.paused) v.pause(); if (!v.seeking && Math.abs(v.currentTime - at) > .02) v.currentTime = at; }
