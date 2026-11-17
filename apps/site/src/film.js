@@ -15,7 +15,10 @@ const NAMES = ['pair', 'single-a', 'single-b', 'bank', 'astern', 'far'], TRACKED
 const CLIPS = {};
 await Promise.all(NAMES.map(async k => {
   const v = document.createElement('video'); v.muted = true; v.loop = true; v.playsInline = true; v.preload = 'auto';
-  CLIPS[k] = { v, want: false, warm: k == 'pair', pose: TRACKED.includes(k) ? await loadPose(`/data/pose-${k}.json`) : null };
+  // The pose follows the frame actually on screen, not the clock: while a clip streams in, the clock can run ahead of the picture.
+  const c0 = { shown: null };
+  if (v.requestVideoFrameCallback) { const tick = (_, m) => { c0.shown = m.mediaTime; v.requestVideoFrameCallback(tick); }; v.requestVideoFrameCallback(tick); v.addEventListener('emptied', () => { c0.shown = null; }); }
+  CLIPS[k] = Object.assign(c0, { v, want: false, warm: k == 'pair', pose: TRACKED.includes(k) ? await loadPose(`/data/pose-${k}.json`) : null });
 }));
 const D = CLIPS.pair, A = CLIPS['single-a'];
 // Each clip is fetched whole and played from memory, so scrubbing never waits on the network for a seek.
@@ -56,7 +59,7 @@ function draw(c, clip, o = {}) {
   const src = o.img || v;
   if (!o.img && v.readyState < 2 && o.clear !== false) return;      // not ready: hold the last picture, never flash black
   if (pose) {
-    t = Math.min(pose.N - 1.001, o.t ?? v.currentTime * pose.hz); b = pose.frame(t);
+    t = Math.min(pose.N - 1.001, o.t ?? (clip.shown ?? v.currentTime) * pose.hz); b = pose.frame(t);
     const k = Math.min(1, (z - 1) * 1.2), fx = W / 2 + ((b.hp[0] + b.sh[0]) / 2 * W - W / 2) * k, fy = H / 2 + (((b.sh[1] + b.an[1]) / 2 - .03) * H - H / 2) * k;
     ox = Math.max(W - W * z, Math.min(0, W / 2 - fx * z)); oy = Math.max(H - H * z, Math.min(0, H / 2 - fy * z));
   }
