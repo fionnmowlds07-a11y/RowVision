@@ -309,7 +309,8 @@ def fill_from_spare(
                     break
                 leaving = briefest
             del crew[leaving]
-        waiting.remove(person)
+        # By identity: comparing two tracks compares their arrays, which has no single answer.
+        waiting = [item for item in waiting if item is not person]
         crew.append(person)
         added.append(person)
     return crew, added

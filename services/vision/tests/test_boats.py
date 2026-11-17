@@ -255,3 +255,14 @@ def test_a_stray_track_among_a_crew_is_not_a_second_boat() -> None:
         points[frame] = np.concatenate([points[frame], stray[None]])
         scores[frame] = np.concatenate([scores[frame], scores[frame][:1]])
     assert len([boat for boat in boats_from(points, scores) if boat.confirmed]) == 1
+
+
+def test_a_spare_rower_is_found_behind_someone_who_cannot_row() -> None:
+    """The cox is seen for longer, so is looked at first, and the rower after them still fills the seat."""
+    *crew, last = track_people(*crew_detections(4), FPS)
+    still = np.broadcast_to(last.points[0], last.points.shape).copy()
+    cox = Track(still, last.scores)
+    unclear = Track(last.points.copy(), last.scores.copy())
+    unclear.points[:20] = np.nan
+    filled, added = fill_from_spare(crew, [cox, unclear], 4, FPS)
+    assert len(filled) == 4 and len(added) == 1 and added[0] is unclear

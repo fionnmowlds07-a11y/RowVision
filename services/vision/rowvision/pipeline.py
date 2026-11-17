@@ -383,7 +383,7 @@ def measure_rower(
         angles=angles,
         side=side,
         no_scores=FILM_SIDE_ON if too_end_on else None,
-        left_out=[s.catch_frame for s in strokes if s not in counted],
+        left_out=[s.catch_frame for s in strokes if all(s is not kept for kept in counted)],
     )
 
 
