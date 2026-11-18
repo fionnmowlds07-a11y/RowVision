@@ -20,6 +20,9 @@ await Promise.all(NAMES.map(async k => {
   if (v.requestVideoFrameCallback) { const tick = (_, m) => { c0.shown = m.mediaTime; v.requestVideoFrameCallback(tick); }; v.requestVideoFrameCallback(tick); v.addEventListener('emptied', () => { c0.shown = null; }); }
   CLIPS[k] = Object.assign(c0, { v, want: false, warm: k == 'pair', pose: TRACKED.includes(k) ? await loadPose(`/data/pose-${k}.json`) : null });
 }));
+// The frame on screen, when the browser says so and it agrees with the clock. After a loop or a seek some browsers
+// keep reporting the old frame for a while; trusting that would draw the end of the clip over its start.
+function shownTime(c) { const t = c.v.currentTime; return c.shown != null && Math.abs(c.shown - t) < .25 ? c.shown : t; }
 const D = CLIPS.pair, A = CLIPS['single-a'];
 // Each clip is fetched whole and played from memory, so scrubbing never waits on the network for a seek.
 const clipUrl = k => `${import.meta.env.VITE_MEDIA_BASE ?? ''}/media/${k}.mp4`;
@@ -76,7 +79,7 @@ function draw(c, clip, o = {}) {
   const src = o.img || v;
   if (!o.img && v.readyState < 2 && o.clear !== false) return;      // not ready: hold the last picture, never flash black
   if (pose) {
-    t = Math.min(pose.N - 1.001, o.t ?? (clip.shown ?? v.currentTime) * pose.hz); b = pose.frame(t);
+    t = Math.min(pose.N - 1.001, o.t ?? shownTime(clip) * pose.hz); b = pose.frame(t);
     const k = Math.min(1, (z - 1) * 1.2), fx = W / 2 + ((b.hp[0] + b.sh[0]) / 2 * W - W / 2) * k, fy = H / 2 + (((b.sh[1] + b.an[1]) / 2 - .03) * H - H / 2) * k;
     ox = Math.max(W - W * z, Math.min(0, W / 2 - fx * z)); oy = Math.max(H - H * z, Math.min(0, H / 2 - fy * z));
   }
