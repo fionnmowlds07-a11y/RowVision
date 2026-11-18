@@ -1,5 +1,5 @@
 # Builds the installers. `npm run dist` makes the one for the system it runs on:
-# a Windows installer on Windows, an AppImage on Linux. CI builds both (see .github/workflows/installers.yml).
+# a Windows installer on Windows, an AppImage and a .deb on Linux. CI builds both (see .github/workflows/installers.yml).
 appId: app.rowvision.desktop
 productName: RowVision
 copyright: RowVision
@@ -32,12 +32,22 @@ nsis:
   shortcutName: RowVision
   # Clips are the user's own, so taking the app off never deletes them.
   deleteAppDataOnUninstall: false
+# The newer AppImage runtime carries its own FUSE, so it starts without libfuse2,
+# which Arch, Ubuntu 22.04+ and others no longer install.
+toolsets:
+  appimage: "1.0.3"
 linux:
   target:
     - target: AppImage
       arch: [x64]
+    # Ubuntu, Debian and Mint: installs by double-click and goes in the app menu.
+    - target: deb
+      arch: [x64]
+  maintainer: RowVision
   icon: build/icons
   executableName: rowvision
   category: Utility
   synopsis: Rowing technique from your own video
   artifactName: RowVision-${version}.AppImage
+deb:
+  artifactName: RowVision-${version}.deb
