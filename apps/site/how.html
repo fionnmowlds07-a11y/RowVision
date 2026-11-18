@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How RowVision works</title>
+<meta name="description" content="Film an outing on a phone, tap yourself once, and RowVision measures your stroke at every catch and finish.">
+<!--head-->
+</head>
+<body>
+<canvas id="water" aria-hidden="true"></canvas>
+<!--nav-->
+<main id="main" class="page">
+  <h1>From a phone clip to what to fix.</h1>
+  <p class="lead">There is nothing to fit to the boat and nothing to wear. You film an outing the way you already do, and RowVision does the watching.</p>
+  <ol class="steps">
+    <li><div><h2>Choose a clip</h2><p>Any phone video of the boat will do. If it is long, pick the 60 seconds you want looked at.</p></div></li>
+    <li><div><h2>Tap yourself</h2><p>On a clear frame, tap the rower who is you. Say which boat it is, whether you are on stroke side, bow side or sculling, and which seat.</p></div></li>
+    <li><div><h2>Leave it to run</h2><p>The analysis runs on your own computer. You can queue more clips while it works.</p></div></li>
+    <li><div><h2>Read the result</h2><p>You get an accuracy rating for the footage, your scores at the catch and the finish, and what to work on next.</p></div></li>
+    <li><div><h2>Check any number</h2><p>Open a measure to see the exact frames it came from, beside the target it was scored against.</p></div></li>
+    <li><div><h2>Step through the stroke</h2><p>Move frame by frame with the keyboard, with your joints and angles drawn over the picture.</p></div></li>
+    <li><div><h2>Look back</h2><p>Your past clips stay in your library, so you can see whether last month’s fix has held.</p></div></li>
+  </ol>
+
+  <h2>Filming that measures well.</h2>
+  <ul class="plain">
+    <li>Film from the side, level with the boat if you can.</li>
+    <li>Get close enough that the rower you care about is easy to pick out.</li>
+    <li>Keep them in the frame for at least a few full strokes.</li>
+    <li>Any boat works, from a single to an eight. In a crew, RowVision follows the one seat you tapped.</li>
+  </ul>
+
+  <h2>It says how far to trust it.</h2>
+  <p>Every result carries an accuracy rating, marked as estimated. When the footage is poor, the overall score stays hidden until you have read the warning. When the rower is too small in the frame to measure, RowVision gives no score at all.</p>
+  <p><a href="/accuracy.html">How the rating works, and the camera dial</a></p>
+  <div class="caution"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5M12 16.5v.5M4 20 12 4l8 16z"/></svg>Film closer. No score given.</div>
+  <div class="next"><a class="btn" href="/filming.html">The filming guide</a><p>Five habits that lift the rating.</p></div>
+</main>
+<!--foot-->
+<script type="module" src="/src/water.js"></script>
+</body>
+</html>

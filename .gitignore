@@ -24,6 +24,7 @@ cdk.out/
 
 # Model weights and generated output
 models/
+!apps/site/public/models/
 *.onnx
 outputs/
 
@@ -48,3 +49,9 @@ next-env.d.ts
 # Installer builds, and the engine copied in to package
 apps/desktop/release/
 apps/desktop/engine/
+
+# Site footage and stills cut from it (see apps/site/pipeline/make_media.sh)
+apps/site/public/media/
+
+# Vite cache for the marketing site
+apps/site/.vite/
