@@ -1,0 +1,12 @@
+// Cloudflare settings for rowvision.app. The site is static files served by a Worker on the free plan.
+// The clips and the installer are not here: they live in the R2 bucket rowvision-downloads, at downloads.rowvision.app,
+// because Worker static files are not served in byte ranges and a video cannot be scrubbed without them.
+{
+  "name": "rowvision",
+  "compatibility_date": "2026-11-01",
+  "assets": { "directory": "./dist", "html_handling": "auto-trailing-slash", "not_found_handling": "404-page" },
+  "routes": [
+    { "pattern": "rowvision.app", "custom_domain": true },
+    { "pattern": "www.rowvision.app", "custom_domain": true }
+  ]
+}

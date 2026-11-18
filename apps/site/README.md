@@ -39,3 +39,11 @@ bash pipeline/make_media.sh ../../videos
 The pose files in `public/data/` were read from the same cuts with `pipeline/clip_pose.py` (rtmlib, onnxruntime, opencv; run with `python -I`), so the start and length of a cut must not change without re-reading its pose.
 
 The clips are cleared for the owner's own preview only. Ask before any of them go on a public site.
+
+## Going live
+
+The site is live at https://rowvision.app on Cloudflare's free plan.
+
+- **Pages:** `wrangler.jsonc` here. `npm run build`, delete `dist/media/`, then `npx wrangler deploy`.
+- **Clips:** in the R2 bucket `rowvision-downloads` under `media/`, served at `downloads.rowvision.app`. `src/film.js` reads them from `VITE_MEDIA_BASE` (in `.env`, which git ignores). Each clip is fetched whole and played from memory so scrolling never waits on a seek. A clip must keep its start and length, or its pose file goes out of step.
+- **Linux installer:** `RowVision-<version>.AppImage` in the same bucket; the download button reads `VITE_LINUX_URL`. It is over the 300 MB limit of the dashboard and `wrangler r2 object put`, so it goes up through R2's S3 API with a short-lived R2 token.
