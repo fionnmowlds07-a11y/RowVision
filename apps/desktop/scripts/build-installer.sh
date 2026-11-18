@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Builds the full Linux installer (an AppImage with the measuring program and ffmpeg inside) on this computer.
 # Needs Docker and Node. Python 3.12 runs inside Docker, so nothing is installed on the host.
+# The engine is built on Debian 11 (glibc 2.31) so it runs on Linux from about 2020 on: Ubuntu 20.04+, Debian 11+,
+# Mint 20+, Fedora 32+. A newer build image raises that floor for everyone, so keep it old.
 #
 #   bash scripts/build-installer.sh            # build it
 #   bash scripts/build-installer.sh --install  # build it, then put RowVision in the app launcher
@@ -15,7 +17,7 @@ if [ ! -x engine/rowvision-engine ]; then
   rm -rf engine
   docker run --rm -v "$root:/src:ro" -v "$PWD:/out" -e OWNER="$(id -u):$(id -g)" \
     -e PIP_DEFAULT_TIMEOUT=180 -e PIP_RETRIES=10 \
-    -w /tmp python:3.12-slim bash -euc '
+    -w /tmp python:3.12-slim-bullseye bash -euc '
       apt-get update -qq >/dev/null && apt-get install -y -qq binutils >/dev/null
       python -m venv /tmp/venv && . /tmp/venv/bin/activate
       cp -r /src/services /tmp/services
@@ -40,7 +42,7 @@ fi
 echo "== Building the installer"
 npm ci
 npm run dist
-ls -lh release/*.AppImage
+ls -lh release/*.AppImage release/*.deb
 
 if [ "${1:-}" = "--install" ]; then
   bash scripts/install-linux.sh
