@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What RowVision measures</title>
+<meta name="description" content="Body angle, knees, arms, rhythm and timing, read at every catch and finish. Explore one real stroke joint by joint.">
+<!--head-->
+</head>
+<body>
+<canvas id="water" aria-hidden="true"></canvas>
+<!--nav-->
+<main id="main" class="page">
+  <h1>Every stroke, joint by joint.</h1>
+  <p class="lead">RowVision finds your shoulders, elbows, wrists, hips, knees and ankles on every frame, marks each catch and each finish, and reads your body there.</p>
+
+  <h2>Try it on a real stroke.</h2>
+  <p>These are the joints RowVision tracked on one rower in a pair, filmed on a phone from a launch. There is no picture here, only what was measured. Drag through the clip.</p>
+  <div class="bench" id="explorer">
+    <canvas width="1000" height="560" role="img" aria-label="A rower drawn from tracked joints, moving through the stroke as you drag. Green arcs mark the knee, hip and elbow angles"></canvas>
+    <dl class="read">
+      <div><dt>Knee</dt><dd data-read="knee">–</dd></div>
+      <div><dt>Hip</dt><dd data-read="hip">–</dd></div>
+      <div><dt>Elbow</dt><dd data-read="elbow">–</dd></div>
+      <div><dt data-lean>Body forward</dt><dd data-read="back">–</dd></div>
+      <p><strong data-phase>Loading the stroke</strong>Angles are read from the joints as drawn, on the side nearest the camera.</p>
+    </dl>
+    <div class="bar">
+      <button type="button" data-play aria-pressed="false">Play at half speed</button>
+      <button type="button" data-go="catch">Next catch</button>
+      <button type="button" data-go="finish">Next finish</button>
+      <label for="scrub">Through the clip</label>
+      <input id="scrub" type="range" min="0" max="100" value="0">
+      <small>Along the bottom is the knee angle for the whole clip. Round marks are catches and square marks are finishes, as in the app.</small>
+    </div>
+  </div>
+  <noscript><p class="note">The explorer needs JavaScript. Everything it shows is described below.</p></noscript>
+
+  <h2>At the catch.</h2>
+  <dl class="rows">
+    <div><dt>Body angle at the catch <span class="tag">Scored</span></dt><dd>How far your trunk leans forward from upright when the blade goes in. The starting target is <strong>26 to 31°</strong>.</dd></div>
+    <div><dt>Knee angle at the catch <span class="tag quiet">Shown</span></dt><dd>How far your legs are compressed. Shown as a rough guide and never scored, because knee angle depends on your proportions and is the hardest joint to read from a moving launch.</dd></div>
+    <div><dt>Arms at the catch <span class="tag quiet">Shown</span></dt><dd>Whether your arms are long when the blade goes in.</dd></div>
+  </dl>
+
+  <h2>Through the drive.</h2>
+  <dl class="rows">
+    <div><dt>Legs before body <span class="tag">Scored</span></dt><dd>Whether the legs start the drive before the back opens. This follows the coaching principle of legs, then body, then arms.</dd></div>
+    <div><dt>When the arms start to bend <span class="tag quiet">Shown</span></dt><dd>How far through the drive your elbows break. They should come in last.</dd></div>
+    <div><dt>Body swing <span class="tag quiet">Shown</span></dt><dd>The whole arc of your trunk, from forward at the catch to laid back at the finish.</dd></div>
+    <div><dt>Stroke length <span class="tag quiet">Shown</span></dt><dd>How far your hands travel along the boat, measured in lengths of your own trunk so it does not depend on how close the camera was.</dd></div>
+  </dl>
+
+  <h2>At the finish.</h2>
+  <dl class="rows">
+    <div><dt>Layback at the finish <span class="tag">Scored</span></dt><dd>How far your trunk leans back when the blade comes out. The starting target is <strong>20 to 25°</strong>.</dd></div>
+    <div><dt>Knee angle at the finish <span class="tag quiet">Shown</span></dt><dd>Whether the legs are flat. Straight legs are normal on the water and are never marked down.</dd></div>
+    <div><dt>Elbow angle at the finish <span class="tag quiet">Shown</span></dt><dd>How far the arms have drawn in.</dd></div>
+  </dl>
+
+  <h2>Rhythm and timing.</h2>
+  <dl class="rows">
+    <div><dt>Stroke rate</dt><dd>Strokes a minute, from the spacing of your catches, and how steady it stays.</dd></div>
+    <div><dt>Drive and recovery rhythm <span class="tag">Scored</span></dt><dd>The share of each stroke spent on the drive. The target moves with your rate, because the recovery shortens as the rate comes up.</dd></div>
+    <div><dt>Recovery against drive <span class="tag quiet">Shown</span></dt><dd>How many times longer the recovery is than the drive, with the time of each in seconds.</dd></div>
+    <div><dt>Timing against the rower you follow</dt><dd>In a crew, how many thousandths of a second your catch and finish come before or after theirs. <a href="/boats.html">See who you follow</a>.</dd></div>
+    <div><dt>Second half against first</dt><dd>With six strokes or more, whether each measure holds or fades as the clip goes on.</dd></div>
+  </dl>
+
+  <h2>How the score is made.</h2>
+  <p>A measure scores 100 inside its target range and falls away in a straight line outside it. Your overall score needs both the catch and the finish to be scored, so an easy measure can never carry the result alone.</p>
+  <p>The starting targets are RowVision’s reading of published rowing studies, most of them done on rowing machines, and no range is wider than 5°. They have not yet been reviewed by a coach. You can move any range in Settings, and choose which measures count.</p>
+
+  <div class="next"><a class="btn" href="/accuracy.html">How far to trust a result</a><p>Every number comes with an accuracy rating.</p></div>
+</main>
+<!--foot-->
+<script type="module" src="/src/water.js"></script>
+<script type="module" src="/src/explorer.js"></script>
+</body>
+</html>

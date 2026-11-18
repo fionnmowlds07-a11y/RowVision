@@ -52,7 +52,7 @@ jobs:
         run: |
           found=$(git ls-files \
             | grep -Ei '\.(mp4|mov|m4v|avi|webm|mkv|hevc|npz|pkl|jpe?g|png|webp|heic|bmp|tiff?)$' \
-            | grep -v -e '^apps/web/public/icons/' -e '^apps/desktop/build/' || true)
+            | grep -v -e '^apps/web/public/icons/' -e '^apps/desktop/build/' -e '^apps/site/public/\(favicon\|logo\)\.png$' || true)
           if [ -n "$found" ]; then
             echo "Real footage must not be committed:"
             echo "$found"
