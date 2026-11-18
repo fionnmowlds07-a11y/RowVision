@@ -41,7 +41,12 @@ fi
 
 echo "== Building the installer"
 npm ci
-npm run dist
+npm run build
+npx electron-builder --linux AppImage
+# The .deb is packed on Debian: electron-builder's packing tool needs libcrypt.so.1, which Arch and others leave out.
+echo "== Packing the .deb (Docker, Debian)"
+docker run --rm -v "$PWD:$PWD" -w "$PWD" -e HOME=/tmp node:26-bookworm \
+  bash -c "npx electron-builder --linux deb --prepackaged release/linux-unpacked && chown -R $(id -u):$(id -g) release"
 ls -lh release/*.AppImage release/*.deb
 
 if [ "${1:-}" = "--install" ]; then
