@@ -33,8 +33,10 @@ export function ClipPage({ id }: { id: string }) {
 
   const { summary } = clip;
   const crew = summary?.crew ?? null;
-  const own = summary?.rower?.seat ?? null;
-  const chosen = seat === undefined ? own : seat;
+  // A coach's crew has no "you": it opens on the stroke seat, named by its number.
+  const coach = clip.setup.coach === true;
+  const own = coach ? null : summary?.rower?.seat ?? null;
+  const chosen = seat === undefined ? summary?.rower?.seat ?? null : seat;
   const shown = crew?.find((rower) => rower.seat === chosen) ?? summary?.rower ?? null;
   return (
     <>
@@ -64,7 +66,7 @@ export function ClipPage({ id }: { id: string }) {
           <MeasureCrew id={clip.id} seats={BOAT_SEATS[clip.setup.boat_class ?? ""]} />
         ) : null}
         {crew && crew.length > 1 ? <Crew crew={crew} summary={summary.crew_summary} ownSeat={own} chosen={chosen} onChoose={setSeat} /> : null}
-        {crew && crew.length > 1 ? <h2 style={{ fontSize: 24 }}>{chosen === own ? "Your results" : `Seat ${chosen ?? "unknown"}`}</h2> : null}
+        {crew && crew.length > 1 ? <h2 style={{ fontSize: 24 }}>{chosen === own && !coach ? "Your results" : `Seat ${chosen ?? "unknown"}`}</h2> : null}
         <Results
           key={chosen ?? "own"}
           side={clip.setup.side ?? "stroke"}

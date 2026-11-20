@@ -23,7 +23,7 @@ export function ExportPdf({ clip }: { clip: ClipDetail }) {
   const [open, setOpen] = useState(false);
   const summary = clip.summary!;
   const seats = BOAT_SEATS[clip.setup.boat_class ?? ""] ?? 1;
-  const own = summary.rower?.seat ?? null;
+  const own = clip.setup.coach ? null : summary.rower?.seat ?? null;
   const rowers: Rower[] = useMemo(() => (summary.crew && summary.crew.length > 1 ? summary.crew : summary.rower ? [summary.rower] : []), [summary]);
   const report = useMemo(() => rowers.map((rower) => reportRower(rower, summary.fps, seats, own)), [rowers, summary.fps, seats, own]);
   const [chosen, setChosen] = useState<string[]>(() => report.map((rower) => rower.key));

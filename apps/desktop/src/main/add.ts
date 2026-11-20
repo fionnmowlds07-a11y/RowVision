@@ -48,7 +48,9 @@ export function cleanAdd(value: unknown): AddRequest | null {
   if (raw.scope !== undefined && raw.scope !== "seat" && raw.scope !== "crew") return null;
   const scope = raw.scope === "crew" && BOAT_SEATS[setup.boat] > 1 ? "crew" : "seat";
 
-  return { source, filmedAt: new Date(filmedAt).toISOString(), setup, note: note.trim(), section: { start, length: length as number | null }, tap: point, scope };
+  // A coach's crew follows no one rower, so it has no tap.
+  const coach = raw.coach === true && scope === "crew";
+  return { source, filmedAt: new Date(filmedAt).toISOString(), setup, note: note.trim(), section: { start, length: length as number | null }, tap: coach ? null : point, scope, coach };
 }
 
 /** Make the clip's folder. The video itself is left where it is. */
@@ -71,6 +73,7 @@ export async function addClip(library: string, request: AddRequest, now = new Da
     section_length: request.section.length,
     tap: request.tap,
     scope: request.scope,
+    ...(request.coach ? { coach: true } : {}),
   };
   await writeJson(path.join(folder, "clip.json"), clip);
   return id;

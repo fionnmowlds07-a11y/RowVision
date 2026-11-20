@@ -293,7 +293,8 @@ void app.whenReady().then(async () => {
     const request = cleanAdd(value);
     if (!request) throw new Error("Not a clip");
     const id = await addClip(library(), request);
-    await saveSettings(settingsFile(), { setup: request.setup });
+    // A coach's crew says nothing about the athlete's own seat, so only the boat is remembered.
+    await saveSettings(settingsFile(), { setup: request.coach ? { ...(await readSetup(settingsFile())), boat: request.setup.boat } : request.setup });
     await analyser.next();
     return id;
   });

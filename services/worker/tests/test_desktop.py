@@ -214,6 +214,12 @@ def test_a_job_can_ask_for_the_whole_crew() -> None:
     assert job_in(Path("clip"), scope="everyone").setup.scope == "seat"
 
 
+def test_a_coach_job_is_only_a_coach_job_for_a_whole_crew() -> None:
+    assert job_in(Path("clip"), scope="crew", coach=True).setup.coach is True
+    assert job_in(Path("clip"), coach=True).setup.coach is False
+    assert job_in(Path("clip"), scope="crew").setup.coach is False
+
+
 def test_measuring_again_takes_the_rowers_side_from_the_job(
     tmp_path: Path, copies: list[Path]
 ) -> None:

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ClipForm, PickCard, freshChoice, useVideoDrop, type Choice } from "@/app/add/clip-form";
-import { BOAT_SEATS } from "@/lib/setup";
+import { BOAT_SEATS, sidesFor } from "@/lib/setup";
 import type { Scope } from "../shared/bridge";
 import styles from "@/app/add/add.module.css";
 
@@ -16,6 +16,9 @@ export function AddPage() {
   const [file, setFile] = useState<File | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [scope, setScope] = useState<Scope>("seat");
+  // Which side the stroke seat rows on. Most boats are rigged with stroke seat on stroke side.
+  const [rig, setRig] = useState("stroke");
+  const [rigOpen, setRigOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dragging = useVideoDrop(file ? null : take);
@@ -44,15 +47,19 @@ export function AddPage() {
     setSaving(true);
     setError(null);
     const { facts, trim, tap, setup, note } = choice;
+    // A whole crew follows no one rower: the stroke seat and the rig say which side every seat rows.
+    const crew = seats > 1 && scope === "crew";
+    const sweep = sidesFor(setup.boat).includes("stroke");
     try {
       const id = await window.rowvision.addClip({
         source: window.rowvision.pathForFile(file),
         filmedAt: new Date(file.lastModified).toISOString(),
-        setup,
+        setup: crew ? { boat: setup.boat, seat: seats, side: sweep ? rig : "scull" } : setup,
         note,
         section: { start: facts ? trim.start : 0, length: facts ? trim.end - trim.start : null },
-        tap,
-        scope: seats > 1 ? scope : "seat",
+        tap: crew ? null : tap,
+        scope: crew ? "crew" : "seat",
+        coach: crew,
       });
       window.location.hash = `#/analysis/${id}`;
     } catch {
@@ -63,6 +70,36 @@ export function AddPage() {
 
   if (!choice) return <p aria-busy="true">Loading…</p>;
   const seats = BOAT_SEATS[choice.setup.boat] ?? 1;
+  const crew = seats > 1 && scope === "crew";
+  const who = seats > 1 ? (
+    <fieldset className={styles.who}>
+      <legend>Who to measure</legend>
+      <div className={styles.seg}>
+        <button type="button" aria-pressed={scope === "seat"} onClick={() => setScope("seat")} disabled={saving}>Just me</button>
+        <button type="button" aria-pressed={scope === "crew"} onClick={() => setScope("crew")} disabled={saving}>Whole crew</button>
+      </div>
+      <p className="soft" style={{ fontSize: 14 }}>
+        {crew ? `Every seat is measured, with each rower's timing. No need to tap anyone. A crew of ${seats} takes about ${seats} times as long.` : "Only you are measured, which is quickest."}
+      </p>
+    </fieldset>
+  ) : null;
+  const rigField = sidesFor(choice.setup.boat).includes("stroke") ? (
+    rigOpen ? (
+      <label className={`field ${styles.span}`}>
+        Stroke seat rows on
+        <select value={rig} onChange={(event) => setRig(event.target.value)} disabled={saving}>
+          <option value="stroke">Stroke side (normal rig)</option>
+          <option value="bow">Bow side</option>
+        </select>
+      </label>
+    ) : (
+      <div className={`${styles.rig} ${styles.span}`}>
+        Rig
+        <p>Normal: stroke seat on stroke side</p>
+        <button type="button" className={styles.rigLink} onClick={() => setRigOpen(true)}>Rigged differently?</button>
+      </div>
+    )
+  ) : <div className={`${styles.rig} ${styles.span}`}>Rig<p>Sculling, so nothing to set</p></div>;
 
   return (
     <>
@@ -75,25 +112,17 @@ export function AddPage() {
           choice={choice}
           onChange={setChoice}
           onRefuse={(message) => { reset(); setRefusal(message); }}
-          cannotShowNote="This video can't be shown here, but it can still be analysed. Carry on, and we'll ask you to tap yourself during analysis. Only the first 60 seconds are analysed."
+          cannotShowNote={crew
+            ? "This video can't be shown here, but it can still be analysed. Only the first 60 seconds are analysed."
+            : "This video can't be shown here, but it can still be analysed. Carry on, and we'll ask you to tap yourself during analysis. Only the first 60 seconds are analysed."}
+          who={who}
+          crew={crew ? rigField : undefined}
         >
           <section className={`card stack ${styles.send}`} aria-label="Add the clip">
             <div className={styles.row}>
               <strong>{file.name}</strong>
               <button type="button" className="button quiet" onClick={reset} disabled={saving}>Change video</button>
             </div>
-            {seats > 1 ? (
-              <fieldset className={styles.who}>
-                <legend>Who to measure</legend>
-                <div className={styles.seg}>
-                  <button type="button" aria-pressed={scope === "seat"} onClick={() => setScope("seat")} disabled={saving}>Just me</button>
-                  <button type="button" aria-pressed={scope === "crew"} onClick={() => setScope("crew")} disabled={saving}>Whole crew</button>
-                </div>
-                <p className="soft" style={{ fontSize: 14 }}>
-                  {scope === "crew" ? `Every seat is measured, with each rower's timing. A crew of ${seats} takes about ${seats} times as long.` : "Only you are measured, which is quickest."}
-                </p>
-              </fieldset>
-            ) : null}
             <p className="soft">The video stays where it is and is read from there, so keep it until the clip is analysed.</p>
             {error ? <p role="alert" className="error">{error}</p> : null}
             <button type="button" className="button primary" onClick={save} disabled={saving}>

@@ -40,6 +40,9 @@ class Setup:
     tap: Tap | None
     scope: str = "seat"
     """"seat" measures the athlete alone. "crew" measures every seat, which takes far longer."""
+    coach: bool = False
+    """A whole crew with no one rower as the athlete. A tap then only says which boat, and the seat
+    and side given are the stroke seat's, which says which side every seat rows."""
 
 
 @dataclass(frozen=True)
@@ -97,7 +100,7 @@ def plan_request(scouting: Scouting, setup: Setup, video: Video) -> Request | No
     if boat is None:
         return None
     tapped = (frame, float(point[0]), float(point[1]))
-    if boat.too_far:
+    if boat.too_far or setup.coach:
         return Request(**base, boat_tap=tapped)
     track = track_at(boat.tracks, frame // COARSE_STEP, point)
     if track is None:
