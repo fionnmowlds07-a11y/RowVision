@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { Analyser, BEFORE_CREW, CREW_SEAT_SHARE, FIRST_SPEED, MOVED, UNEXPECTED, clipWork, jobFor, overallProgress, secondsLeft } from "../../src/main/analysis";
 import { readClip } from "../../src/main/library";
 import type { Analysis } from "../../src/shared/bridge";
+import type { Effort } from "../../src/shared/effort";
 
 const FAKE = path.resolve(__dirname, "../fake-engine.mjs");
 
@@ -15,9 +16,11 @@ let notices: string[];
 let speed: number | null;
 let engine: string[] | null;
 let modelsReady = true;
+let effort: Effort = "balanced";
 
 beforeEach(() => {
   modelsReady = true;
+  effort = "balanced";
   root = mkdtempSync(path.join(tmpdir(), "rowvision-analysis-"));
   library = path.join(root, "clips");
   control = path.join(root, "control");
@@ -44,7 +47,9 @@ function make(): Analyser {
     notify: (title) => void notices.push(title),
     onBattery: () => false,
     readSpeed: async () => speed,
-    saveSpeed: async (value) => { speed = value; },
+    saveSpeed: async (_, value) => { speed = value; },
+    effort: async () => effort,
+    cores: () => 8,
     modelsReady: () => modelsReady,
   });
   return analyser;
@@ -170,6 +175,7 @@ test("a clip measured for one rower can be measured again for the whole crew", a
   const runner = make();
   await runner.start();
   await settled("one", "done");
+  await vi.waitFor(() => expect(runner.snapshot().running).toBeNull());
   expect(await runner.measureCrew("one")).toBeNull();
   await vi.waitFor(() => expect(runner.snapshot().running).toBeNull());
   await settled("one", "done");
@@ -183,9 +189,10 @@ test("a crew run that is stopped gives back the one rower's results", async () =
   const runner = make();
   await runner.start();
   await settled("one", "done");
+  await vi.waitFor(() => expect(runner.snapshot().running).toBeNull());
   const before = readFileSync(path.join(library, "one", "summary.json"), "utf8");
   writeFileSync(control, "hang");
-  await runner.measureCrew("one");
+  expect(await runner.measureCrew("one")).toBeNull();
   await vi.waitFor(() => expect(runner.snapshot().running?.id).toBe("one"));
   expect(await state("one")).toBe("waiting");
   await runner.stop("one");
@@ -255,4 +262,25 @@ test("the rig goes to the engine when the clip has one", () => {
   const rig = ["stroke", "bow", "bow", "stroke"];
   expect(jobFor("f", { boat_class: "4-", rig }, "real").rig).toEqual(rig);
   expect(jobFor("f", { boat_class: "4-" }, "real").rig).toBeUndefined();
+});
+
+test("the job says how many cores and what priority, from the effort chosen", async () => {
+  addClip("one", "2026-11-08T10:00:00Z");
+  effort = "gentle";
+  const runner = make();
+  await runner.start();
+  await settled("one", "done");
+  const job = JSON.parse(readFileSync(path.join(library, "one", "job.json"), "utf8"));
+  expect([job.threads, job.priority]).toEqual([2, "low"]);
+  expect(runner.snapshot().effort).toBe("gentle");
+});
+
+test("full speed leaves the cores to the engine and runs at normal priority", async () => {
+  addClip("one", "2026-11-08T10:00:00Z");
+  effort = "full";
+  await make().start();
+  await settled("one", "done");
+  const job = JSON.parse(readFileSync(path.join(library, "one", "job.json"), "utf8"));
+  expect(job.threads).toBeUndefined();
+  expect(job.priority).toBe("normal");
 });

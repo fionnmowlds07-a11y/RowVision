@@ -104,7 +104,7 @@ test("the page has no Node access and only the narrow bridge", async () => {
     bridge: Object.keys(window.rowvision).sort(),
     origin: location.origin,
   }));
-  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["addClip", "canSend", "cancelModels", "changeClipsFolder", "deleteClip", "downloadModels", "engineVersion", "exportPdf", "finishWelcome", "getAnalysis", "getClip", "getColours", "getModels", "getSetup", "getSpace", "getTargets", "getWelcome", "listClips", "measureAgain", "measureCrew", "onAnalysis", "onModels", "onSendProgress", "pathForFile", "removeVideo", "sendClip", "setColours", "setTargets", "showReport", "startClip", "stopClip", "tapAgain"], origin: "app://rowvision" });
+  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["addClip", "canSend", "cancelModels", "changeClipsFolder", "deleteClip", "downloadModels", "engineVersion", "exportPdf", "finishWelcome", "getAnalysis", "getClip", "getColours", "getEffort", "getModels", "getSetup", "getSpace", "getTargets", "getWelcome", "listClips", "measureAgain", "measureCrew", "onAnalysis", "onModels", "onSendProgress", "pathForFile", "removeVideo", "sendClip", "setColours", "setEffort", "setTargets", "showReport", "startClip", "stopClip", "tapAgain"], origin: "app://rowvision" });
   const prefs = await app.evaluate(({ BrowserWindow }) => {
     // Not in Electron's types, but it reports the settings the page really runs with.
     const contents = BrowserWindow.getAllWindows()[0].webContents as unknown as { getLastWebPreferences(): Electron.WebPreferences | null };
@@ -333,6 +333,24 @@ test("two clips are compared side by side, the earlier one first", async () => {
   await expect(table).toContainText("measurement noise");
   if (process.env.ROWVISION_SHOT) await page.screenshot({ path: process.env.ROWVISION_SHOT.replace(".png", "-compare.png"), fullPage: true });
   await page.evaluate(() => { window.location.hash = "#/"; });
+});
+
+test("analysis speed is chosen in Settings, warned about when adding, and kept on this computer", async () => {
+  await openAdd();
+  await page.locator("input[type=file]").setInputFiles(path.join(sources, "row.mp4"));
+  await expect(page.getByText("Analysing uses a lot of your computer's power")).toBeVisible();
+  await page.getByRole("link", { name: "Choose the speed in Settings" }).click();
+  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
+  const speed = page.getByRole("group", { name: "Analysis speed" });
+  await expect(speed.getByRole("button", { name: "Balanced" })).toHaveAttribute("aria-pressed", "true");
+  await speed.getByRole("button", { name: "Gentle" }).click();
+  await expect(speed.getByRole("button", { name: "Gentle" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("status").filter({ hasText: "Gentle." })).toContainText("cores on this computer");
+  expect(readJson(path.join(data, "settings.json")).effort).toBe("gentle");
+  await speed.getByRole("button", { name: "Full speed" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Full speed." })).toContainText("All ");
+  await speed.getByRole("button", { name: "Balanced" }).click();
+  await expect.poll(() => readJson(path.join(data, "settings.json")).effort).toBe("balanced");
 });
 
 test("colours are saved on this computer", async () => {

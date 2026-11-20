@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
+import { cpus } from "node:os";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, Notification, powerMonitor, session, shell, type IpcMainInvokeEvent } from "electron";
 import { APP_ORIGIN, CHANNELS, CLIP_ID, type Analysis, type ClipItem, type ModelsState, type Welcome } from "../shared/bridge";
@@ -12,7 +13,8 @@ import { MOST_BYTES, pdfName, printReport } from "./pdf";
 import { registerSchemes, serve } from "./protocol";
 import { cleanConsent, sendClip } from "./send";
 import { cleanTargets } from "../../../web/lib/targets";
-import { cleanColours, readColours, readSetup, readSpeed, readTargets, readWelcome, saveSettings, writeColours } from "./settings";
+import { cleanColours, readColours, readEffort, readSetup, readSpeed, readTargets, readWelcome, saveSettings, saveSpeed, writeColours } from "./settings";
+import { isEffort } from "../shared/effort";
 import { checkFolder, clipsFolderIn, isEmptyLibrary } from "./welcome";
 
 // Tests point the app at a throwaway folder. Everyone else uses the system's app data folder.
@@ -81,8 +83,9 @@ const analyser = new Analyser({
   },
   notify,
   onBattery: () => powerMonitor.isOnBatteryPower(),
-  readSpeed: () => readSpeed(settingsFile()),
-  saveSpeed: (speed) => saveSettings(settingsFile(), { speed }),
+  readSpeed: (effort) => readSpeed(settingsFile(), effort),
+  saveSpeed: (effort, speed) => saveSpeed(settingsFile(), effort, speed),
+  effort: () => readEffort(settingsFile()),
 });
 
 /** The library only knows a clip is waiting. The analyser knows which one is running. */
@@ -240,6 +243,12 @@ void app.whenReady().then(async () => {
     return target;
   });
   handle(CHANNELS.showReport, async () => { if (lastReport) shell.showItemInFolder(lastReport); });
+  handle(CHANNELS.getEffort, async () => ({ effort: await readEffort(settingsFile()), cores: cpus().length }));
+  handle(CHANNELS.setEffort, async (effort) => {
+    if (!isEffort(effort)) throw new Error("Not an effort");
+    await saveSettings(settingsFile(), { effort });
+    await analyser.effortChanged();
+  });
   handle(CHANNELS.tapAgain, (id, tap) => {
     const point = cleanTap(tap);
     if (!point) throw new Error("Not a tap");

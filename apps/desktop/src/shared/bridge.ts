@@ -3,6 +3,7 @@
 import type { Summary } from "../../../web/lib/result";
 import type { Setup } from "../../../web/lib/setup";
 import type { TargetChoices } from "../../../web/lib/targets";
+import type { Effort } from "./effort";
 
 export type Colours = { ground: string | null; highlight: string | null };
 
@@ -60,6 +61,8 @@ export type Analysis = {
   engineMissing: boolean;
   /** The measuring models are not downloaded yet, so clips wait for them. */
   modelsMissing: boolean;
+  /** How hard the running clip works the computer, or the next one will. */
+  effort: Effort;
 };
 
 /** The measuring models the engine needs, and whether they are on this computer. */
@@ -139,6 +142,9 @@ export type Bridge = {
   exportPdf(html: string, name: string): Promise<string | null>;
   /** Shows the last saved report in its folder. */
   showReport(): Promise<void>;
+  /** How hard analysis works the computer, and how many cores it has. */
+  getEffort(): Promise<{ effort: Effort; cores: number }>;
+  setEffort(effort: Effort): Promise<void>;
   /** Measures every seat of a clip that was measured for one rower. Returns why not, or null once it is queued. */
   measureCrew(id: string): Promise<string | null>;
   /** Says which rower is you, then carries on. */
@@ -183,6 +189,8 @@ export const CHANNELS = {
   measureCrew: "analysis:crew",
   exportPdf: "report:export",
   showReport: "report:show",
+  getEffort: "effort:get",
+  setEffort: "effort:set",
   tapAgain: "analysis:tap",
   getSpace: "space:get",
   deleteClip: "clips:delete",
