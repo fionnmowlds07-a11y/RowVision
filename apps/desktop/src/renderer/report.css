@@ -1,0 +1,340 @@
+/* The PDF report's pages. The same rules draw the small previews in the export window and the A4 pages
+   in the PDF: every size is a share of the page's width (cqw), so a page looks the same at any size. */
+.rvr-sheet {
+  box-sizing: border-box;
+  width: 100%;
+  aspect-ratio: 210 / 297;
+  container-type: inline-size;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-family: "DM Sans Variable", "DM Sans", "Segoe UI", system-ui, sans-serif;
+  line-height: 1.35;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.rvr-sheet h3 {
+  margin: 0;
+  font: 800 6cqw/1 "Bricolage Grotesque Variable", "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+.rvr-meta {
+  font-size: 2.3cqw;
+}
+
+.rvr-foot {
+  margin-top: auto;
+  font-size: 2cqw;
+  display: flex;
+  justify-content: space-between;
+  gap: 2cqw;
+}
+
+.rvr-frame {
+  position: relative;
+  border-radius: 1.4cqw;
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 16 / 9;
+}
+
+.rvr-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rvr-tag {
+  position: absolute;
+  left: 1.6cqw;
+  top: 1.4cqw;
+  font: 700 2.2cqw/1 "DM Sans Variable", "DM Sans", system-ui, sans-serif;
+  padding: 0.9cqw 1.4cqw;
+  border-radius: 99px;
+}
+
+.rvr-nums {
+  display: flex;
+  gap: 1cqw;
+  flex-wrap: wrap;
+  font: 700 2.1cqw/1 "DM Sans Variable", "DM Sans", system-ui, sans-serif;
+}
+
+.rvr-nums span {
+  padding: 0.8cqw 1.2cqw;
+  border-radius: 0.8cqw;
+}
+
+/* A: white contact sheet */
+.rvr-a {
+  background: #fff;
+  color: #0f1a14;
+  padding: 5cqw;
+  gap: 3cqw;
+}
+
+.rvr-a .rvr-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  border-bottom: 0.5cqw solid #0f1a14;
+  padding-bottom: 2cqw;
+}
+
+.rvr-a .rvr-grid {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  gap: 1.8cqw 2cqw;
+  align-items: center;
+}
+
+.rvr-a .rvr-h {
+  font: 700 2.2cqw/1 "DM Sans Variable", "DM Sans", system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #5b6b62;
+}
+
+.rvr-a .rvr-n {
+  font: 800 3.4cqw/1 "Bricolage Grotesque Variable", "Bricolage Grotesque", system-ui, sans-serif;
+}
+
+.rvr-a .rvr-tag,
+.rvr-d .rvr-tag {
+  background: #0f1a14;
+  color: #fff;
+}
+
+.rvr-a .rvr-foot,
+.rvr-d .rvr-foot {
+  color: #5b6b62;
+}
+
+/* B: black water, big frames, three strokes a page */
+.rvr-b {
+  background: #050807;
+  color: #fff;
+  padding: 5cqw;
+  gap: 3cqw;
+}
+
+.rvr-b .rvr-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rvr-b .rvr-meta {
+  color: #a9bdb0;
+}
+
+.rvr-score {
+  background: #4be38a;
+  color: #04140b;
+  font: 800 3cqw/1 "Bricolage Grotesque Variable", "Bricolage Grotesque", system-ui, sans-serif;
+  padding: 1.6cqw 2.4cqw;
+  border-radius: 1.4cqw;
+}
+
+.rvr-b .rvr-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4cqw;
+}
+
+.rvr-b .rvr-pair h4 {
+  margin: 0;
+  font: 700 2.6cqw/1 "DM Sans Variable", "DM Sans", system-ui, sans-serif;
+  color: #a9bdb0;
+}
+
+.rvr-duo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2cqw;
+}
+
+.rvr-duo > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2cqw;
+}
+
+.rvr-b .rvr-tag {
+  background: rgb(0 0 0 / 0.72);
+  color: #fff;
+}
+
+.rvr-b .rvr-nums span {
+  background: #142019;
+}
+
+.rvr-b .rvr-nums .rvr-in {
+  background: #4be38a;
+  color: #04140b;
+}
+
+.rvr-b .rvr-nums .rvr-out {
+  background: #ffb547;
+  color: #2a1800;
+}
+
+.rvr-b .rvr-foot {
+  color: #7d9286;
+}
+
+/* C: green report, averages first, then every catch and every finish */
+.rvr-c {
+  background: #f3f7f2;
+  color: #0b2a19;
+}
+
+.rvr-band {
+  background: #0f5a32;
+  color: #fff;
+  padding: 5cqw 5cqw 4cqw;
+  display: flex;
+  flex-direction: column;
+  gap: 2.4cqw;
+}
+
+.rvr-band .rvr-meta {
+  color: #bfe8cf;
+}
+
+.rvr-c .rvr-top {
+  padding: 5cqw 5cqw 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+}
+
+.rvr-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.4cqw;
+}
+
+.rvr-stats div {
+  background: rgb(255 255 255 / 0.12);
+  border-radius: 1.2cqw;
+  padding: 1.6cqw;
+}
+
+.rvr-stats small {
+  display: block;
+  font-size: 1.9cqw;
+  color: #bfe8cf;
+}
+
+.rvr-stats b {
+  font: 800 3.4cqw/1.1 "Bricolage Grotesque Variable", "Bricolage Grotesque", system-ui, sans-serif;
+}
+
+.rvr-c .rvr-body {
+  padding: 3.4cqw 5cqw 5cqw;
+  display: flex;
+  flex-direction: column;
+  gap: 2cqw;
+  flex: 1;
+}
+
+.rvr-c .rvr-body h4 {
+  margin: 0;
+  font: 800 3cqw/1 "Bricolage Grotesque Variable", "Bricolage Grotesque", system-ui, sans-serif;
+}
+
+.rvr-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.6cqw;
+}
+
+.rvr-c .rvr-tag {
+  background: #fff;
+  color: #0b2a19;
+}
+
+.rvr-c .rvr-foot {
+  color: #4f6b5b;
+}
+
+/* D: one stroke a page, catch over finish, the stroke's numbers against the targets */
+.rvr-d {
+  background: #fff;
+  color: #111;
+  padding: 5cqw;
+  gap: 2.4cqw;
+}
+
+.rvr-d .rvr-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 2cqw;
+}
+
+.rvr-stroke {
+  font: 800 8cqw/0.9 "Bricolage Grotesque Variable", "Bricolage Grotesque", system-ui, sans-serif;
+  color: #0f5a32;
+  white-space: nowrap;
+}
+
+.rvr-d .rvr-frame {
+  flex: none;
+  width: 80%;
+  align-self: center;
+}
+
+.rvr-d table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 2.3cqw;
+  font-variant-numeric: tabular-nums;
+}
+
+.rvr-d th,
+.rvr-d td {
+  text-align: left;
+  padding: 0.9cqw 0.6cqw;
+  border-bottom: 0.25cqw solid #e2e8e4;
+}
+
+.rvr-d th {
+  font-size: 1.9cqw;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #667;
+}
+
+.rvr-d .rvr-in {
+  color: #0f7a40;
+  font-weight: 700;
+}
+
+.rvr-d .rvr-out {
+  color: #b45f00;
+  font-weight: 700;
+}
+
+/* In the PDF each sheet is one A4 page. */
+@page {
+  size: A4;
+  margin: 0;
+}
+
+@media print {
+  .rvr-doc {
+    margin: 0;
+    container-type: inline-size;
+  }
+
+  .rvr-doc .rvr-sheet {
+    width: 210mm;
+    height: 297mm;
+    break-after: page;
+  }
+}

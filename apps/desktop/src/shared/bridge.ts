@@ -129,6 +129,10 @@ export type Bridge = {
   stopClip(id: string): Promise<void>;
   /** Puts a stopped or failed clip back in the queue. */
   startClip(id: string): Promise<void>;
+  /** Asks where to save, then saves the report page as a PDF. Returns where it went, or null if the save was called off. */
+  exportPdf(html: string, name: string): Promise<string | null>;
+  /** Shows the last saved report in its folder. */
+  showReport(): Promise<void>;
   /** Measures every seat of a clip that was measured for one rower. Returns why not, or null once it is queued. */
   measureCrew(id: string): Promise<string | null>;
   /** Says which rower is you, then carries on. */
@@ -171,6 +175,8 @@ export const CHANNELS = {
   stopClip: "analysis:stop",
   startClip: "analysis:start",
   measureCrew: "analysis:crew",
+  exportPdf: "report:export",
+  showReport: "report:show",
   tapAgain: "analysis:tap",
   getSpace: "space:get",
   deleteClip: "clips:delete",

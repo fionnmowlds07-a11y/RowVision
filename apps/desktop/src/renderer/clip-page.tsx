@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CompareWith } from "./compare-page";
+import { ExportPdf } from "./export-dialog";
 import { SendClip } from "./send-dialog";
 import { libraryChanged } from "./use-library";
 import { Crew } from "@/app/clips/[id]/crew";
@@ -42,7 +43,10 @@ export function ClipPage({ id }: { id: string }) {
           <h1 style={{ fontSize: 32 }}>{longDate(clip.createdAt)}</h1>
           <p style={{ margin: "8px 0 0", color: "var(--on-ground-soft)" }}>{setupLine(clip.setup)}{clip.setup.note ? `. ${clip.setup.note}` : ""}</p>
         </div>
-        <SendClip clip={clip} onSent={() => setCount((value) => value + 1)} />
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          {summary?.rower ? <ExportPdf clip={clip} /> : null}
+          <SendClip clip={clip} onSent={() => setCount((value) => value + 1)} />
+        </div>
       </div>
       {!summary ? (
         <section className="card stack">

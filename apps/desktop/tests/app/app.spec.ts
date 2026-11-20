@@ -55,6 +55,7 @@ async function launch() {
       ROWVISION_TEST_NOTICES: "1",
       FAKE_ENGINE_CONTROL: control,
       ROWVISION_SEND_URL: intakeUrl,
+      ROWVISION_TEST_SAVE_PDF: path.join(data, "report.pdf"),
     },
   });
   page = await app.firstWindow();
@@ -103,7 +104,7 @@ test("the page has no Node access and only the narrow bridge", async () => {
     bridge: Object.keys(window.rowvision).sort(),
     origin: location.origin,
   }));
-  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["addClip", "canSend", "cancelModels", "changeClipsFolder", "deleteClip", "downloadModels", "engineVersion", "finishWelcome", "getAnalysis", "getClip", "getColours", "getModels", "getSetup", "getSpace", "getTargets", "getWelcome", "listClips", "measureAgain", "measureCrew", "onAnalysis", "onModels", "onSendProgress", "pathForFile", "removeVideo", "sendClip", "setColours", "setTargets", "startClip", "stopClip", "tapAgain"], origin: "app://rowvision" });
+  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["addClip", "canSend", "cancelModels", "changeClipsFolder", "deleteClip", "downloadModels", "engineVersion", "exportPdf", "finishWelcome", "getAnalysis", "getClip", "getColours", "getModels", "getSetup", "getSpace", "getTargets", "getWelcome", "listClips", "measureAgain", "measureCrew", "onAnalysis", "onModels", "onSendProgress", "pathForFile", "removeVideo", "sendClip", "setColours", "setTargets", "showReport", "startClip", "stopClip", "tapAgain"], origin: "app://rowvision" });
   const prefs = await app.evaluate(({ BrowserWindow }) => {
     // Not in Electron's types, but it reports the settings the page really runs with.
     const contents = BrowserWindow.getAllWindows()[0].webContents as unknown as { getLastWebPreferences(): Electron.WebPreferences | null };
@@ -291,6 +292,31 @@ test("the video stays in view while the results scroll, and can be put away for 
   await expect(page.getByRole("navigation", { name: "Results" }).getByRole("button", { name: "Stats only" })).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("navigation", { name: "Results" }).getByRole("button", { name: "Video and stats" }).click();
   await expect(page.getByRole("region", { name: "Frame viewer" })).toBeVisible();
+  await page.evaluate(() => { window.location.hash = "#/"; });
+});
+
+test("a PDF of every catch and finish is exported in the layout the coach picks", async () => {
+  await page.evaluate(() => { window.location.hash = "#/clip/test-clip"; });
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  const dialog = page.getByRole("dialog", { name: "Export a PDF" });
+  const layouts = dialog.getByRole("list", { name: "Layouts" });
+  await expect(layouts.getByRole("listitem")).toHaveCount(4);
+  // Every layout is drawn from the clip's own frames before any is chosen.
+  const download = layouts.getByRole("button", { name: "Download One stroke per page" });
+  await expect(download).toBeEnabled({ timeout: 20_000 });
+  await expect(layouts.locator("img")).not.toHaveCount(0);
+  expect(await layouts.locator("img").first().evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+  await expect(layouts.getByRole("listitem").nth(3)).toContainText(`${CATCHES.length} pages`);
+  if (process.env.ROWVISION_SHOT) await page.screenshot({ path: process.env.ROWVISION_SHOT.replace(".png", "-export.png") });
+
+  await download.click();
+  await expect(dialog.getByRole("status")).toContainText("Saved to");
+  const pdf = readFileSync(path.join(data, "report.pdf"));
+  expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+  expect(pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g)?.length).toBe(CATCHES.length);
+  // The hidden window that drew the PDF is gone.
+  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
+  await dialog.getByRole("button", { name: "Close" }).click();
   await page.evaluate(() => { window.location.hash = "#/"; });
 });
 
