@@ -260,6 +260,20 @@ test("the video stays in view while the results scroll, and can be put away for 
   await expect(viewer.getByRole("button", { name: "Play" })).toBeInViewport();
   await expect(viewer.getByRole("button", { name: "Zoom to rower" })).toBeInViewport();
 
+  // The button on the video opens the big view, and nothing from the results shows through it.
+  await viewer.getByRole("button", { name: "Full screen" }).click();
+  const exit = viewer.getByRole("button", { name: "Exit full screen" });
+  await expect(exit).toBeVisible();
+  const showsThrough = await page.evaluate(() => {
+    const behind = [...document.querySelectorAll('nav[aria-label="Results"] button, [class*="miniLane"]')].map((element) => element.getBoundingClientRect())
+      .filter((box) => box.width && box.top >= 0 && box.bottom <= innerHeight);
+    return behind.map((box) => !document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)?.closest('[aria-label="Frame viewer"]'));
+  });
+  expect(showsThrough.length).toBeGreaterThan(2);
+  expect(showsThrough.filter(Boolean)).toHaveLength(0);
+  await exit.click();
+  await expect(viewer.getByRole("button", { name: "Full screen" })).toBeVisible();
+
   const statsOnly = results.getByRole("button", { name: "Stats only" });
   await statsOnly.click();
   await expect(statsOnly).toHaveAttribute("aria-pressed", "true");

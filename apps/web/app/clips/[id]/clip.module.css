@@ -139,6 +139,42 @@
   display: none;
 }
 
+/* The column stays put while the results scroll, which makes it its own layer. While the big view is
+   open, that layer has to sit above the results toolbar and the score bars, or they show through. */
+.lifted {
+  z-index: 30;
+}
+
+.fullButton {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--on-stage) 25%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--stage) 78%, transparent);
+  color: var(--on-stage);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+
+.fullButton:hover {
+  background: var(--stage);
+  border-color: var(--highlight);
+}
+
+.fullButton:focus-visible {
+  outline: 2px solid var(--highlight);
+  outline-offset: 2px;
+}
+
 .openVideo {
   width: 100%;
 }
