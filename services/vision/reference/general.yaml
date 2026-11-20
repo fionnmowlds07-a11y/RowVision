@@ -27,11 +27,11 @@ targets:
     sources: ["24146710", "40708773"]
     evidence: ergometer
   finish_knee_deg:
-    min: 175
-    max: 180
+    min: 167
+    max: 172
     sources: ["24146710", "40708773"]
-    evidence: project judgement, straighter than the rowing machine studies
-    note: Legs are normally flat at the finish on the water, so a straight leg is not penalised.
+    evidence: project judgement, near the studies' 167 to 169
+    note: Legs are flat at the finish, but the knee never reads a full 180 as the thigh slopes down to the seat.
   drive_share:
     by_rate_spm:
       22: 0.394

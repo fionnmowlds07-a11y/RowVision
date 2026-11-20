@@ -77,6 +77,7 @@ export function ClipPage({ id }: { id: string }) {
           framesLink={clip.hasVideo ? clipUrl(clip.id, "frames.json") : null}
           oldVersion={false}
           daysLeft={null}
+          measuresNote={<p className="soft" style={{ margin: "12px 0", fontSize: 14 }}>You can change what counts towards the score in <a href="#/settings">Settings</a>.</p>}
         />
         </>
       )}
