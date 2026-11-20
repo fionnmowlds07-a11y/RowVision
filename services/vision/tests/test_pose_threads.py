@@ -27,8 +27,12 @@ def made(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
             # Like rtmlib, which looks the module up as it makes each model.
             import onnxruntime
 
-            self.det_model = onnxruntime.InferenceSession(path_or_bytes="det.onnx", providers=["cpu"])
-            self.pose_model = onnxruntime.InferenceSession(path_or_bytes="pose.onnx", providers=["cpu"])
+            self.det_model = onnxruntime.InferenceSession(
+                path_or_bytes="det.onnx", providers=["cpu"]
+            )
+            self.pose_model = onnxruntime.InferenceSession(
+                path_or_bytes="pose.onnx", providers=["cpu"]
+            )
 
     rtmlib = types.ModuleType("rtmlib")
     rtmlib.Body = Body  # type: ignore[attr-defined]
