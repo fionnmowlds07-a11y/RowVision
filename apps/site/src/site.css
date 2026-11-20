@@ -75,6 +75,7 @@ small { font-size: 14px; color: var(--soft); }
 .gets { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 40px; }
 .gets .btn { font-size: 18px; padding: 18px 24px; }
 .note { margin-top: 16px; color: var(--soft); }
+.fine { margin-top: 8px; line-height: 1.5; } .fine a { color: inherit; }
 .caution { display: inline-flex; gap: 10px; align-items: center; background: var(--caution-bg); color: var(--caution); font-weight: 700; padding: 12px 18px; border-radius: 10px; margin-top: 28px; }
 
 /* the water behind the short pages */
