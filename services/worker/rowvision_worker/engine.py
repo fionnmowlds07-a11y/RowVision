@@ -125,14 +125,15 @@ def pause_for(scouting: Scouting, video: Video) -> NeedsTap:
 
 
 class RealEngine:
-    def __init__(self, device: str) -> None:
+    def __init__(self, device: str, threads: int | None = None) -> None:
         self._device = device
+        self._threads = threads
         self._backend: PoseBackend | None = None
 
     def _get_backend(self, report: Report) -> PoseBackend:
         if self._backend is None:
             report("Loading the pose model", None)
-            self._backend = RtmBackend(device=self._device)
+            self._backend = RtmBackend(device=self._device, threads=self._threads)
         return self._backend
 
     def run(
@@ -233,5 +234,5 @@ def fake_report(video: Video) -> dict[str, Any]:
     }
 
 
-def make_engine(kind: str, device: str) -> Engine:
-    return FakeEngine() if kind == "fake" else RealEngine(device)
+def make_engine(kind: str, device: str, threads: int | None = None) -> Engine:
+    return FakeEngine() if kind == "fake" else RealEngine(device, threads)

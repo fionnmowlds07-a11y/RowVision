@@ -1,10 +1,12 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createWriteStream, promises as fs } from "node:fs";
 import path from "node:path";
+import { cpus } from "node:os";
 import { createInterface } from "node:readline";
 import { SECTION_SECONDS } from "../../../web/lib/clip-checks";
 import { BOAT_SEATS } from "../../../web/lib/setup";
 import type { Analysis, Running } from "../shared/bridge";
+import { DEFAULT_EFFORT, effortPlan, type Effort } from "../shared/effort";
 import { STAGES, canonical } from "../shared/stages";
 import { PAUSE_FILE, STATE_FILE, listClips, markClip, readJson, writeJson } from "./library";
 
@@ -86,29 +88,46 @@ type Options = {
   onChange: (analysis: Analysis) => void;
   notify: (title: string, body: string, id: string) => void;
   onBattery: () => boolean;
-  readSpeed: () => Promise<number | null>;
-  saveSpeed: (secondsPerSecond: number) => Promise<void>;
+  /** How fast this computer analyses at an effort, in seconds of work per second of video. */
+  readSpeed: (effort: Effort) => Promise<number | null>;
+  saveSpeed: (effort: Effort, secondsPerSecond: number) => Promise<void>;
+  /** How hard analysis may work the computer. Defaults to balanced. */
+  effort?: () => Promise<Effort>;
+  /** How many processor cores the computer has. Defaults to what the system says. */
+  cores?: () => number;
   /** Whether the measuring models are on this computer. Clips wait until they are. Defaults to yes. */
   modelsReady?: () => boolean;
   /** Extra environment for the engine, such as where it keeps its models. */
   env?: () => NodeJS.ProcessEnv;
 };
 
-type Current = Running & { child: ChildProcess; ended: boolean; stopping: boolean; forgotten?: boolean; seconds: number; timer?: NodeJS.Timeout };
+type Current = Running & { child: ChildProcess; ended: boolean; stopping: boolean; forgotten?: boolean; seconds: number; effort: Effort; timer?: NodeJS.Timeout };
 
 /** Analyses one clip at a time, oldest first. Everything it knows is also in the clips' folders. */
 export class Analyser {
   private current: Current | null = null;
   private waiting: { id: string; seconds: number }[] = [];
   private speed = FIRST_SPEED;
+  private effort: Effort = DEFAULT_EFFORT;
   private quitting = false;
   private busy: Promise<void> = Promise.resolve();
 
   constructor(private readonly options: Options) {}
 
   async start(): Promise<void> {
-    this.speed = (await this.options.readSpeed()) ?? FIRST_SPEED;
+    await this.readEffort();
     await this.next();
+  }
+
+  private async readEffort(): Promise<void> {
+    this.effort = (await this.options.effort?.()) ?? DEFAULT_EFFORT;
+    this.speed = (await this.options.readSpeed(this.effort)) ?? FIRST_SPEED;
+  }
+
+  /** After the effort is changed in Settings. It applies from the next clip; the wait times change now. */
+  async effortChanged(): Promise<void> {
+    await this.readEffort();
+    this.changed();
   }
 
   snapshot(): Analysis {
@@ -122,7 +141,7 @@ export class Analyser {
       return item;
     });
     const modelsMissing = !(this.options.modelsReady?.() ?? true);
-    return { running, waiting, onBattery: this.options.onBattery(), engineMissing: this.options.engine() === null, modelsMissing };
+    return { running, waiting, onBattery: this.options.onBattery(), engineMissing: this.options.engine() === null, modelsMissing, effort: this.current?.effort ?? this.effort };
   }
 
   changed(): void {
@@ -160,7 +179,9 @@ export class Analyser {
       return this.pickNext();
     }
     const jobFile = path.join(folder, "job.json");
-    await writeJson(jobFile, jobFor(folder, clip, this.options.kind));
+    const effort = this.effort;
+    const { threads, priority } = effortPlan(effort, this.options.cores?.() ?? cpus().length);
+    await writeJson(jobFile, { ...jobFor(folder, clip, this.options.kind), ...(threads === null ? {} : { threads }), priority });
 
     const [program, ...rest] = command;
     const child = spawn(program, [...rest, jobFile], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true, env: engineEnv(program, process.env, this.options.env?.()) });
@@ -169,7 +190,7 @@ export class Analyser {
     child.stdin?.on("error", () => undefined);
     const current: Current = {
       id, child, stage: "Getting ready", progress: 0, startedAt: new Date().toISOString(), secondsLeft: null,
-      ended: false, stopping: false, seconds: clipWork(clip),
+      ended: false, stopping: false, seconds: clipWork(clip), effort,
     };
     this.current = current;
 
@@ -197,8 +218,10 @@ export class Analyser {
         void finish(null).then(async () => {
           await fs.rm(path.join(folder, BEFORE_CREW), { force: true });
           const taken = (Date.now() - Date.parse(current.startedAt)) / 1000;
-          this.speed = taken / Math.max(current.seconds, 1);
-          await this.options.saveSpeed(this.speed);
+          const speed = taken / Math.max(current.seconds, 1);
+          // A change of effort part way through leaves the new effort's speed alone.
+          if (current.effort === this.effort) this.speed = speed;
+          await this.options.saveSpeed(current.effort, speed);
           const overall = typeof event.overall === "number" && event.band !== "Poor" ? `Overall ${Math.round(event.overall)}` : "No overall score";
           this.options.notify("Your clip is ready", `${overall}${typeof event.band === "string" ? `, accuracy ${event.band}` : ""}.`, id);
         });

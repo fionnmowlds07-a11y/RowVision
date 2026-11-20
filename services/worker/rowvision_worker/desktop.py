@@ -45,6 +45,7 @@ NO_SKELETON_MESSAGE = (
 PROGRESS_STEP = 0.01
 """Smallest change in progress worth telling the app about."""
 BELOW_NORMAL_PRIORITY = 0x00004000
+IDLE_PRIORITY = 0x00000040
 FINISHED, NEEDS_TAP, CANCELLED, FAILED = 0, 3, 4, 1
 """Exit codes."""
 
@@ -63,6 +64,13 @@ class DesktopJob:
     setup: Setup
     engine: str
     device: str
+    threads: int | None = None
+    """How many processor cores to use. None uses them all."""
+    priority: str = "below"
+    """How much the computer favours the analysis over other work: "normal", "below" or "low"."""
+
+
+PRIORITIES = ("normal", "below", "low")
 
 
 def parse_rig(value: Any, boat_class: str) -> tuple[str, ...] | None:
@@ -94,7 +102,13 @@ def parse_job(data: dict[str, Any]) -> DesktopJob:
         ),
         engine=data.get("engine", "real"),
         device=data.get("device", "cpu"),
+        threads=_threads(data.get("threads")),
+        priority=data["priority"] if data.get("priority") in PRIORITIES else "below",
     )
+
+
+def _threads(value: Any) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) and 1 <= value <= 256 else None
 
 
 def write_json(path: Path, value: Any) -> None:
@@ -211,13 +225,16 @@ def watch_input(stream: TextIO, stop: threading.Event) -> None:
     stop.set()
 
 
-def lower_priority() -> None:
-    """Analysis can take many minutes, and the computer should stay usable."""
+def lower_priority(priority: str = "below") -> None:
+    """Analysis can take many minutes, so other programs come first unless full speed is asked for."""
+    if priority == "normal":
+        return
     if sys.platform == "win32":
         kernel = ctypes.windll.kernel32  # type: ignore[attr-defined]
-        kernel.SetPriorityClass(kernel.GetCurrentProcess(), BELOW_NORMAL_PRIORITY)
+        wanted = IDLE_PRIORITY if priority == "low" else BELOW_NORMAL_PRIORITY
+        kernel.SetPriorityClass(kernel.GetCurrentProcess(), wanted)
     else:
-        os.nice(10)
+        os.nice(19 if priority == "low" else 10)
 
 
 def send_line(event: dict[str, Any]) -> None:
@@ -266,16 +283,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("job", type=Path, help="Path of the job file")
     arguments = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, stream=sys.stderr)
-    lower_priority()
     try:
         job = parse_job(json.loads(arguments.job.read_text()))
     except (OSError, ValueError, KeyError, TypeError):
         log.exception("could not read the job")
         send_line({"event": "failed", "message": FAILED_MESSAGE})
         return FAILED
+    lower_priority(job.priority)
     stop = threading.Event()
     threading.Thread(target=watch_input, args=(sys.stdin, stop), daemon=True).start()
-    return run(job, make_engine(job.engine, job.device), send_line, stop.is_set)
+    return run(job, make_engine(job.engine, job.device, job.threads), send_line, stop.is_set)
 
 
 if __name__ == "__main__":

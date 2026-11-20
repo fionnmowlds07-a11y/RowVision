@@ -136,6 +136,16 @@ export function AnalysisPage({ id }: { id: string }) {
           {analysis.engineMissing && state === "waiting" ? (
             <p className={styles.caution}>The measuring part of RowVision isn&apos;t installed on this computer yet, so clips wait here until it is.</p>
           ) : null}
+          {state === "running" || state === "waiting" ? (
+            <p className="soft" style={{ fontSize: 14 }}>
+              {analysis.effort === "full"
+                ? "Running at full speed, using every core, so the computer may be slow to use until it finishes."
+                : analysis.effort === "gentle"
+                  ? "Running gently, so the computer stays easy to use. It takes longer."
+                  : "Running balanced: about half the computer's power, leaving room for your other programs."}{" "}
+              <a href="#/settings">Change the speed</a>
+            </p>
+          ) : null}
           {analysis.onBattery && (state === "running" || state === "waiting") ? (
             <p className={styles.caution}>This laptop is on battery. Analysis is quicker, and kinder to the battery, when it is plugged in.</p>
           ) : null}

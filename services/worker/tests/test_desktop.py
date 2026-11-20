@@ -244,3 +244,24 @@ def test_a_rig_is_kept_only_when_it_gives_every_seat_a_side() -> None:
     assert job_in(Path("clip"), **eight, rig=["port"] * 8).setup.rig is None
     assert job_in(Path("clip"), **eight).setup.rig is None
     assert job_in(Path("clip"), boat_class="1x", side="scull", seat=1, rig=["bow"]).setup.rig is None
+
+
+def test_the_job_says_how_hard_to_work() -> None:
+    assert job_in(Path("clip"), threads=4, priority="low").threads == 4
+    assert job_in(Path("clip"), threads=4, priority="low").priority == "low"
+    assert job_in(Path("clip")).threads is None
+    assert job_in(Path("clip")).priority == "below"
+    assert job_in(Path("clip"), threads=0, priority="max").threads is None
+    assert job_in(Path("clip"), threads=True).threads is None
+    assert job_in(Path("clip"), priority="max").priority == "below"
+
+
+@pytest.mark.parametrize(("priority", "nice"), [("normal", None), ("below", 10), ("low", 19)])
+def test_the_priority_asked_for_is_the_one_given(
+    monkeypatch: pytest.MonkeyPatch, priority: str, nice: int | None
+) -> None:
+    given: list[int] = []
+    monkeypatch.setattr(desktop.sys, "platform", "linux")
+    monkeypatch.setattr(desktop.os, "nice", given.append)
+    desktop.lower_priority(priority)
+    assert given == ([] if nice is None else [nice])

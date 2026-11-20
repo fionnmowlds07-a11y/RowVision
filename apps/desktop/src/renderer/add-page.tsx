@@ -138,6 +138,7 @@ export function AddPage() {
               <button type="button" className="button quiet" onClick={reset} disabled={saving}>Change video</button>
             </div>
             <p className="soft">The video stays where it is and is read from there, so keep it until the clip is analysed.</p>
+            <p className={styles.caution}>Analysing uses a lot of your computer&apos;s power for several minutes, so it may get warm and the fan may run. <a href="#/settings">Choose the speed in Settings</a>.</p>
             {rigProblem ? <p role="alert" className="error">{rigProblem}</p> : null}
             {error ? <p role="alert" className="error">{error}</p> : null}
             <button type="button" className="button primary" onClick={save} disabled={saving || rigProblem !== null}>
