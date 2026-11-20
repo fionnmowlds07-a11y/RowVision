@@ -15,7 +15,7 @@ This was a structured search, not a formal systematic review. No study was score
 | Forward trunk angle at catch | 26–31° | About 26–32° (thorax); 33–36° in one study | Cardoso 2024; Penichet-Tomas 2025 |
 | Trunk layback at finish | 20–25° | About 18–28° (thorax) | Cardoso 2024 |
 | Knee angle at catch | 50–55° | About 44–52°; 56–61° | Bell 2013; Penichet-Tomas 2025 |
-| Knee angle at finish | 175–180° | Mostly 160–164°; 167–169° | Our judgement, informed by Bell 2013 and Penichet-Tomas 2025 |
+| Knee angle at finish | 167–172° | Mostly 160–164°; 167–169° | Our judgement, informed by Bell 2013 and Penichet-Tomas 2025 |
 | Drive share of the stroke | About 39–47%, rising with rate | 39.4% at 22 spm, 43.0% at 26 spm, 46.8% at 32 spm | Engstrom 2023 |
 | Legs lead the trunk off the catch | Legs first | Coaching principle, not a measured number | Rowing Canada and British Rowing technique models |
 

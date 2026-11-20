@@ -185,6 +185,8 @@ test("the results show what to work on, the measures and a freeze frame for each
   const measures = page.getByRole("region", { name: "Measures" });
   await expect(measures).toContainText("Body angle at the catch");
   await expect(measures).toContainText("Knee at the catch");
+  await expect(measures.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "#/settings");
+  await expect(measures).toContainText("You can change what counts towards the score in Settings.");
   // Opening a measure shows a freeze frame for each stroke, and one jumps the viewer to that frame.
   await measures.getByRole("button", { name: /Body angle at the catch/ }).click();
   const freezes = page.getByRole("button", { name: /^Stroke \d+, go to frame \d+$/ });

@@ -32,7 +32,7 @@ export const GENERAL_TARGETS: TargetChoices = {
   catch_lean_deg: { low: 26, high: 31, counts: true },
   finish_lean_deg: { low: -25, high: -20, counts: true },
   catch_knee_deg: { low: 50, high: 55, counts: false },
-  finish_knee_deg: { low: 175, high: 180, counts: false },
+  finish_knee_deg: { low: 167, high: 172, counts: false },
 };
 
 export function sameChoices(a: TargetChoices, b: TargetChoices): boolean {

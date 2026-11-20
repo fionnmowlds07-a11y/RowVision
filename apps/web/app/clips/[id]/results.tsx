@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { type ReactNode, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { evidenceFrames, formatTarget, formatValue, laneMarks, modelFits, overallGap, overallVisible, ratingNote, sourceLink, timingText } from "@/lib/logic";
 import type { FrameData, Metric, Rower, Summary } from "@/lib/result";
 import { strokeSeries } from "@/lib/strokes";
@@ -52,11 +52,13 @@ type Props = {
   framesLink: string | null;
   oldVersion: boolean;
   daysLeft: number | null;
+  /** Shown under the measures, such as where to change what counts towards the score. */
+  measuresNote?: ReactNode;
   /** Set when `rower` is one seat of a measured crew, whose frame data is kept under its seat number. */
   crewSeat?: number | null;
 };
 
-export function Results({ side, summary, rower, videoLink, framesLink, oldVersion, daysLeft, crewSeat = null }: Props) {
+export function Results({ side, summary, rower, videoLink, framesLink, oldVersion, daysLeft, crewSeat = null, measuresNote }: Props) {
   const [data, setData] = useState<FrameData | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [asking, setAsking] = useState(false);
@@ -271,6 +273,7 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
                 </li>
               ))}
             </ul>
+            {measuresNote}
             {firstModel ? <button type="button" className="button quiet" onClick={() => setModel(firstModel.name)}>See the 3D model</button> : null}
           </section>
           </div>
