@@ -61,3 +61,4 @@ docs/handover.md
 docs/home-worker.md
 docs/deployment.md
 apps/web/AGENTS.md
+.wrangler/
