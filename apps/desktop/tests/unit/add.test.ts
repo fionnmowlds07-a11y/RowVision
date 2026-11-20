@@ -90,3 +90,18 @@ test("a coach's whole crew has no tap, and is only a coach's when it is a whole 
   const own = await addClip(library, cleanAdd(good())!);
   expect(JSON.parse(readFileSync(path.join(library, own, "clip.json"), "utf8")).coach).toBeUndefined();
 });
+
+test("a rig is kept when it gives every seat a side and agrees with the seat's side", async () => {
+  const german = ["stroke", "bow", "stroke", "bow", "bow", "stroke", "bow", "stroke"];
+  const eight = { ...good(), setup: { boat: "8+", side: "bow", seat: 5 }, rig: german };
+  expect(cleanAdd(eight)?.rig).toEqual(german);
+  // Seat 5 rows bow side in this rig, so saying stroke side is refused.
+  expect(cleanAdd({ ...eight, setup: { boat: "8+", side: "stroke", seat: 5 } })).toBeNull();
+  expect(cleanAdd({ ...eight, rig: german.slice(1) })).toBeNull();
+  expect(cleanAdd({ ...eight, rig: Array(8).fill("bow") })).toBeNull();
+  expect(cleanAdd({ ...good(), setup: { boat: "4x", side: "scull", seat: 2 }, rig: ["bow", "stroke", "bow", "stroke"] })).toBeNull();
+  expect(cleanAdd(good())?.rig).toBeUndefined();
+  const library = path.join(folder, "clips");
+  const id = await addClip(library, cleanAdd(eight)!);
+  expect(JSON.parse(readFileSync(path.join(library, id, "clip.json"), "utf8")).rig).toEqual(german);
+});

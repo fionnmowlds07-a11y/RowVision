@@ -40,6 +40,8 @@ class Setup:
     tap: Tap | None
     scope: str = "seat"
     """"seat" measures the athlete alone. "crew" measures every seat, which takes far longer."""
+    rig: tuple[str, ...] | None = None
+    """Each seat's side, bow seat first, when a sweep boat is not rigged with sides alternating."""
     coach: bool = False
     """A whole crew with no one rower as the athlete. A tap then only says which boat, and the seat
     and side given are the stroke seat's, which says which side every seat rows."""
@@ -88,6 +90,7 @@ def plan_request(scouting: Scouting, setup: Setup, video: Video) -> Request | No
         "boats_in_video": max(confirmed, 1),
         "side": setup.side,
         "scope": Scope(setup.scope),
+        "rig": setup.rig,
     }
     if not scouting.boats:
         return Request(**base)

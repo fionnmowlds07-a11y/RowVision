@@ -7,6 +7,7 @@ one rower's joints are saved. Timing against the rower being followed is carried
 reason.
 """
 
+from collections.abc import Sequence
 from dataclasses import replace
 from typing import Any
 
@@ -153,7 +154,12 @@ def remeasure_rower(summary: dict[str, Any], frames: dict[str, Any]) -> RowerRes
     return _remeasure_one(summary, saved, poses, views, saved_turns(frames.get("turns"), count))
 
 
-def with_sides(summary: dict[str, Any], own_seat: int | None, own_side: str) -> dict[str, Any]:
+def with_sides(
+    summary: dict[str, Any],
+    own_seat: int | None,
+    own_side: str,
+    rig: Sequence[str] | None = None,
+) -> dict[str, Any]:
     """Return a saved result with each rower's side filled in, for results from before it was kept.
 
     The side comes from what the athlete said when adding the clip. Sides already saved are kept.
@@ -162,7 +168,7 @@ def with_sides(summary: dict[str, Any], own_seat: int | None, own_side: str) -> 
     def filled(rower: dict[str, Any] | None, alone: bool) -> dict[str, Any] | None:
         if rower is None or rower.get("side"):
             return rower
-        side = own_side if alone else seat_side(rower.get("seat"), own_seat, own_side)
+        side = own_side if alone else seat_side(rower.get("seat"), own_seat, own_side, rig)
         return {**rower, "side": side}
 
     crew = summary.get("crew")

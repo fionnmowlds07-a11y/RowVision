@@ -68,6 +68,8 @@ export function jobFor(folder: string, clip: Clip, kind: string): Record<string,
     device: "cpu",
     scope: clip.scope === "crew" ? "crew" : "seat",
   };
+  // Each seat's side, for a boat not rigged with sides alternating.
+  if (Array.isArray(clip.rig)) job.rig = clip.rig;
   // A coach's crew: a click on the video only says which boat.
   if (clip.coach === true && clip.scope === "crew") job.coach = true;
   // Left out when the page could not play the video, so the engine takes the first 60 seconds.

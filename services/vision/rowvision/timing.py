@@ -5,6 +5,7 @@ nearest the stern on their own side, and scullers follow stroke. Sweep rowers on
 view of the camera, so comparing along a side also cancels most of the near and far side effect.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -31,27 +32,43 @@ class FollowTiming:
     strokes: int
 
 
-def leader_seat(seat: int, boat_seats: int, side: str, stroke_side: str = "stroke") -> int | None:
+def leader_seat(
+    seat: int,
+    boat_seats: int,
+    side: str,
+    stroke_side: str = "stroke",
+    rig: Sequence[str] | None = None,
+) -> int | None:
     """Return the seat a rower follows, or None for the stroke seat and a single sculler.
 
-    A sweep rower follows the rower nearest the stern on their own side. That is the stroke seat
-    for the side the stroke seat rows on, and the seat behind it for the other side, whose own
-    leader follows stroke. Most boats have the stroke seat on stroke side, but not all, so
-    `stroke_side` says which side the stroke seat rows on.
+    A sweep rower follows the rower nearest the stern on their own side, and the rower who leads
+    the side away from the stroke seat follows stroke. With no `rig`, sides are taken to alternate,
+    so that leader is the seat behind stroke. Most boats have the stroke seat on stroke side, but
+    not all, so `stroke_side` says which side the stroke seat rows on. A `rig` gives each seat's
+    side, bow seat first, for boats rigged otherwise, such as a bucket rig.
     """
     if seat >= boat_seats:
         return None
+    if rig is not None and len(rig) == boat_seats and side != "scull":
+        own = rig[seat - 1]
+        sternmost = max(other for other in range(1, boat_seats + 1) if rig[other - 1] == own)
+        return boat_seats if sternmost == seat else sternmost
     if side not in ("scull", stroke_side) and seat < boat_seats - 1:
         return boat_seats - 1
     return boat_seats
 
 
-def seat_side(seat: int | None, own_seat: int | None, own_side: str) -> str:
-    """Return the side a seat rows on, worked out from the athlete's own seat and side.
+def seat_side(
+    seat: int | None, own_seat: int | None, own_side: str, rig: Sequence[str] | None = None
+) -> str:
+    """Return the side a seat rows on.
 
-    Sides alternate along a sweep boat, so seats an even number apart row on the same side. With
-    no seat to count from, the athlete's own side is used.
+    A `rig` gives each seat's side, bow seat first. Without one, sides are taken to alternate along
+    a sweep boat, so seats an even number apart row on the same side, counted from the athlete's
+    own seat and side. With no seat to count from, the athlete's own side is used.
     """
+    if own_side != "scull" and rig is not None and seat is not None and 1 <= seat <= len(rig):
+        return rig[seat - 1]
     if own_side == "scull" or seat is None or own_seat is None or (seat - own_seat) % 2 == 0:
         return own_side
     return "bow" if own_side == "stroke" else "stroke"
