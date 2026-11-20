@@ -47,3 +47,11 @@ The site is live at https://rowvision.app on Cloudflare's free plan.
 - **Pages:** `wrangler.jsonc` here. `npm run build`, delete `dist/media/`, then `npx wrangler deploy`.
 - **Clips:** in the R2 bucket `rowvision-downloads` under `media/`, served at `downloads.rowvision.app`. `src/film.js` reads them from `VITE_MEDIA_BASE` (in `.env`, which git ignores). Each clip is fetched whole and played from memory so scrolling never waits on a seek. A clip must keep its start and length, or its pose file goes out of step.
 - **Linux installer:** `RowVision-<version>.AppImage` in the same bucket; the download button reads `VITE_LINUX_URL`. It is over the 300 MB limit of the dashboard and `wrangler r2 object put`, so it goes up through R2's S3 API with a short-lived R2 token.
+- **Download counts:** the buttons link to `/get/deb` and `/get/appimage`. `worker/index.js` adds a row (time, file, country; no IP) to the D1 database `rowvision-downloads`, then redirects to the installer. Link previews and HEAD requests are not counted. The addresses go into `dist/downloads.json` from `VITE_DEB_URL` and `VITE_LINUX_URL` at build time. A new database needs `npx wrangler d1 execute rowvision-downloads --remote --file worker/schema.sql` once. To see the counts, open Cloudflare dashboard → Storage & Databases → D1 → rowvision-downloads → Console, or run:
+
+  ```sh
+  npx wrangler d1 execute rowvision-downloads --remote --command \
+    "SELECT substr(at,1,10) AS day, file, count(*) AS n FROM downloads GROUP BY day, file ORDER BY day DESC"
+  ```
+
+  These are clicks on a download button, not people: one person can download twice.
