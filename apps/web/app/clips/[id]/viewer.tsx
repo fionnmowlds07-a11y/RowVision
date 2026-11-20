@@ -23,10 +23,11 @@ type Props = {
   scene: Scene | null;
   jump: Jump | null;
   fullScreen: boolean;
+  onOpen: () => void;
   onClose: () => void;
 };
 
-export function Viewer({ link, fps, frames, rower, scene, jump, fullScreen, onClose }: Props) {
+export function Viewer({ link, fps, frames, rower, scene, jump, fullScreen, onOpen, onClose }: Props) {
   const video = useRef<HTMLVideoElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const stage = useRef<HTMLDivElement>(null);
@@ -249,6 +250,19 @@ export function Viewer({ link, fps, frames, rower, scene, jump, fullScreen, onCl
           />
         </div>
         <canvas ref={canvas} className={styles.overlay} aria-hidden="true" />
+        <button
+          type="button"
+          className={styles.fullButton}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={fullScreen ? onClose : onOpen}
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            {fullScreen
+              ? <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />
+              : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
+          </svg>
+          {fullScreen ? "Exit full screen" : "Full screen"}
+        </button>
       </div>
 
       <div className={styles.lane} aria-hidden="true">

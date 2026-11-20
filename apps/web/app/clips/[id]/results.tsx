@@ -111,9 +111,27 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
   // On Poor, the rating's warnings are already the filming advice.
   const notes = advice.kind === "filming" ? summary.warnings : [...summary.warnings, ...rating.warnings];
 
+  // The big view fills the window, and the window fills the screen while it is open.
+  function openFull() {
+    setFullScreen(true);
+    document.documentElement.requestFullscreen?.().catch(() => {});
+  }
+
+  // Esc leaves the screen-wide view; the big view goes with it.
+  useEffect(() => {
+    const left = () => { if (!document.fullscreenElement) setFullScreen(false); };
+    document.addEventListener("fullscreenchange", left);
+    return () => document.removeEventListener("fullscreenchange", left);
+  }, []);
+
+  function closeFull() {
+    setFullScreen(false);
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }
+
   function show(frame: number) {
     setJump((old) => ({ frame, nonce: (old?.nonce ?? 0) + 1 }));
-    setFullScreen(true);
+    openFull();
   }
 
   function openMeasure(metric: Metric) {
@@ -187,8 +205,8 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
 
       <div className={`${styles.body} ${view === "stats" || !videoLink ? styles.statsOnly : ""}`}>
         {videoLink ? (
-          <div className={styles.videoColumn}>
-            <button type="button" className={`button primary ${styles.openVideo}`} onClick={() => setFullScreen(true)}>Open video</button>
+          <div className={`${styles.videoColumn} ${fullScreen ? styles.lifted : ""}`}>
+            <button type="button" className={`button primary ${styles.openVideo}`} onClick={openFull}>Open video</button>
             <div className={fullScreen ? undefined : view === "stats" ? styles.videoAway : styles.videoHolder}>
               <Viewer
                 link={videoLink}
@@ -198,7 +216,8 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
                 scene={scene}
                 jump={jump}
                 fullScreen={fullScreen}
-                onClose={() => setFullScreen(false)}
+                onOpen={openFull}
+                onClose={closeFull}
               />
             </div>
           </div>
