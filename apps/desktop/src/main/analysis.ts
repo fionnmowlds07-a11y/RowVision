@@ -6,7 +6,7 @@ import { SECTION_SECONDS } from "../../../web/lib/clip-checks";
 import { BOAT_SEATS } from "../../../web/lib/setup";
 import type { Analysis, Running } from "../shared/bridge";
 import { STAGES, canonical } from "../shared/stages";
-import { PAUSE_FILE, listClips, markClip, readJson, writeJson } from "./library";
+import { PAUSE_FILE, STATE_FILE, listClips, markClip, readJson, writeJson } from "./library";
 
 /** A first guess before this computer has finished a clip: about 10 minutes for 30 seconds. */
 export const FIRST_SPEED = 20;
@@ -15,6 +15,8 @@ const STOP_GRACE_MS = 15_000;
 export const CREW_SEAT_SHARE = 0.6;
 export const UNEXPECTED = "Analysis stopped unexpectedly. Start again to try once more.";
 export const MOVED = "The video can't be found. Has it been moved or deleted?";
+/** One rower's results, kept while the whole crew is measured, and put back if that does not finish. */
+export const BEFORE_CREW = "summary-one-rower.json";
 
 /** How far through the whole run the engine is, never going backwards. */
 export function overallProgress(stage: string, progress: number | null, before: number): number {
@@ -150,6 +152,7 @@ export class Analyser {
     const source = typeof clip.source === "string" ? clip.source : null;
     if (!hasCopy && (!source || !(await fs.stat(source).then((stat) => stat.isFile(), () => false)))) {
       await markClip(library, id, "failed", MOVED);
+      await this.putBackOneRower(folder);
       return this.pickNext();
     }
     const jobFile = path.join(folder, "job.json");
@@ -171,6 +174,7 @@ export class Analyser {
       current.ended = true;
       if (current.timer) clearTimeout(current.timer);
       if (mark && !current.forgotten) await markClip(library, id, mark, message);
+      if (mark && !current.forgotten) await this.putBackOneRower(folder);
     };
 
     createInterface({ input: child.stdout! }).on("line", (line) => {
@@ -187,6 +191,7 @@ export class Analyser {
         this.changed();
       } else if (event.event === "done") {
         void finish(null).then(async () => {
+          await fs.rm(path.join(folder, BEFORE_CREW), { force: true });
           const taken = (Date.now() - Date.parse(current.startedAt)) / 1000;
           this.speed = taken / Math.max(current.seconds, 1);
           await this.options.saveSpeed(this.speed);
@@ -244,6 +249,33 @@ export class Analyser {
   async restart(id: string): Promise<void> {
     await markClip(this.options.library(), id, null);
     await this.next();
+  }
+
+  /** Measure every seat of a clip that was measured for one rower. Its results stay until the crew's arrive. */
+  async measureCrew(id: string): Promise<string | null> {
+    const folder = path.join(this.options.library(), id);
+    const clip = ((await readJson(path.join(folder, "clip.json"))) ?? {}) as Clip;
+    const seats = typeof clip.boat_class === "string" ? BOAT_SEATS[clip.boat_class] ?? 1 : 1;
+    if (seats < 2) return "This boat has one rower, who is already measured.";
+    if (clip.scope === "crew") return "The whole crew is already measured.";
+    if (this.current?.id === id) return "This clip is being analysed. Try again when it has finished.";
+    const summary = path.join(folder, "summary.json");
+    if (!(await fs.stat(summary).then(() => true, () => false))) return "Measure this clip first.";
+    await fs.rename(summary, path.join(folder, BEFORE_CREW));
+    await writeJson(path.join(folder, "clip.json"), { ...clip, scope: "crew" });
+    await markClip(this.options.library(), id, null);
+    await this.next();
+    return null;
+  }
+
+  /** A crew run that stopped or failed gives back the one rower's results it started from. */
+  private async putBackOneRower(folder: string): Promise<void> {
+    const kept = path.join(folder, BEFORE_CREW);
+    if (!(await fs.stat(kept).then(() => true, () => false))) return;
+    await fs.rename(kept, path.join(folder, "summary.json"));
+    const clip = ((await readJson(path.join(folder, "clip.json"))) ?? {}) as Clip;
+    await writeJson(path.join(folder, "clip.json"), { ...clip, scope: "seat" });
+    await fs.rm(path.join(folder, STATE_FILE), { force: true });
   }
 
   /** Say which rower is you, as seconds into the working copy and a share of the frame. */

@@ -129,6 +129,8 @@ export type Bridge = {
   stopClip(id: string): Promise<void>;
   /** Puts a stopped or failed clip back in the queue. */
   startClip(id: string): Promise<void>;
+  /** Measures every seat of a clip that was measured for one rower. Returns why not, or null once it is queued. */
+  measureCrew(id: string): Promise<string | null>;
   /** Says which rower is you, then carries on. */
   tapAgain(id: string, tap: { t: number; x: number; y: number }): Promise<void>;
   getSpace(): Promise<Space>;
@@ -168,6 +170,7 @@ export const CHANNELS = {
   analysisChanged: "analysis:changed",
   stopClip: "analysis:stop",
   startClip: "analysis:start",
+  measureCrew: "analysis:crew",
   tapAgain: "analysis:tap",
   getSpace: "space:get",
   deleteClip: "clips:delete",

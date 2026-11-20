@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { Analyser, CREW_SEAT_SHARE, FIRST_SPEED, MOVED, UNEXPECTED, clipWork, jobFor, overallProgress, secondsLeft } from "../../src/main/analysis";
+import { Analyser, BEFORE_CREW, CREW_SEAT_SHARE, FIRST_SPEED, MOVED, UNEXPECTED, clipWork, jobFor, overallProgress, secondsLeft } from "../../src/main/analysis";
 import { readClip } from "../../src/main/library";
 import type { Analysis } from "../../src/shared/bridge";
 
@@ -163,6 +163,43 @@ test("a clip that needs a tap waits for one, then carries on", async () => {
   await runner.tap("one", { t: 1, x: 0.4, y: 0.5 });
   await settled("one", "done");
   expect(JSON.parse(readFileSync(path.join(library, "one", "clip.json"), "utf8")).tap).toEqual({ t: 1, x: 0.4, y: 0.5 });
+});
+
+test("a clip measured for one rower can be measured again for the whole crew", async () => {
+  addClip("one", "2026-11-08T10:00:00Z");
+  const runner = make();
+  await runner.start();
+  await settled("one", "done");
+  expect(await runner.measureCrew("one")).toBeNull();
+  await vi.waitFor(() => expect(runner.snapshot().running).toBeNull());
+  await settled("one", "done");
+  expect(JSON.parse(readFileSync(path.join(library, "one", "job.json"), "utf8")).scope).toBe("crew");
+  expect(existsSync(path.join(library, "one", BEFORE_CREW))).toBe(false);
+  expect(await runner.measureCrew("one")).toBe("The whole crew is already measured.");
+});
+
+test("a crew run that is stopped gives back the one rower's results", async () => {
+  addClip("one", "2026-11-08T10:00:00Z");
+  const runner = make();
+  await runner.start();
+  await settled("one", "done");
+  const before = readFileSync(path.join(library, "one", "summary.json"), "utf8");
+  writeFileSync(control, "hang");
+  await runner.measureCrew("one");
+  await vi.waitFor(() => expect(runner.snapshot().running?.id).toBe("one"));
+  expect(await state("one")).toBe("waiting");
+  await runner.stop("one");
+  await settled("one", "done");
+  expect(readFileSync(path.join(library, "one", "summary.json"), "utf8")).toBe(before);
+  expect(JSON.parse(readFileSync(path.join(library, "one", "clip.json"), "utf8")).scope).toBe("seat");
+});
+
+test("a single, or a clip not measured yet, is not measured as a crew", async () => {
+  addClip("single", "2026-11-08T10:00:00Z", { boat_class: "1x", seat: 1 });
+  addClip("fresh", "2026-11-08T11:00:00Z");
+  const runner = make();
+  expect(await runner.measureCrew("single")).toBe("This boat has one rower, who is already measured.");
+  expect(await runner.measureCrew("fresh")).toBe("Measure this clip first.");
 });
 
 test("a moved video fails with a plain message", async () => {

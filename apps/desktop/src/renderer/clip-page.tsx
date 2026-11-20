@@ -4,6 +4,7 @@ import { SendClip } from "./send-dialog";
 import { libraryChanged } from "./use-library";
 import { Crew } from "@/app/clips/[id]/crew";
 import { Results } from "@/app/clips/[id]/results";
+import { BOAT_SEATS } from "@/lib/setup";
 import { clipUrl, type ClipDetail } from "../shared/bridge";
 import { longDate, setupLine, size } from "./format";
 
@@ -55,6 +56,9 @@ export function ClipPage({ id }: { id: string }) {
         </section>
       ) : (
         <>
+        {!(crew && crew.length > 1) && (BOAT_SEATS[clip.setup.boat_class ?? ""] ?? 1) > 1 && clip.hasVideo ? (
+          <MeasureCrew id={clip.id} seats={BOAT_SEATS[clip.setup.boat_class ?? ""]} />
+        ) : null}
         {crew && crew.length > 1 ? <Crew crew={crew} summary={summary.crew_summary} ownSeat={own} chosen={chosen} onChoose={setSeat} /> : null}
         {crew && crew.length > 1 ? <h2 style={{ fontSize: 24 }}>{chosen === own ? "Your results" : `Seat ${chosen ?? "unknown"}`}</h2> : null}
         <Results
@@ -73,6 +77,38 @@ export function ClipPage({ id }: { id: string }) {
       {summary?.rower ? <CompareWith id={clip.id} /> : null}
       <Manage clip={clip} onChange={() => { setCount((value) => value + 1); libraryChanged(); }} />
     </>
+  );
+}
+
+/** A crew clip measured for one rower: one button measures every seat. */
+function MeasureCrew({ id, seats }: { id: string; seats: number }) {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  async function go() {
+    setBusy(true);
+    setProblem(null);
+    const why = await window.rowvision.measureCrew(id);
+    if (why) {
+      setProblem(why);
+      setBusy(false);
+      return;
+    }
+    libraryChanged();
+    window.location.hash = `#/analysis/${id}`;
+  }
+
+  return (
+    <section className="card stack" aria-labelledby="crew-title">
+      <h2 id="crew-title" style={{ fontSize: 19 }}>Measure the whole crew</h2>
+      <p className="soft">
+        Only you were measured. Measure all {seats} rowers to see each seat's angles and timing. It takes about {seats} times as long. If you stop it, your results now come back.
+      </p>
+      {problem ? <p className="error" role="alert">{problem}</p> : null}
+      <div>
+        <button type="button" className="button primary" disabled={busy} onClick={() => void go()}>{busy ? "Starting" : `Measure all ${seats} rowers`}</button>
+      </div>
+    </section>
   );
 }
 
