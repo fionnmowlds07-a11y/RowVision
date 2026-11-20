@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, Notification, powerMonitor, session, shell, type IpcMainInvokeEvent } from "electron";
 import { APP_ORIGIN, CHANNELS, CLIP_ID, type Analysis, type ClipItem, type ModelsState, type Welcome } from "../shared/bridge";
@@ -7,6 +8,7 @@ import { Analyser } from "./analysis";
 import { Models } from "./models";
 import { engineVersion, measureAgain } from "./remeasure";
 import { deleteClip, librarySpace, listClips, readClip, removeVideo } from "./library";
+import { MOST_BYTES, pdfName, printReport } from "./pdf";
 import { registerSchemes, serve } from "./protocol";
 import { cleanConsent, sendClip } from "./send";
 import { cleanTargets } from "../../../web/lib/targets";
@@ -219,6 +221,25 @@ void app.whenReady().then(async () => {
   handle(CHANNELS.stopClip, (id) => analyser.stop(clipId(id)));
   handle(CHANNELS.startClip, (id) => analyser.restart(clipId(id)));
   handle(CHANNELS.measureCrew, (id) => analyser.measureCrew(clipId(id)));
+  // Where the last report was saved, so the page can show it without naming any path itself.
+  let lastReport: string | null = null;
+  handle(CHANNELS.exportPdf, async (html, name) => {
+    if (typeof html !== "string" || html.length > MOST_BYTES) throw new Error("Not a report");
+    // Tests name the file, rather than opening a dialog.
+    let target = process.env.ROWVISION_TEST_SAVE_PDF ?? null;
+    if (!target) {
+      const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+      const options: Electron.SaveDialogOptions = { title: "Save the report", defaultPath: path.join(app.getPath("documents"), pdfName(name)), filters: [{ name: "PDF", extensions: ["pdf"] }] };
+      const result = window ? await dialog.showSaveDialog(window, options) : await dialog.showSaveDialog(options);
+      target = result.canceled ? null : (result.filePath ?? null);
+    }
+    if (!target) return null;
+    if (!target.toLowerCase().endsWith(".pdf")) target += ".pdf";
+    await writeFile(target, await printReport(html));
+    lastReport = target;
+    return target;
+  });
+  handle(CHANNELS.showReport, async () => { if (lastReport) shell.showItemInFolder(lastReport); });
   handle(CHANNELS.tapAgain, (id, tap) => {
     const point = cleanTap(tap);
     if (!point) throw new Error("Not a tap");
