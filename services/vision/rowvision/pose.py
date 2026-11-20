@@ -20,7 +20,9 @@ class PoseBackend(Protocol):
 class RtmBackend:
     """YOLOX detection and RTMPose estimation through ONNX Runtime."""
 
-    def __init__(self, mode: str = "balanced", device: str = "cpu", threads: int | None = None) -> None:
+    def __init__(
+        self, mode: str = "balanced", device: str = "cpu", threads: int | None = None
+    ) -> None:
         """`threads` caps how many processor cores the models use. None lets them use them all."""
         from rtmlib import Body  # type: ignore[import-untyped]
 

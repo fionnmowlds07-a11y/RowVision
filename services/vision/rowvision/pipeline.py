@@ -21,6 +21,7 @@ from rowvision.boats import (
     overlap_frames,
     preview_frame,
 )
+from rowvision.cox import beyond_neighbour, facing_backwards, seat_spacing
 from rowvision.metrics import (
     MEASURES,
     AngleSeries,
@@ -474,6 +475,34 @@ def _with_lean_warning(rating: Rating, readable: bool) -> Rating:
     return rating if readable else replace(rating, warnings=[*rating.warnings, LEAN_UNREADABLE])
 
 
+def _leave_out_cox(
+    fine: dict[int | None, tuple[FloatArray, FloatArray]],
+    seats: dict[int, Track],
+    facing: int,
+    nearest: NDArray[np.intp],
+    flipped: NDArray[np.bool_],
+) -> None:
+    """Take out the frames where the bow or stroke seat's tracking slipped onto a cox beyond them.
+
+    A stern cox faces the crew, the other way from every rower. A cox lying in the bow faces the
+    same way, but sits further beyond the bow seat than any two rowers sit apart.
+    """
+    order = sorted(seats)
+    if len(order) < 2 or not len(nearest):
+        return
+    centres = [seats[seat].centre()[nearest] for seat in order]
+    spacing = seat_spacing(centres, float(np.median([seats[seat].trunk() for seat in order])))
+    for end, beside in ((order[0], order[1]), (order[-1], order[-2])):
+        if end not in fine:
+            continue
+        points, scores = fine[end]
+        neighbour = seats[beside].centre()[nearest]
+        wrong = facing_backwards(as_one_side(points, flipped), facing)
+        wrong |= beyond_neighbour(points, neighbour, spacing)
+        points[wrong] = np.nan
+        scores[wrong] = 0
+
+
 def scout(read: FrameReader, frames: int, fps: float, backend: PoseBackend) -> Scouting:
     """Find every person and boat in the clip from sampled frames."""
     coarse_fps = fps / COARSE_STEP
@@ -714,6 +743,7 @@ def analyse(
         points[dropped] = np.nan
         scores[dropped] = 0
         fine[seat] = points, scores
+    _leave_out_cox(fine, assignment.seats, assignment.facing, nearest, flipped)
     one_side = {seat: as_one_side(points, flipped) for seat, (points, _) in fine.items()}
 
     targets_file, calibration = load_targets(), load_calibration()
