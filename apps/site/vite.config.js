@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 
 const PAGES = ['index', 'how', 'measures', 'accuracy', 'filming', 'boats', 'privacy', 'roadmap', 'faq', 'about', 'download'];
 const part = name => readFileSync(resolve(import.meta.dirname, 'partials', `${name}.html`), 'utf8');
@@ -19,8 +19,20 @@ const chrome = {
   },
 };
 
+// The download buttons go to /get/<file>, where worker/index.js counts the click and sends the browser on.
+// It finds the installer addresses in downloads.json, written here from .env so they are set in one place.
+const downloads = {
+  name: 'download-addresses',
+  generateBundle() {
+    const env = loadEnv('production', import.meta.dirname, 'VITE_');
+    const files = { deb: env.VITE_DEB_URL, appimage: env.VITE_LINUX_URL };
+    for (const [file, url] of Object.entries(files)) if (!url) this.error(`No address for the ${file} download in .env`);
+    this.emitFile({ type: 'asset', fileName: 'downloads.json', source: JSON.stringify(files) });
+  },
+};
+
 export default defineConfig({
-  plugins: [chrome],
+  plugins: [chrome, downloads],
   // es2022: the film waits for its pose data at the top of the module
   build: { target: 'es2022', rollupOptions: { input: Object.fromEntries(PAGES.map(n => [n, resolve(import.meta.dirname, `${n}.html`)])) } },
 });
