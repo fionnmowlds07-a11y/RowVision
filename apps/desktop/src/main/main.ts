@@ -218,6 +218,7 @@ void app.whenReady().then(async () => {
   handle(CHANNELS.removeVideo, (id) => removeVideo(library(), clipId(id)));
   handle(CHANNELS.stopClip, (id) => analyser.stop(clipId(id)));
   handle(CHANNELS.startClip, (id) => analyser.restart(clipId(id)));
+  handle(CHANNELS.measureCrew, (id) => analyser.measureCrew(clipId(id)));
   handle(CHANNELS.tapAgain, (id, tap) => {
     const point = cleanTap(tap);
     if (!point) throw new Error("Not a tap");

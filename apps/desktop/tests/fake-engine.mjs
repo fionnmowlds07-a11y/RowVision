@@ -1,6 +1,6 @@
 // Stands in for the real engine in tests: same job file, same progress lines, no models.
 // What it does comes from the file named by FAKE_ENGINE_CONTROL, read again as it goes:
-// "done" finishes, "hang" waits, "tap" asks which rower is you, "fail" fails.
+// "done" finishes, "one" finishes with one rower measured, "hang" waits, "tap" asks which rower is you, "fail" fails.
 import { copyFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -135,7 +135,7 @@ const crew = crewJob ? [
 ] : null;
 const summary = {
   version: VERSION, fps: 30, frames: 180, view_deg: 0, film_closer: null, warnings: [], shots: [], facing: 1,
-  rower: crew ? crew[1] : null,
+  rower: crew ? crew[1] : mode() === "one" ? seatResult(2, 29, null) : null,
   ...(crew ? { crew, crew_summary: { seats: [], catch_lean_range_deg: 5, finish_lean_range_deg: 1 } } : {}),
 };
 writeFileSync(path.join(folder, "frames.json"), JSON.stringify({ views: null, poses: [], angles: {} }));
