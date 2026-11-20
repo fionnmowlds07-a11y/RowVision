@@ -1,0 +1,66 @@
+.rig {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* The boat seen from above, bow on the left: a row of seats, each with its oar drawn on the side it rows. */
+.boat {
+  display: grid;
+  align-items: center;
+  gap: 2px 6px;
+  font-size: 13px;
+}
+
+.sideName,
+.end {
+  color: var(--ink-soft);
+  white-space: nowrap;
+  padding-right: 4px;
+}
+
+.end:last-of-type {
+  padding: 0 0 0 4px;
+}
+
+.oar {
+  height: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.oar i {
+  width: 4px;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--highlight);
+}
+
+.seat {
+  appearance: none;
+  border: 2px solid transparent;
+  min-height: 40px;
+  border-radius: var(--radius-field);
+  background: var(--quiet);
+  color: var(--ink);
+  font: 700 15px var(--font-text);
+  cursor: pointer;
+}
+
+.seat[data-side="bow"] {
+  border-top-color: var(--highlight);
+}
+
+.seat[data-side="stroke"] {
+  border-bottom-color: var(--highlight);
+}
+
+.seat:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--highlight) 22%, var(--quiet));
+}
+
+.seat:focus-visible {
+  outline: 2px solid var(--highlight);
+  outline-offset: 2px;
+}

@@ -33,6 +33,8 @@ export type AddRequest = {
   scope: Scope;
   /** A whole crew added without saying who is the athlete, as a coach would. No seat is "you". */
   coach?: boolean;
+  /** Each seat's side, bow seat first, for a sweep boat that may not be rigged with sides alternating. */
+  rig?: ("stroke" | "bow")[];
 };
 
 export type Scope = "seat" | "crew";

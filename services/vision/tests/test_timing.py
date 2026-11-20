@@ -136,3 +136,41 @@ def test_strokes_filmed_end_on_are_not_timed_against_the_leader() -> None:
     assert whole is not None and whole.strokes > 6
     assert timing is not None and timing.catch_ms == 0
     assert timing.strokes < whole.strokes
+
+
+# Each eight's sides, bow seat first. Stroke seat is on stroke side in all of them.
+NORMAL_EIGHT = ("bow", "stroke", "bow", "stroke", "bow", "stroke", "bow", "stroke")
+GERMAN_EIGHT = ("stroke", "bow", "stroke", "bow", "bow", "stroke", "bow", "stroke")
+ITALIAN_EIGHT = ("stroke", "bow", "bow", "stroke", "stroke", "bow", "bow", "stroke")
+
+
+def test_a_normal_rig_gives_the_same_leaders_as_alternating_sides() -> None:
+    for seat in range(1, 9):
+        side = NORMAL_EIGHT[seat - 1]
+        assert leader_seat(seat, 8, side, rig=NORMAL_EIGHT) == leader_seat(seat, 8, side)
+
+
+@pytest.mark.parametrize(
+    ("rig", "leaders"),
+    [
+        # German: 4 and 5 share bow side, so 7 still leads bow side and everyone follows along it.
+        (GERMAN_EIGHT, {1: 8, 2: 7, 3: 8, 4: 7, 5: 7, 6: 8, 7: 8, 8: None}),
+        # Italian: 6 and 7 are both bow side, so 7 leads it and follows stroke.
+        (ITALIAN_EIGHT, {1: 8, 2: 7, 3: 7, 4: 8, 5: 8, 6: 7, 7: 8, 8: None}),
+    ],
+)
+def test_a_bucket_rig_follows_the_sternmost_rower_on_each_side(
+    rig: tuple[str, ...], leaders: dict[int, int | None]
+) -> None:
+    assert {seat: leader_seat(seat, 8, rig[seat - 1], rig=rig) for seat in range(1, 9)} == leaders
+
+
+def test_a_four_bucket_rig_with_two_and_three_together() -> None:
+    rig = ("stroke", "bow", "bow", "stroke")
+    assert [leader_seat(seat, 4, rig[seat - 1], rig=rig) for seat in range(1, 5)] == [4, 3, 4, None]
+
+
+def test_a_rig_says_each_seats_side_whatever_the_athlete_said() -> None:
+    assert [seat_side(seat, 2, "stroke", GERMAN_EIGHT) for seat in (4, 5, 8)] == ["bow", "bow", "stroke"]
+    assert seat_side(None, 2, "stroke", GERMAN_EIGHT) == "stroke"
+    assert seat_side(3, 2, "scull", GERMAN_EIGHT) == "scull"

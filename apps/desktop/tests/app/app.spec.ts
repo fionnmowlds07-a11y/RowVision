@@ -625,10 +625,15 @@ test("a whole crew is added with just the boat, then shown seat by seat", async 
   // No tap, side or seat: the boat and its rig are enough.
   const boatCard = page.getByRole("region", { name: "Your boat" });
   await expect(page.getByText("Drag to a clear frame, then tap yourself")).toHaveCount(0);
-  await expect(boatCard.locator("select")).toHaveCount(1);
-  await expect(boatCard).toContainText("Normal: stroke seat on stroke side");
-  await boatCard.getByRole("button", { name: "Rigged differently?" }).click();
-  await expect(boatCard.getByRole("combobox", { name: "Stroke seat rows on" })).toHaveValue("stroke");
+  const rig = boatCard.getByRole("combobox", { name: "Rig" });
+  await expect(rig).toHaveValue("normal");
+  await expect(boatCard.locator("select")).toHaveCount(2);
+  // Both rowers on one side is not a pair, so the clip can't be added until a side has someone again.
+  await boatCard.getByRole("button", { name: "Seat 2, stroke side. Move to bow side" }).click();
+  await expect(page.getByRole("alert")).toContainText("Both sides need at least one rower");
+  await expect(page.getByRole("button", { name: "Add to your clips" })).toBeDisabled();
+  await boatCard.getByRole("button", { name: "Seat 2, bow side. Move to stroke side" }).click();
+  await expect(rig).toHaveValue("normal");
   await page.getByRole("button", { name: "Add to your clips" }).click();
   await expect(page).toHaveURL(/#\/analysis\/[a-z0-9-]+$/);
   const id = /#\/analysis\/([a-z0-9-]+)$/.exec(page.url())![1];
@@ -681,6 +686,39 @@ test("a clip measured for one rower can then be measured for the whole crew", as
   await expect(page.getByRole("region", { name: "Your crew" }).getByRole("button", { name: /^Seat \d/ })).toHaveCount(2);
   await expect(page.getByRole("button", { name: /^Measure all/ })).toHaveCount(0);
   expect(existsSync(path.join(data, "clips", id, "summary-one-rower.json"))).toBe(false);
+  await page.evaluate(() => { window.location.hash = "#/"; });
+});
+
+test("a four or eight is added with its rig, and each seat's side comes from it", async () => {
+  writeFileSync(control, "done");
+  await openAdd();
+  await page.locator("input[type=file]").setInputFiles(path.join(sources, "row.mp4"));
+  const boatCard = page.getByRole("region", { name: "Your boat" });
+  await boatCard.locator("select").first().selectOption("8+");
+  // Just me: the rig takes the place of the side, as the seat and the rig say which side you row.
+  await expect(boatCard.getByRole("combobox", { name: "Side" })).toHaveCount(0);
+  await boatCard.getByRole("combobox", { name: "Rig" }).selectOption("german");
+  await expect(boatCard.getByRole("button", { name: /^Seat 4, bow side/ })).toBeVisible();
+  await expect(boatCard.getByRole("button", { name: /^Seat 5, bow side/ })).toBeVisible();
+  await boatCard.getByRole("combobox", { name: "Your seat" }).selectOption("5");
+  // Moving one seat makes it a custom rig.
+  await boatCard.getByRole("button", { name: "Seat 1, stroke side. Move to bow side" }).click();
+  await expect(boatCard.getByRole("combobox", { name: "Rig" })).toHaveValue("custom");
+  await boatCard.getByRole("button", { name: "Seat 1, bow side. Move to stroke side" }).click();
+  await expect(boatCard.getByRole("combobox", { name: "Rig" })).toHaveValue("german");
+  await page.locator("[aria-label='Tap yourself on this frame']").click();
+  await page.getByRole("button", { name: "Add to your clips" }).click();
+  await expect(page).toHaveURL(/#\/analysis\/[a-z0-9-]+$/);
+  const id = /#\/analysis\/([a-z0-9-]+)$/.exec(page.url())![1];
+  const german = ["stroke", "bow", "stroke", "bow", "bow", "stroke", "bow", "stroke"];
+  expect(readJson(path.join(data, "clips", id, "clip.json"))).toMatchObject({ boat_class: "8+", seat: 5, side: "bow", rig: german });
+  expect(readJson(path.join(data, "clips", id, "job.json")).rig).toEqual(german);
+  await expect(page.getByRole("heading", { name: "Analysed" })).toBeVisible();
+  // The rig is offered again next time for an eight.
+  await openAdd();
+  await page.locator("input[type=file]").setInputFiles(path.join(sources, "row.mp4"));
+  await page.getByRole("region", { name: "Your boat" }).locator("select").first().selectOption("8+");
+  await expect(page.getByRole("region", { name: "Your boat" }).getByRole("combobox", { name: "Rig" })).toHaveValue("german");
   await page.evaluate(() => { window.location.hash = "#/"; });
 });
 

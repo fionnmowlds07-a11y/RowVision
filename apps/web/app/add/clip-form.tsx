@@ -88,9 +88,11 @@ type FormProps = {
   who?: ReactNode;
   /** In place of side, seat and the tap, when no one rower is followed, such as a whole crew filmed by a coach. */
   crew?: ReactNode;
+  /** In place of the side, when the side comes from something else, such as the boat's rig. */
+  side?: ReactNode;
 };
 
-export function ClipForm({ file, choice, onChange, onRefuse, cannotShowNote, children, who, crew }: FormProps) {
+export function ClipForm({ file, choice, onChange, onRefuse, cannotShowNote, children, who, crew, side }: FormProps) {
   const video = useRef<HTMLVideoElement>(null);
   const objectUrl = useMemo(() => URL.createObjectURL(file), [file]);
   const [frameTime, setFrameTime] = useState(0);
@@ -207,12 +209,14 @@ export function ClipForm({ file, choice, onChange, onRefuse, cannotShowNote, chi
         </label>
         {crew ?? (
         <>
+        {side ?? (
         <label className="field">
           Side
           <select value={setup.side} onChange={(e) => onChange({ ...choice, setup: { ...setup, side: e.target.value } })}>
-            {sidesFor(setup.boat).map((side) => <option key={side} value={side}>{SIDE_NAMES[side]}</option>)}
+            {sidesFor(setup.boat).map((option) => <option key={option} value={option}>{SIDE_NAMES[option]}</option>)}
           </select>
         </label>
+        )}
         <label className="field">
           Your seat
           <select value={setup.seat} onChange={(e) => onChange({ ...choice, setup: { ...setup, seat: Number(e.target.value) } })}>

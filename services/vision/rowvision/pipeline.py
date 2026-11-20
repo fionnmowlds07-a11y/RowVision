@@ -111,6 +111,8 @@ class Request:
     """Frame, x and y where the athlete tapped their boat."""
     side: str = "scull"
     """Stroke, bow or scull, which decides who this rower follows."""
+    rig: tuple[str, ...] | None = None
+    """Each seat's side, bow seat first, for a sweep boat. None takes sides to alternate."""
 
 
 @dataclass(frozen=True)
@@ -692,11 +694,13 @@ def analyse(
     in_view = boat.seen()[np.minimum(np.arange(frames) // COARSE_STEP, coarse_frames - 1)]
 
     leaders: dict[int | None, int] = {}
-    stroke_side = seat_side(request.boat_seats, own_seat, request.side)
+    stroke_side = seat_side(request.boat_seats, own_seat, request.side, request.rig)
     for seat, _ in targets:
-        side = seat_side(seat, own_seat, request.side)
+        side = seat_side(seat, own_seat, request.side, request.rig)
         leader = (
-            None if seat is None else leader_seat(seat, request.boat_seats, side, stroke_side)
+            None
+            if seat is None
+            else leader_seat(seat, request.boat_seats, side, stroke_side, request.rig)
         )
         if leader is not None and leader in assignment.seats:
             leaders[seat] = leader
@@ -718,7 +722,7 @@ def analyse(
         points, scores = fine[seat]
         measured = np.isfinite(points[:, sk.LEFT_SHOULDER, 0])
         agreement = agreements.get(id(track))
-        own_side = seat_side(seat, own_seat, request.side)
+        own_side = seat_side(seat, own_seat, request.side, request.rig)
         angle_frames, angle_note = angle_side(flipped, measured, own_side, assignment.facing)
         rower = measure_rower(
             seat,

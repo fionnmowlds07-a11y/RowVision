@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { MIN_SECONDS, SECTION_SECONDS } from "../../../web/lib/clip-checks";
+import { isRig } from "../../../web/lib/rigs";
 import { BOAT_SEATS } from "../../../web/lib/setup";
 import type { AddRequest } from "../shared/bridge";
 import { writeJson } from "./library";
@@ -50,7 +51,10 @@ export function cleanAdd(value: unknown): AddRequest | null {
 
   // A coach's crew follows no one rower, so it has no tap.
   const coach = raw.coach === true && scope === "crew";
-  return { source, filmedAt: new Date(filmedAt).toISOString(), setup, note: note.trim(), section: { start, length: length as number | null }, tap: coach ? null : point, scope, coach };
+  // The rig decides each seat's side, so the side given must be the rig's side for that seat.
+  if (raw.rig !== undefined && (!isRig(setup.boat, raw.rig) || raw.rig[setup.seat - 1] !== setup.side)) return null;
+  const rig = raw.rig as AddRequest["rig"];
+  return { source, filmedAt: new Date(filmedAt).toISOString(), setup, note: note.trim(), section: { start, length: length as number | null }, tap: coach ? null : point, scope, coach, ...(rig ? { rig: [...rig] } : {}) };
 }
 
 /** Make the clip's folder. The video itself is left where it is. */
@@ -74,6 +78,7 @@ export async function addClip(library: string, request: AddRequest, now = new Da
     tap: request.tap,
     scope: request.scope,
     ...(request.coach ? { coach: true } : {}),
+    ...(request.rig ? { rig: request.rig } : {}),
   };
   await writeJson(path.join(folder, "clip.json"), clip);
   return id;

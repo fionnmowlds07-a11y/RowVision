@@ -250,3 +250,9 @@ test("a coach's crew tells the engine a click only picks the boat", () => {
   expect(jobFor("f", { scope: "seat", coach: true }, "real").coach).toBeUndefined();
   expect(jobFor("f", { scope: "crew" }, "real").coach).toBeUndefined();
 });
+
+test("the rig goes to the engine when the clip has one", () => {
+  const rig = ["stroke", "bow", "bow", "stroke"];
+  expect(jobFor("f", { boat_class: "4-", rig }, "real").rig).toEqual(rig);
+  expect(jobFor("f", { boat_class: "4-" }, "real").rig).toBeUndefined();
+});

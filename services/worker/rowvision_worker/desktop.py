@@ -24,7 +24,17 @@ from rowvision.remeasure import NoSkeleton, remeasure, with_sides
 from rowvision.version import code_version
 
 from rowvision_worker import media, models
-from rowvision_worker.engine import Cancelled, Done, Engine, NeedsTap, Setup, Tap, Video, make_engine
+from rowvision_worker.engine import (
+    BOAT_SEATS,
+    Cancelled,
+    Done,
+    Engine,
+    NeedsTap,
+    Setup,
+    Tap,
+    Video,
+    make_engine,
+)
 from rowvision_worker.results import headline, split_report
 
 FAILED_MESSAGE = "We couldn't analyse this clip. Try another clip, or send it to us."
@@ -55,6 +65,16 @@ class DesktopJob:
     device: str
 
 
+def parse_rig(value: Any, boat_class: str) -> tuple[str, ...] | None:
+    """Each seat's side, bow seat first, or None unless it is a whole sweep boat's worth."""
+    seats = BOAT_SEATS.get(boat_class)
+    if seats is None or seats < 2 or not isinstance(value, list) or len(value) != seats:
+        return None
+    if not all(side in ("stroke", "bow") for side in value):
+        return None
+    return tuple(value)
+
+
 def parse_job(data: dict[str, Any]) -> DesktopJob:
     tap = data.get("tap")
     source = data.get("source")
@@ -70,6 +90,7 @@ def parse_job(data: dict[str, Any]) -> DesktopJob:
             tap=Tap(float(tap["t"]), float(tap["x"]), float(tap["y"])) if tap else None,
             scope="crew" if data.get("scope") == "crew" else "seat",
             coach=data.get("coach") is True and data.get("scope") == "crew",
+            rig=parse_rig(data.get("rig"), data["boat_class"]),
         ),
         engine=data.get("engine", "real"),
         device=data.get("device", "cpu"),
@@ -157,7 +178,8 @@ def _with_job_sides(folder: Path, summary: dict[str, Any]) -> dict[str, Any]:
     """Fill in each rower's side from the job, for clips analysed before the side was kept."""
     try:
         job = json.loads((folder / "job.json").read_text())
-        filled: dict[str, Any] = with_sides(summary, int(job["seat"]), str(job["side"]))
+        rig = parse_rig(job.get("rig"), str(job.get("boat_class")))
+        filled: dict[str, Any] = with_sides(summary, int(job["seat"]), str(job["side"]), rig)
         return filled
     except (OSError, ValueError, KeyError, TypeError):
         return summary

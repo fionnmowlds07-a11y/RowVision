@@ -128,3 +128,10 @@ def test_a_coach_tap_only_picks_the_boat() -> None:
     assert request.boat_tap == (60, 500.0, 250.0)
     assert request.seat == 8
     assert request.side == "stroke"
+
+
+def test_the_rig_goes_through_to_the_request() -> None:
+    rig = ("stroke", "bow", "stroke", "bow", "bow", "stroke", "bow", "stroke")
+    request = plan_request(FakeScouting([crew()]), Setup("8+", "stroke", 8, None, rig=rig), VIDEO)
+    assert request is not None
+    assert request.rig == rig

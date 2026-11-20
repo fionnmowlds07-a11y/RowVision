@@ -234,3 +234,13 @@ def test_measuring_again_works_without_a_job_file(tmp_path: Path, copies: list[P
     (tmp_path / "job.json").unlink(missing_ok=True)
     assert desktop.measure_again(tmp_path, lambda event: None) == desktop.FINISHED
     assert json.loads((tmp_path / "summary.json").read_text())["rower"].get("side") is None
+
+
+def test_a_rig_is_kept_only_when_it_gives_every_seat_a_side() -> None:
+    eight = {"boat_class": "8+", "side": "stroke", "seat": 8}
+    german = ["stroke", "bow", "stroke", "bow", "bow", "stroke", "bow", "stroke"]
+    assert job_in(Path("clip"), **eight, rig=german).setup.rig == tuple(german)
+    assert job_in(Path("clip"), **eight, rig=german[:7]).setup.rig is None
+    assert job_in(Path("clip"), **eight, rig=["port"] * 8).setup.rig is None
+    assert job_in(Path("clip"), **eight).setup.rig is None
+    assert job_in(Path("clip"), boat_class="1x", side="scull", seat=1, rig=["bow"]).setup.rig is None

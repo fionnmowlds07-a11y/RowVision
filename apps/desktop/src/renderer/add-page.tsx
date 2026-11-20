@@ -1,8 +1,27 @@
 import { useEffect, useState } from "react";
 import { ClipForm, PickCard, freshChoice, useVideoDrop, type Choice } from "@/app/add/clip-form";
-import { BOAT_SEATS, sidesFor } from "@/lib/setup";
+import { fitRig, hasRig, isRig, type Rig } from "@/lib/rigs";
+import { BOAT_SEATS } from "@/lib/setup";
 import type { Scope } from "../shared/bridge";
+import { RigPicker } from "./rig-picker";
 import styles from "@/app/add/add.module.css";
+
+/** A crew usually keeps its rig, so the last one used for each boat is offered again on this computer. */
+const RIG_KEY = "rowvision.rigs";
+function savedRigs(): Record<string, unknown> {
+  try {
+    return JSON.parse(window.localStorage.getItem(RIG_KEY) ?? "{}") as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+function keepRig(boat: string, rig: Rig) {
+  try {
+    window.localStorage.setItem(RIG_KEY, JSON.stringify({ ...savedRigs(), [boat]: rig }));
+  } catch {
+    // Storage is blocked, so the normal rig is offered next time.
+  }
+}
 
 const VIDEO_NAME = /\.(mp4|mov|m4v|avi|mkv|webm|mts|m2ts|3gp)$/i;
 
@@ -16,9 +35,8 @@ export function AddPage() {
   const [file, setFile] = useState<File | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [scope, setScope] = useState<Scope>("seat");
-  // Which side the stroke seat rows on. Most boats are rigged with stroke seat on stroke side.
-  const [rig, setRig] = useState("stroke");
-  const [rigOpen, setRigOpen] = useState(false);
+  // Each boat's rig, bow seat first. Starts on the last one used, or the normal rig.
+  const [rigs, setRigs] = useState<Record<string, unknown>>(savedRigs);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dragging = useVideoDrop(file ? null : take);
@@ -49,17 +67,22 @@ export function AddPage() {
     const { facts, trim, tap, setup, note } = choice;
     // A whole crew follows no one rower: the stroke seat and the rig say which side every seat rows.
     const crew = seats > 1 && scope === "crew";
-    const sweep = sidesFor(setup.boat).includes("stroke");
+    // A pair's rig follows from your side and seat. A four or eight can be rigged any way, so its rig is sent.
+    const rig = hasRig(setup.boat) && (crew || seats > 2) ? fitRig(setup.boat, rigs[setup.boat]) : undefined;
+    const seat = crew ? seats : setup.seat;
+    const side = rig ? rig[seat - 1] : crew ? "scull" : setup.side;
+    if (rig) keepRig(setup.boat, rig);
     try {
       const id = await window.rowvision.addClip({
         source: window.rowvision.pathForFile(file),
         filmedAt: new Date(file.lastModified).toISOString(),
-        setup: crew ? { boat: setup.boat, seat: seats, side: sweep ? rig : "scull" } : setup,
+        setup: { boat: setup.boat, seat, side },
         note,
         section: { start: facts ? trim.start : 0, length: facts ? trim.end - trim.start : null },
         tap: crew ? null : tap,
         scope: crew ? "crew" : "seat",
         coach: crew,
+        ...(rig ? { rig } : {}),
       });
       window.location.hash = `#/analysis/${id}`;
     } catch {
@@ -83,23 +106,13 @@ export function AddPage() {
       </p>
     </fieldset>
   ) : null;
-  const rigField = sidesFor(choice.setup.boat).includes("stroke") ? (
-    rigOpen ? (
-      <label className={`field ${styles.span}`}>
-        Stroke seat rows on
-        <select value={rig} onChange={(event) => setRig(event.target.value)} disabled={saving}>
-          <option value="stroke">Stroke side (normal rig)</option>
-          <option value="bow">Bow side</option>
-        </select>
-      </label>
-    ) : (
-      <div className={`${styles.rig} ${styles.span}`}>
-        Rig
-        <p>Normal: stroke seat on stroke side</p>
-        <button type="button" className={styles.rigLink} onClick={() => setRigOpen(true)}>Rigged differently?</button>
-      </div>
-    )
-  ) : <div className={`${styles.rig} ${styles.span}`}>Rig<p>Sculling, so nothing to set</p></div>;
+  const boat = choice.setup.boat;
+  const rigPicker = hasRig(boat) ? (
+    <RigPicker className={styles.wide} boat={boat} rig={fitRig(boat, rigs[boat])} disabled={saving} onChange={(next) => setRigs((old) => ({ ...old, [boat]: next }))} />
+  ) : null;
+  const usedRig = hasRig(boat) && (crew || seats > 2) ? fitRig(boat, rigs[boat]) : null;
+  const rigProblem = usedRig && !isRig(boat, usedRig) ? "Both sides need at least one rower. Click a seat to move it to the other side." : null;
+  const crewField = rigPicker ?? <div className={`${styles.rig} ${styles.span}`}>Rig<p>Sculling, so nothing to set</p></div>;
 
   return (
     <>
@@ -116,7 +129,8 @@ export function AddPage() {
             ? "This video can't be shown here, but it can still be analysed. Only the first 60 seconds are analysed."
             : "This video can't be shown here, but it can still be analysed. Carry on, and we'll ask you to tap yourself during analysis. Only the first 60 seconds are analysed."}
           who={who}
-          crew={crew ? rigField : undefined}
+          crew={crew ? crewField : undefined}
+          side={!crew && seats > 2 ? rigPicker ?? undefined : undefined}
         >
           <section className={`card stack ${styles.send}`} aria-label="Add the clip">
             <div className={styles.row}>
@@ -124,8 +138,9 @@ export function AddPage() {
               <button type="button" className="button quiet" onClick={reset} disabled={saving}>Change video</button>
             </div>
             <p className="soft">The video stays where it is and is read from there, so keep it until the clip is analysed.</p>
+            {rigProblem ? <p role="alert" className="error">{rigProblem}</p> : null}
             {error ? <p role="alert" className="error">{error}</p> : null}
-            <button type="button" className="button primary" onClick={save} disabled={saving}>
+            <button type="button" className="button primary" onClick={save} disabled={saving || rigProblem !== null}>
               {saving ? "Adding" : "Add to your clips"}
             </button>
           </section>
