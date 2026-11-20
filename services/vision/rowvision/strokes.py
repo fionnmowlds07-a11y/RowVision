@@ -1,6 +1,7 @@
 """Find the rower's facing direction and split a clip into strokes."""
 
 from dataclasses import dataclass
+from itertools import pairwise
 
 import numpy as np
 from numpy.typing import NDArray
@@ -20,6 +21,9 @@ ALIGN_PASSES = 2
 CATCH_RUN_UP_SHARE = 0.35
 MIN_EVENT_SPACING = 0.7
 MIN_REACH_RANGE = 0.3
+FILL_PERIODS = (0.7, 1.4)
+"""Two catches this many stroke periods apart are one stroke, so a finish lies between them."""
+FILL_SEARCH_SHARE = 0.15
 """Smallest hand travel, in trunk lengths, that counts as rowing. Excludes a still cox."""
 
 
@@ -202,7 +206,41 @@ def _detect_run(reach: FloatArray, fps: float) -> StrokeTimeline:
     spacing = int(lag * 0.6)
     catches = _align_to_shape(smoothed, _drop_outliers(_peaks(smoothed, spacing), lag), lag, 1)
     finishes = _align_to_shape(smoothed, _drop_outliers(_peaks(-smoothed, spacing), lag), lag, -1)
+    finishes = _with_missing(smoothed, catches, finishes, lag, -1)
+    catches = _with_missing(smoothed, finishes, catches, lag, 1)
     return StrokeTimeline(catches, finishes, 60 * fps / lag, regularity, float(lag))
+
+
+def _with_missing(
+    signal: FloatArray, around: list[int], events: list[int], lag: int, sign: int
+) -> list[int]:
+    """Add the event that must lie between two marks one stroke apart when none was found there.
+
+    Every stroke has one finish between its catches, and one catch between its finishes. One weak
+    peak used to lose the whole stroke. The missing event goes where the rower's other strokes
+    put theirs, as a share of the way between the marks, then to the nearest turn of the signal.
+    `sign` is 1 to add a maximum and -1 to add a minimum.
+    """
+    shares = [
+        (event - before) / (after - before)
+        for before, after in pairwise(around)
+        for event in events
+        if before < event < after
+    ]
+    if not shares:
+        return events
+    share = float(np.median(shares))
+    added = []
+    for before, after in pairwise(around):
+        one_stroke = FILL_PERIODS[0] * lag <= after - before <= FILL_PERIODS[1] * lag
+        if not one_stroke or any(before < event < after for event in events):
+            continue
+        guess = before + round(share * (after - before))
+        reach = max(round(FILL_SEARCH_SHARE * lag), 1)
+        start, end = max(guess - reach, before + 1), min(guess + reach + 1, after)
+        if end > start:
+            added.append(start + int(np.argmax(sign * signal[start:end])))
+    return sorted([*events, *added])
 
 
 def crew_reach(signals: list[FloatArray]) -> FloatArray:

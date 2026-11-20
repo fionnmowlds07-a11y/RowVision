@@ -208,6 +208,11 @@ function scoredTarget(rower: TargetRower, name: string) {
   return metric && metric.score !== null ? metric.target : null;
 }
 
+/** Which way the rower faces on a frame: the other way in stretches filmed from the far side of the boat. */
+export function facingAt(facing: number, otherSide: number[][], frame: number) {
+  return otherSide.some(([start, end]) => frame >= start && frame < end) ? -facing : facing;
+}
+
 function trunkEdge(hip: Point, shoulder: Point, degrees: number, facing: number, squeeze: number) {
   const length = Math.hypot((shoulder.x - hip.x) / squeeze, shoulder.y - hip.y);
   const lean = (degrees * Math.PI) / 180;

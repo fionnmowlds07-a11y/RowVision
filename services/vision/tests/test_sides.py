@@ -1,7 +1,10 @@
 import numpy as np
 from crew import crew_detections, crossing_sides_detections
 
-from rowvision.sides import crew_facing, side_changes, split_at
+from rowvision.metrics import angle_series
+from rowvision.sides import as_one_side, crew_facing, side_changes, split_at
+from rowvision.strokes import facing_direction
+from rowvision.synthetic import generate
 from rowvision.tracking import track_people
 
 FPS = 30
@@ -36,3 +39,26 @@ def test_no_track_runs_across_a_change() -> None:
         seen = np.isfinite(piece.points[:, 5, 0])
         assert not (seen[:cut].any() and seen[cut:].any())
     assert split_at(tracks, []) is tracks
+
+
+def test_mirrored_frames_measure_the_same_as_the_frames_they_mirror() -> None:
+    clip = generate(strokes=4, facing=-1)
+    mirrored = clip.points[:, [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15]].copy()
+    mirrored[..., 0] = 1900.0 - mirrored[..., 0]
+    assert facing_direction(mirrored) == 1
+    flipped = np.ones(len(mirrored), dtype=bool)
+    back = as_one_side(mirrored, flipped)
+    assert facing_direction(back) == -1
+    before, after = angle_series(clip.points, -1, 0.0), angle_series(back, -1, 0.0)
+    for name in ("trunk_lean", "knee", "elbow"):
+        np.testing.assert_allclose(getattr(after, name), getattr(before, name), atol=1e-6)
+
+
+def test_frames_from_the_usual_side_are_left_alone() -> None:
+    clip = generate(strokes=2)
+    assert as_one_side(clip.points, None) is clip.points
+    assert as_one_side(clip.points, np.zeros(len(clip.points), dtype=bool)) is clip.points
+    half = np.arange(len(clip.points)) >= len(clip.points) // 2
+    part = as_one_side(clip.points, half)
+    np.testing.assert_array_equal(part[~half], clip.points[~half])
+    assert not np.allclose(part[half], clip.points[half])

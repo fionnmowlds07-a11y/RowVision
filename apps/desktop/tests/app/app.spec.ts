@@ -219,6 +219,37 @@ test("the results show the extra numbers, and every stroke as a chart and a tabl
   await page.evaluate(() => { window.location.hash = "#/"; });
 });
 
+test("a clip filmed mostly end-on shows its numbers, no scores, and says to film side-on", async () => {
+  const reason = "Too much of this video was filmed from in front of or behind the boat, so the results are unreliable and no scores were given. Film side-on, from directly alongside the boat.";
+  const folder = makeClip(path.join(data, "clips"), "end-on-clip");
+  const file = path.join(folder, "summary.json");
+  const summary = JSON.parse(readFileSync(file, "utf8"));
+  const { rower } = summary;
+  rower.no_scores = reason;
+  rower.left_out = [CATCHES[2]];
+  rower.rating.warnings = [reason];
+  rower.card = { ...rower.card, overall: null, phases: {}, metrics: rower.card.metrics.map((metric: { score: number | null }) => ({ ...metric, score: null, reason: "Not scored, as too much of this video was filmed end-on." })) };
+  writeFileSync(file, JSON.stringify(summary));
+  try {
+    await page.evaluate(() => { window.location.hash = "#/clip/end-on-clip"; });
+    await expect(page.getByText("No scores: film side-on. These results are unreliable.")).toBeVisible();
+    // The advice is how to film it, never praise for measures that were not scored.
+    await expect(page.getByRole("heading", { name: "Film it better next time" })).toBeVisible();
+    await expect(page.getByText(reason).first()).toBeVisible();
+    await expect(page.getByText("Everything scored here is on target.")).toHaveCount(0);
+    // The numbers are still there, and the stroke filmed end-on is marked.
+    await expect(page.getByRole("region", { name: "Measures" })).toContainText("Body angle at the catch");
+    const strokes = page.getByRole("region", { name: "Stroke by stroke" });
+    await expect(strokes).toContainText("Strokes filmed end-on are listed but do not count towards your results.");
+    await strokes.getByText("See the numbers").click();
+    await expect(strokes.getByRole("row").nth(3)).toContainText("end-on, not counted");
+    await expect(strokes.getByRole("row").nth(1)).not.toContainText("end-on");
+  } finally {
+    await page.evaluate(() => { window.location.hash = "#/"; });
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
 test("the video stays in view while the results scroll, and can be put away for stats only", async () => {
   await page.evaluate(() => { window.location.hash = "#/clip/test-clip"; });
   const viewer = page.getByRole("region", { name: "Frame viewer" });

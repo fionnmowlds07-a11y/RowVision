@@ -165,3 +165,42 @@ def test_rate_comes_from_clear_footage_even_when_end_on_footage_is_longer() -> N
     slower = np.concatenate([signal[: clear.sum()], np.interp(np.arange(0, 440, 0.5), np.arange(440), signal[clear.sum() :])])
     timeline = detect_strokes(slower, 30, np.arange(len(slower)) < clear.sum())
     assert timeline.rate_spm == pytest.approx(60 * 30 / 55, abs=1)
+
+
+def weak_finish(stroke: int) -> tuple[np.ndarray, int]:
+    """Eight strokes, one of which barely draws the hands in, so its finish is not a clear turn."""
+    clip = generate(strokes=8, rate_spm=24)
+    reach = reach_signal(clip.points, -1)
+    whole = detect_strokes(reach, clip.fps)
+    finish = whole.finishes[stroke]
+    half = round(whole.period_frames * 0.3)
+    span = slice(finish - half, finish + half)
+    reach = reach.copy()
+    reach[span] = np.nanmean(reach) + 0.05 + 0.02 * (reach[span] - reach[span].min())
+    return reach, finish
+
+
+def test_a_stroke_with_a_weak_finish_is_still_a_stroke() -> None:
+    reach, finish = weak_finish(3)
+    clip = generate(strokes=8, rate_spm=24)
+    timeline = detect_strokes(reach, clip.fps)
+    full = [
+        (a, b)
+        for a, b in zip(timeline.catches, timeline.catches[1:], strict=False)
+        if any(a < f < b for f in timeline.finishes)
+    ]
+    assert len(full) == len(timeline.catches) - 1
+    assert min(abs(f - finish) for f in timeline.finishes) <= 4
+
+
+def test_no_finish_is_added_across_a_missed_stroke() -> None:
+    """Catches two strokes apart have two finishes to find between them, so none is guessed."""
+    clip = generate(strokes=8, rate_spm=24)
+    reach = reach_signal(clip.points, -1)
+    timeline = detect_strokes(reach, clip.fps)
+    from rowvision.strokes import _with_missing
+
+    catches = [c for i, c in enumerate(timeline.catches) if i != 3]
+    finishes = [f for f in timeline.finishes if not catches[2] < f < catches[3]]
+    filled = _with_missing(reach, catches, finishes, round(timeline.period_frames), -1)
+    assert filled == finishes
