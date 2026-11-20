@@ -93,6 +93,8 @@ export type Summary = {
   frames: number;
   view_deg: number | null;
   film_closer: string | null;
+  /** Stretches of frames, as [start, end), filmed from the other side of the boat. Missing on older results. */
+  other_side?: number[][];
   warnings: string[];
   shots: Shot[];
   facing: number;

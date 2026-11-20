@@ -250,10 +250,19 @@ def analysis_json(analysis: Analysis) -> dict[str, Any]:
             for shot in analysis.shots
         ],
         "facing": analysis.facing,
+        "other_side": _ranges(getattr(analysis, "flipped", None)),
         "rower": own_rower(rowers, analysis.own_seat),
         "crew": rowers if whole_crew else None,
         "crew_summary": crew_summary(rowers, getattr(analysis, "sweep", False)) if whole_crew else None,
     }
+
+
+def _ranges(mask: Any) -> list[list[int]]:
+    """Return the stretches of frames where the mask is set, as [start, end) pairs."""
+    if mask is None:
+        return []
+    edges = np.flatnonzero(np.diff(np.concatenate([[0], np.asarray(mask, dtype=int), [0]])))
+    return [[int(start), int(end)] for start, end in zip(edges[::2], edges[1::2], strict=True)]
 
 
 def boat_choices_json(choices: list[BoatChoice]) -> list[dict[str, Any]]:

@@ -1,6 +1,6 @@
 """Score measurements against technique targets, leaving out anything too unreliable to score."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 
 import numpy as np
@@ -136,6 +136,28 @@ def _extra(name: str, summary: dict[str, float], spread: dict[str, float]) -> Me
     return MetricScore(name, rule.label, rule.phase, value, None, None, reason)
 
 
+def _phases(metrics: list[MetricScore]) -> tuple[dict[Phase, float], float | None]:
+    phases: dict[Phase, float] = {}
+    for phase in Phase:
+        scores = [m.score for m in metrics if m.phase is phase and m.score is not None]
+        if scores:
+            phases[phase] = float(np.mean(scores))
+    complete = all(Phase(name) in phases for name in NEEDED_FOR_OVERALL)
+    return phases, float(np.mean(list(phases.values()))) if complete else None
+
+
+def without_scores(card: ScoreCard, names: set[str], reason: str) -> ScoreCard:
+    """Return the card with the named measures shown but not scored, and the totals worked again."""
+    metrics = [
+        replace(metric, score=None, reason=reason)
+        if metric.name in names and metric.score is not None
+        else metric
+        for metric in card.metrics
+    ]
+    phases, overall = _phases(metrics)
+    return ScoreCard(metrics, phases, overall, card.extras)
+
+
 def score_stroke(
     summary: dict[str, float],
     spread: dict[str, float],
@@ -147,12 +169,6 @@ def score_stroke(
     metrics = [
         _score_metric(name, summary, spread, strokes, rate_spm, targets) for name in RULES
     ]
-    phases: dict[Phase, float] = {}
-    for phase in Phase:
-        scores = [m.score for m in metrics if m.phase is phase and m.score is not None]
-        if scores:
-            phases[phase] = float(np.mean(scores))
-    complete = all(Phase(name) in phases for name in NEEDED_FOR_OVERALL)
-    overall = float(np.mean(list(phases.values()))) if complete else None
+    phases, overall = _phases(metrics)
     extras = [_extra(name, summary, spread) for name in EXTRAS]
     return ScoreCard(metrics, phases, overall, extras)

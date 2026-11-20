@@ -14,6 +14,7 @@ import {
   clampView,
   clipTime,
   evidenceFrames,
+  facingAt,
   formatChange,
   formatTarget,
   formatValue,
@@ -491,4 +492,12 @@ test("the 3D model is only offered when the whole pose can be built", () => {
   assert.equal(modelFits("finish_lean_deg", [lean, knee]), false);
   assert.equal(modelFits("finish_elbow_deg", [lean, knee]), false);
   assert.equal(modelFits("legs_first", [lean, knee]), false);
+});
+
+test("the rower faces the other way in frames filmed from the far side of the boat", () => {
+  assert.equal(facingAt(1, [], 40), 1);
+  assert.equal(facingAt(1, [[30, 60]], 29), 1);
+  assert.equal(facingAt(1, [[30, 60]], 30), -1);
+  assert.equal(facingAt(-1, [[30, 60]], 59), 1);
+  assert.equal(facingAt(-1, [[30, 60]], 60), -1);
 });
