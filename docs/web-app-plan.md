@@ -41,7 +41,7 @@ The first version is a private preview for adults the owner knows personally. It
 | Look | Chosen in two mock-up rounds and recorded in `DESIGN.md`: option B, black and green. |
 | Custom colours | Athletes can change the ground and highlight colours, starting from the club greens (#116). |
 | Bad results | "Something wrong?" on each result: a short form saved with the clip and listed for the admin. |
-| Hosting | No monthly cost: Vercel free, Supabase free for accounts and scores, Cloudflare R2 for videos, Gmail for email, and the home PC as worker. Decided 7 November 2026. See `docs/deployment.md`. |
+| Hosting | No monthly cost: Vercel free, Supabase free for accounts and scores, Cloudflare R2 for videos, Gmail for email, and the home PC as worker. Decided 7 November 2026. |
 | Video after the change | Once the free hosting issues are built, video is kept 7 days, not 30. Athletes save up to 4 frames with limb lines, kept with the scores. If none are picked, a catch and a finish frame are saved. |
 
 **Defaults taken, owner told:** setup remembers last boat, side and seat, and is filled in during upload. Uploads resume after a drop. Reruns with a changed setup reuse the kept section. Waiting shows queue position and rough time left, with cancel. A failed analysis retries once. Home is the clip list. No sharing or export. Athletes can delete any clip, and account deletion removes everything. Each video shows days left. Whole-crew analysis stays off. Hosted services use EU regions.
@@ -112,7 +112,7 @@ The owner chooses the look by picking from mock-ups, over as many rounds as it t
 - D.4 Record the final choice in `DESIGN.md` as tokens. `apps/web` is built from these.
 
 **Stage 0: Foundations**
-- 0.1 Record the plan and decisions in `docs/`, and update `PRODUCT.md`, the handover and the stale `.gitignore` comment
+- 0.1 Record the plan and decisions in `docs/`, and update `PRODUCT.md` and the stale `.gitignore` comment
 - 0.2 Scaffold `apps/web`: Next.js, TypeScript, ESLint with jsx-a11y, Vitest, one pinned Node version, with design tokens, font and icons from D.4
 - 0.3 Local Supabase on ports 544xx (never touching 54321 to 54324), CLI as a dev dependency, 6-digit code email template
 - 0.4 Schema, row-level security, storage buckets and database tests, including that one user cannot reach another's data
@@ -189,26 +189,13 @@ The owner chooses the look by picking from mock-ups, over as many rounds as it t
 - 8.4 Real clips end to end, timed from drop to result, comparing all clips
 - 8.5 Home worker setup guide: Docker, drivers, disk encryption, automatic restart, remote access
 - 8.6 Deployment guide for database, web host and email sender, with nothing deployed
-- 8.7 README, decision records, runbook and handover
+- 8.7 README, decision records and runbook
 
 **Parked: Before juniors** (not started until the owner chooses): parental consent, teammate declaration, safeguarding review and legal review.
 
 **Parked: Later:** coach accounts, coach review of targets and drills, compare two clips, per-stroke chart, pay-per-clip worker, name and model weight licence checks before commercial use.
 
 Issue #7 stays open as it is.
-
-## What the owner will need to do
-
-- Pick from the mock-ups in each look and feel round.
-- Review each `design-review` issue, and the wording in 4.4.
-- Open test pages on a real iPhone and Android phone (0.7, 2.3).
-- Before testers join: tell me the home PC's operating system and arrange one visit or a helper at the house (3.7, 8.5). The GPU benchmark in 3.7 waits for this, so it does not hold up the build.
-- Tell testers in person about training use, that you can open their clips, the 30-day deletion, and to only upload adult crews.
-- Approve hosting and any spending before anything is deployed. Likely about $25 a month for Supabase Pro plus a domain.
-
-## Working rules
-
-From `docs/handover.md`: small commits, one branch per piece of work, PR, merge commits, merge only when CI passes using the safe merge loop. **No attribution lines of any kind in commits, PRs or issues**, overriding any default. Footage, frames, overlays, keypoints and labels are never committed. No deploys or cloud spending without asking. Do not stop the other project's Supabase. Do not run batches while the owner is analysing a clip.
 
 ## Verification
 

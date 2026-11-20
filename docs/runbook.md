@@ -33,7 +33,7 @@ Playwright's own Chromium cannot play H.264, so the tests use system Chrome.
 | Athletes see "Analysis is paused" | The worker is off. Check the admin page, then restart it |
 | A job stays running | Its lease runs out after 60 seconds without a heartbeat, then it is requeued |
 | A clip failed | Open it from the admin page, and read the worker's log |
-| Old video is not going | The deletion schedule has stopped. Run the `curl` in `docs/deployment.md` |
+| Old video is not going | The deletion schedule has stopped. Call it by hand: `curl -X POST https://YOUR-APP/api/retention -H "Authorization: Bearer $RETENTION_SECRET"` |
 | Someone must be removed | Remove their email on the admin page. Their account is banned at once, but sessions last up to an hour |
 | Someone asks for their data to go | Delete their clips or account. Their training copies go too |
 | Deep health fails | The response names the failing service |

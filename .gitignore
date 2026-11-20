@@ -55,3 +55,9 @@ apps/site/public/media/
 
 # Vite cache for the marketing site
 apps/site/.vite/
+
+# Personal working notes, kept locally
+docs/handover.md
+docs/home-worker.md
+docs/deployment.md
+apps/web/AGENTS.md
