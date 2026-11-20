@@ -107,3 +107,23 @@
 .netnote { position: fixed; left: 16px; bottom: 16px; z-index: 50; max-width: min(26rem, calc(100vw - 32px)); display: flex; gap: 12px; align-items: flex-start;
   background: var(--caution-bg); color: var(--caution); font-size: 15px; line-height: 1.4; padding: 12px 14px 12px 16px; border-radius: 10px; box-shadow: 0 12px 32px -8px rgba(0, 0, 0, .6); }
 .netnote button { flex: none; background: none; border: 0; color: inherit; font: inherit; font-size: 22px; line-height: 1; cursor: pointer; padding: 0 2px; }
+
+/* ---- telling people to scroll: the film only moves when you do ----
+   A line under the opening button, a bar along the bottom showing how much film is left,
+   and a pill on the video that shows before the first scroll and comes back whenever you stop partway. */
+.cue, .cuebar, .js .cue-lede { display: none; }
+.film-on .cue { display: flex; position: fixed; left: 50%; top: calc(50% + min(60vw, 108vh) * .252 - 76px); z-index: 15; align-items: center; gap: 10px; transform: translateX(-50%);
+  font-size: 15px; font-weight: 700; letter-spacing: .02em; color: var(--text); background: rgba(4, 20, 11, .82); border: 1px solid rgba(75, 227, 138, .45);
+  padding: 10px 16px 10px 18px; border-radius: 999px; backdrop-filter: blur(6px); pointer-events: none; opacity: 0; transition: opacity .5s; }
+.film-on .cue.on { opacity: 1; }
+.film-on .cue svg { color: var(--hl); }
+.film-on .cue-lede { display: flex; align-items: center; gap: 8px; margin: 18px 0 0; font-weight: 700; color: var(--hl); }
+.film-on .cuebar { display: block; position: fixed; left: 0; right: 0; bottom: 0; height: 4px; z-index: 16; background: rgba(255, 255, 255, .1); pointer-events: none; }
+.cuebar i { display: block; height: 100%; width: 100%; background: var(--hl); transform-origin: left; transform: scaleX(0); }
+@media (prefers-reduced-motion: no-preference) {
+  .film-on .cue svg, .film-on .cue-lede svg { animation: nudge 1.6s ease-in-out infinite; }
+  @keyframes nudge { 0%, 100% { transform: translateY(-3px); } 50% { transform: translateY(4px); } }
+}
+@media (max-width: 760px) {
+  .film-on .cue { top: calc(50% + 92vw * .252 - 64px); }
+}
