@@ -69,6 +69,7 @@ def parse_job(data: dict[str, Any]) -> DesktopJob:
             seat=int(data["seat"]),
             tap=Tap(float(tap["t"]), float(tap["x"]), float(tap["y"])) if tap else None,
             scope="crew" if data.get("scope") == "crew" else "seat",
+            coach=data.get("coach") is True and data.get("scope") == "crew",
         ),
         engine=data.get("engine", "real"),
         device=data.get("device", "cpu"),

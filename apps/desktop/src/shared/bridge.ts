@@ -16,6 +16,8 @@ export type ClipSetup = {
   filmed_at?: string;
   /** "crew" when every seat was asked for. */
   scope?: string;
+  /** Added as a whole crew with no one rower as "you". */
+  coach?: boolean;
 };
 
 /** What the add page hands over. The video stays where it is and is read from there. */
@@ -29,6 +31,8 @@ export type AddRequest = {
   tap: { t: number; x: number; y: number } | null;
   /** "crew" measures every seat, which takes about as many times longer as there are seats. */
   scope: Scope;
+  /** A whole crew added without saying who is the athlete, as a coach would. No seat is "you". */
+  coach?: boolean;
 };
 
 export type Scope = "seat" | "crew";

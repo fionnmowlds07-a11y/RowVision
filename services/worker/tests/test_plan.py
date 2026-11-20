@@ -117,3 +117,14 @@ def test_the_whole_crew_is_asked_for_only_when_the_setup_says_so() -> None:
     whole = plan_request(FakeScouting([crew()]), Setup("8+", "bow", 3, Tap(2.0, 0.5, 0.5), "crew"), VIDEO)
     assert alone is not None and alone.scope is Scope.SEAT
     assert whole is not None and whole.scope is Scope.CREW
+
+
+def test_a_coach_tap_only_picks_the_boat() -> None:
+    """A coach's crew follows no one rower, so the stroke seat and rig given stay in charge of the sides."""
+    coach = Setup("8+", "stroke", 8, Tap(2.0, 0.5, 0.5), scope="crew", coach=True)
+    request = plan_request(FakeScouting([crew()]), coach, VIDEO)
+    assert request is not None
+    assert request.tap is None
+    assert request.boat_tap == (60, 500.0, 250.0)
+    assert request.seat == 8
+    assert request.side == "stroke"

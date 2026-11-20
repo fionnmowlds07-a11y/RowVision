@@ -68,6 +68,8 @@ export function jobFor(folder: string, clip: Clip, kind: string): Record<string,
     device: "cpu",
     scope: clip.scope === "crew" ? "crew" : "seat",
   };
+  // A coach's crew: a click on the video only says which boat.
+  if (clip.coach === true && clip.scope === "crew") job.coach = true;
   // Left out when the page could not play the video, so the engine takes the first 60 seconds.
   if (typeof clip.section_length === "number") job.length = clip.section_length;
   return job;
@@ -199,7 +201,11 @@ export class Analyser {
           this.options.notify("Your clip is ready", `${overall}${typeof event.band === "string" ? `, accuracy ${event.band}` : ""}.`, id);
         });
       } else if (event.event === "needs_tap") {
-        void finish(null).then(() => this.options.notify("Which one is you?", "Click on yourself so analysis can carry on.", id));
+        void finish(null).then(() => this.options.notify(
+          clip.coach === true ? "Which boat is it?" : "Which one is you?",
+          clip.coach === true ? "Click on the crew so analysis can carry on." : "Click on yourself so analysis can carry on.",
+          id,
+        ));
       } else if (event.event === "cancelled") {
         void finish("stopped");
       } else if (event.event === "failed") {

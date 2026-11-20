@@ -79,7 +79,7 @@ export function AnalysisPage({ id }: { id: string }) {
   return (
     <>
       <div>
-        <h1 style={{ fontSize: 32 }}>{HEADINGS[state]}</h1>
+        <h1 style={{ fontSize: 32 }}>{state === "needs_tap" && clip.setup.coach ? "Click on the crew to carry on" : HEADINGS[state]}</h1>
         <p className={styles.sub}>{[shortDate(clip.createdAt), setupLine(clip.setup), clip.setup.note].filter(Boolean).join(" · ")}</p>
       </div>
 
@@ -99,10 +99,12 @@ export function AnalysisPage({ id }: { id: string }) {
           )}
           {state === "needs_tap" && clip.hasVideo ? (
             <>
-              <button type="button" className={styles.tapLayer} onClick={tapFrame} aria-label="Tap yourself on this frame">
+              <button type="button" className={styles.tapLayer} onClick={tapFrame} aria-label={clip.setup.coach ? "Click the crew on this frame" : "Tap yourself on this frame"}>
                 {tap ? <span className={styles.ring} style={{ left: `${tap.x * 100}%`, top: `${tap.y * 100}%` }} /> : null}
               </button>
-              <p className={styles.banner}><strong>Which one is you?</strong> We couldn&apos;t tell. Click on yourself in the picture.</p>
+              {clip.setup.coach
+                ? <p className={styles.banner}><strong>Which boat is it?</strong> There&apos;s more than one in view. Click on the crew in the picture.</p>
+                : <p className={styles.banner}><strong>Which one is you?</strong> We couldn&apos;t tell. Click on yourself in the picture.</p>}
             </>
           ) : null}
         </div>
@@ -169,7 +171,7 @@ export function AnalysisPage({ id }: { id: string }) {
             </div>
           ) : null}
           {state === "needs_tap" ? (
-            <button type="button" className="button primary" disabled={!tap || sending} onClick={() => void sendTap()}>{sending ? "Carrying on" : "This is me"}</button>
+            <button type="button" className="button primary" disabled={!tap || sending} onClick={() => void sendTap()}>{sending ? "Carrying on" : clip?.setup.coach ? "This is the boat" : "This is me"}</button>
           ) : null}
           {(state === "running" || state === "waiting" || state === "needs_tap") && !confirming ? (
             <button type="button" className="button quiet" onClick={() => setConfirming(true)}>Cancel</button>

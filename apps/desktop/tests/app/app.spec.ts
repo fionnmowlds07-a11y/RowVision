@@ -607,7 +607,7 @@ test("a clip is sent only after both ticks, then marked as sent", async () => {
 });
 
 // Before the tests that try forbidden things on purpose.
-test("a whole crew is asked for when adding, then shown seat by seat", async () => {
+test("a whole crew is added with just the boat, then shown seat by seat", async () => {
   writeFileSync(control, "done");
   await openAdd();
   await page.locator("input[type=file]").setInputFiles(path.join(sources, "row.mp4"));
@@ -619,13 +619,21 @@ test("a whole crew is asked for when adding, then shown seat by seat", async () 
   await seat.selectOption("2");
   const who = page.getByRole("group", { name: "Who to measure" });
   await expect(who.getByRole("button", { name: "Just me" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("Drag to a clear frame, then tap yourself")).toBeVisible();
   await who.getByRole("button", { name: "Whole crew" }).click();
   await expect(who).toContainText("A crew of 2 takes about 2 times as long.");
+  // No tap, side or seat: the boat and its rig are enough.
+  const boatCard = page.getByRole("region", { name: "Your boat" });
+  await expect(page.getByText("Drag to a clear frame, then tap yourself")).toHaveCount(0);
+  await expect(boatCard.locator("select")).toHaveCount(1);
+  await expect(boatCard).toContainText("Normal: stroke seat on stroke side");
+  await boatCard.getByRole("button", { name: "Rigged differently?" }).click();
+  await expect(boatCard.getByRole("combobox", { name: "Stroke seat rows on" })).toHaveValue("stroke");
   await page.getByRole("button", { name: "Add to your clips" }).click();
   await expect(page).toHaveURL(/#\/analysis\/[a-z0-9-]+$/);
   const id = /#\/analysis\/([a-z0-9-]+)$/.exec(page.url())![1];
-  expect(readJson(path.join(data, "clips", id, "clip.json")).scope).toBe("crew");
-  expect(readJson(path.join(data, "clips", id, "job.json")).scope).toBe("crew");
+  expect(readJson(path.join(data, "clips", id, "clip.json"))).toMatchObject({ scope: "crew", coach: true, seat: 2, side: "stroke", tap: null });
+  expect(readJson(path.join(data, "clips", id, "job.json"))).toMatchObject({ scope: "crew", coach: true });
   await expect(page.getByRole("heading", { name: "Analysed" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Progress" })).toContainText("Measuring your crew");
   await panel().getByRole("link", { name: "See your results" }).click();
@@ -635,11 +643,12 @@ test("a whole crew is asked for when adding, then shown seat by seat", async () 
   await expect(crew).toContainText("5°");
   const seats = crew.getByRole("button", { name: /^Seat \d/ });
   await expect(seats).toHaveCount(2);
-  // Stroke first. Seat 2 is the athlete, and seat 1 is late against them.
-  await expect(seats.nth(0)).toHaveAccessibleName("Seat 2, you, sets the rhythm, body angle at the catch 29°");
+  // Stroke first, and no seat is "you": a coach added this crew. Seat 1 is late against stroke.
+  await expect(seats.nth(0)).toHaveAccessibleName("Seat 2, sets the rhythm, body angle at the catch 29°");
   await expect(seats.nth(0)).toHaveAttribute("aria-pressed", "true");
   await expect(seats.nth(1)).toHaveAccessibleName("Seat 1, catch against seat 2: about 90 ms late, body angle at the catch 24°");
-  await expect(page.getByRole("heading", { name: "Your results" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Seat 2", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your results" })).toHaveCount(0);
   await seats.nth(1).click();
   await expect(page.getByRole("heading", { name: "Seat 1", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Measures" })).toContainText("You 24° forward");

@@ -11,7 +11,8 @@ export function longDate(iso: string): string {
   return Number.isNaN(date.getTime()) ? "Unknown date" : LONG_DATE.format(date);
 }
 
-export function setupLine(setup: { boat_class?: string; seat?: number }): string {
+export function setupLine(setup: { boat_class?: string; seat?: number; coach?: boolean }): string {
+  if (setup.coach) return [setup.boat_class, "whole crew"].filter(Boolean).join(" ");
   return [setup.boat_class, setup.seat !== undefined ? `seat ${setup.seat}` : null].filter(Boolean).join(" ");
 }
 

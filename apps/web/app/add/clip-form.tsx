@@ -84,9 +84,13 @@ type FormProps = {
   cannotShowNote: string;
   /** The last card, which sends or saves the clip. */
   children: ReactNode;
+  /** A choice of who to measure, shown at the top of the boat card. */
+  who?: ReactNode;
+  /** In place of side, seat and the tap, when no one rower is followed, such as a whole crew filmed by a coach. */
+  crew?: ReactNode;
 };
 
-export function ClipForm({ file, choice, onChange, onRefuse, cannotShowNote, children }: FormProps) {
+export function ClipForm({ file, choice, onChange, onRefuse, cannotShowNote, children, who, crew }: FormProps) {
   const video = useRef<HTMLVideoElement>(null);
   const objectUrl = useMemo(() => URL.createObjectURL(file), [file]);
   const [frameTime, setFrameTime] = useState(0);
@@ -143,7 +147,7 @@ export function ClipForm({ file, choice, onChange, onRefuse, cannotShowNote, chi
         <div className={styles.scroller}>
           <div className={styles.frame} style={{ width: `${zoom * 100}%` }}>
             <video ref={video} src={objectUrl} muted playsInline preload="auto" onLoadedMetadata={loaded} onError={() => onChange({ ...choice, cannotShow: true })} />
-            {facts ? (
+            {facts && !crew ? (
               <button type="button" className={styles.tapLayer} onClick={tapFrame} aria-label="Tap yourself on this frame">
                 {tap ? <span className={styles.ring} style={{ left: `${tap.x * 100}%`, top: `${tap.y * 100}%` }} /> : null}
               </button>
@@ -170,6 +174,8 @@ export function ClipForm({ file, choice, onChange, onRefuse, cannotShowNote, chi
                 <input type="range" className={styles.range} min={0} max={facts.duration} step={0.5} value={trim.end} onChange={(e) => moveEnd(Number(e.target.value))} />
               </label>
             </div>
+            {crew ? null : (
+            <>
             <label className="field">
               Drag to a clear frame, then tap yourself
               <input type="range" className={styles.range} min={trim.start} max={trim.end} step={0.1} value={frameTime} onChange={(e) => seek(Number(e.target.value), choice)} />
@@ -182,6 +188,8 @@ export function ClipForm({ file, choice, onChange, onRefuse, cannotShowNote, chi
                 ))}
               </div>
             </div>
+            </>
+            )}
           </>
         ) : null}
         {facts && looksCompressed(file.name, facts) ? (
@@ -190,12 +198,15 @@ export function ClipForm({ file, choice, onChange, onRefuse, cannotShowNote, chi
       </section>
 
       <section className={`card ${styles.setup}`} aria-label="Your boat">
+        {who ? <div className={styles.wide}>{who}</div> : null}
         <label className="field">
           Boat
           <select value={setup.boat} onChange={(e) => onChange({ ...choice, setup: fitSetup({ ...setup, boat: e.target.value }) })}>
             {Object.keys(BOAT_SEATS).map((boat) => <option key={boat} value={boat}>{BOAT_NAMES[boat]}</option>)}
           </select>
         </label>
+        {crew ?? (
+        <>
         <label className="field">
           Side
           <select value={setup.side} onChange={(e) => onChange({ ...choice, setup: { ...setup, side: e.target.value } })}>
@@ -208,6 +219,8 @@ export function ClipForm({ file, choice, onChange, onRefuse, cannotShowNote, chi
             {seatsFor(setup.boat).map((seat) => <option key={seat} value={seat}>{seat}</option>)}
           </select>
         </label>
+        </>
+        )}
         <label className="field">
           Note, if you like
           <input value={note} maxLength={200} onChange={(e) => onChange({ ...choice, note: e.target.value })} placeholder="Saturday steady state" />

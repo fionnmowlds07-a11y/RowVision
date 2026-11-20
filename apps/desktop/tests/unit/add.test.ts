@@ -25,7 +25,7 @@ const good = () => ({
 });
 
 test("a good request comes through tidied", () => {
-  expect(cleanAdd(good())).toEqual({ ...good(), note: "Saturday", scope: "seat" });
+  expect(cleanAdd(good())).toEqual({ ...good(), note: "Saturday", scope: "seat", coach: false });
   expect(cleanAdd({ ...good(), section: { start: 0, length: null }, tap: null })).not.toBeNull();
 });
 
@@ -77,4 +77,16 @@ test("the clip remembers that the whole crew was asked for", async () => {
   const library = path.join(folder, "clips");
   const id = await addClip(library, cleanAdd({ ...good(), scope: "crew" })!);
   expect(JSON.parse(readFileSync(path.join(library, id, "clip.json"), "utf8")).scope).toBe("crew");
+});
+
+test("a coach's whole crew has no tap, and is only a coach's when it is a whole crew", async () => {
+  const coach = cleanAdd({ ...good(), scope: "crew", coach: true, setup: { boat: "2-", side: "stroke", seat: 2 } })!;
+  expect(coach).toMatchObject({ coach: true, tap: null, scope: "crew" });
+  expect(cleanAdd({ ...good(), coach: true })).toMatchObject({ coach: false, tap: { t: 1.2 } });
+  const library = path.join(folder, "clips");
+  const id = await addClip(library, coach);
+  const saved = JSON.parse(readFileSync(path.join(library, id, "clip.json"), "utf8"));
+  expect(saved).toMatchObject({ coach: true, scope: "crew", seat: 2, side: "stroke", tap: null });
+  const own = await addClip(library, cleanAdd(good())!);
+  expect(JSON.parse(readFileSync(path.join(library, own, "clip.json"), "utf8")).coach).toBeUndefined();
 });
