@@ -221,6 +221,10 @@ if (still) {
   size(); addEventListener('resize', size);
   const cards = [...document.querySelectorAll('.card')].map(el => ({ el, c: el.querySelector('canvas'), clip: CLIPS[el.dataset.clip] }));
   const l1 = document.querySelector('.l1'), l2 = document.querySelector('.l2'), lede = document.querySelector('.lede'), scrim = $('scrim'), laptop = $('laptop');
+  // Telling people to scroll: the pill shows before the first scroll and comes back after 4 s without scrolling.
+  const cue = $('cue'), cueBar = document.querySelector('#cuebar i');
+  if (matchMedia('(pointer: coarse)').matches) { cue.querySelector('.cue-txt').textContent = 'Swipe up to play'; document.querySelector('.cue-lede').lastChild.textContent = 'Swipe up to play the film'; }
+  let still4 = 0, lastX = 0;
   const strip = document.querySelector('.strip'), lanesEl = document.querySelector('.lanes'), chip = document.querySelector('.chip');
 
   // chapters: where you are, and a way to jump
@@ -306,6 +310,9 @@ if (still) {
       drawChart(g, pad + 44, cw - pad - (small ? 0 : 40), chh * (small ? .46 : .5), chh * .9, seg(x, 20.9, 21.7), ease(seg(x, 21.8, 22.5)));
     }
     lanes(out(seg(x, 23.3, 24)));
+    still4 = Math.abs(x - lastX) > .002 ? 0 : still4 + dt; lastX = x;
+    cue.classList.toggle('on', x < .15 || (x < 25.5 && still4 > 4));
+    cueBar.style.transform = `scaleX(${x / T})`;
 
     for (const c of Object.values(CLIPS)) { if (!c.want && !c.v.paused) c.v.pause(); c.want = false; }
     requestAnimationFrame(frame);
