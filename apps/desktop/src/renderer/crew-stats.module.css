@@ -1,0 +1,497 @@
+/* The hand-over, crew board and compare-rowers screens. Colours per rower and per body part are
+   set from the code; everything else follows the app's tokens. */
+
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.titleRow h3,
+.twoUp h3 {
+  font-size: 16px;
+}
+
+.titleRow > span {
+  font-size: 13px;
+}
+
+.key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.key span,
+.chips button,
+.rowButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.key i,
+.chips i,
+.rowButton i,
+.targetSwatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.targetSwatch {
+  background: rgb(53 208 127 / 0.22);
+  outline: 1px solid rgb(53 208 127 / 0.5);
+}
+
+/* ---- Charts ---- */
+
+.chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.chart text {
+  fill: var(--ink-soft);
+  font: 400 12px var(--font-text);
+}
+
+.chart text.strong {
+  fill: var(--ink);
+  font-weight: 700;
+}
+
+.rule {
+  stroke: #2c3b32;
+}
+
+.faint {
+  stroke: var(--quiet);
+}
+
+.finish {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.dot {
+  fill: var(--panel);
+}
+
+.zone {
+  fill: rgb(53 208 127 / 0.12);
+}
+
+.cursor {
+  stroke: var(--ink-soft);
+  stroke-dasharray: 3 3;
+}
+
+.pick {
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 150ms;
+}
+
+.pick:hover,
+.pick:focus-visible {
+  opacity: 1;
+  outline: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.figure {
+  margin: 0;
+  min-width: 0;
+}
+
+.figure h4 {
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.figure figcaption {
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.strip {
+  display: block;
+  width: 120px;
+  height: 14px;
+}
+
+/* ---- The hand-over ---- */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chips button {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--quiet);
+  color: var(--ink-soft);
+  font: 700 14px var(--font-text);
+}
+
+.chips button small {
+  font-weight: 400;
+}
+
+.chips button[aria-pressed="true"] {
+  background: #2c3b32;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--highlight);
+}
+
+.callout {
+  border-left: 3px solid var(--highlight);
+  padding: 2px 0 2px 14px;
+}
+
+.callout p {
+  margin: 0;
+}
+
+.headline {
+  font: 700 17px/1.35 var(--font-display);
+  margin-bottom: 4px !important;
+}
+
+.drives,
+.parts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px 24px;
+}
+
+.figure .chart {
+  max-width: 460px;
+}
+
+.timeline {
+  max-width: 720px;
+}
+
+.twoUp {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 24px;
+}
+
+.twoUp p {
+  font-size: 13px;
+}
+
+.forward {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.forward li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 8px 12px;
+  border-radius: var(--radius-field);
+  background: var(--quiet);
+  font-size: 14px;
+}
+
+
+/* ---- The crew board ---- */
+
+.viewSwitch {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 3px;
+  gap: 3px;
+  border-radius: var(--radius-button);
+  background: var(--quiet);
+}
+
+.viewSwitch button {
+  appearance: none;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--ink-soft);
+  font: 500 14px var(--font-text);
+  min-height: 40px;
+  padding: 0 16px;
+  cursor: pointer;
+  transition: color 150ms, background-color 150ms;
+}
+
+.viewSwitch button:hover {
+  color: var(--ink);
+}
+
+.viewSwitch button[aria-pressed="true"] {
+  background: var(--highlight);
+  color: var(--on-highlight);
+  font-weight: 700;
+}
+
+.scrub {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.scrub input {
+  flex: 1;
+  accent-color: var(--highlight);
+}
+
+.readout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.scroll {
+  overflow-x: auto;
+}
+
+.board {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.board th,
+.board td {
+  padding: 7px 6px;
+  text-align: right;
+  white-space: nowrap;
+  border-top: 1px solid var(--quiet);
+  font-weight: 400;
+}
+
+.board thead th {
+  border-top: 0;
+  vertical-align: bottom;
+}
+
+.board th:first-child,
+.board td:nth-last-child(2) {
+  text-align: left;
+}
+
+.board tbody tr:hover {
+  background: rgb(255 255 255 / 0.03);
+}
+
+.sortButton,
+.rowButton {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 4px 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.sortButton {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.sortButton:hover,
+.rowButton:hover {
+  color: var(--link);
+}
+
+.rowButton {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.outside {
+  color: #ffd27a;
+  font-weight: 700;
+}
+
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- Compare two rowers ---- */
+
+.pickers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px 20px;
+  align-items: end;
+}
+
+.pickers p {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 13px;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px;
+  border-radius: var(--radius-field);
+  background: var(--panel);
+}
+
+.tile > span {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tile strong {
+  font: 800 28px/1.15 var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+.tile strong b {
+  font-weight: inherit;
+}
+
+.tile small {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.lanes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.laneRow {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.2fr) 78px 78px minmax(120px, 3fr) minmax(96px, 1.1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px solid var(--quiet);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.laneRow:first-child {
+  border-top: 0;
+}
+
+.laneLabel {
+  font-weight: 700;
+}
+
+.laneValue {
+  font-weight: 700;
+  text-align: right;
+}
+
+.lane {
+  position: relative;
+  height: 18px;
+}
+
+.lane::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 8px;
+  height: 2px;
+  background: var(--quiet);
+}
+
+.laneBand,
+.laneGap,
+.laneGapWide,
+.laneMark {
+  position: absolute;
+}
+
+.laneBand {
+  top: 2px;
+  height: 14px;
+  border-radius: 4px;
+  background: rgb(53 208 127 / 0.18);
+  outline: 1px solid rgb(53 208 127 / 0.4);
+}
+
+.laneGap,
+.laneGapWide {
+  top: 8px;
+  height: 2px;
+  background: var(--ink-soft);
+}
+
+.laneGapWide {
+  background: #ffd27a;
+}
+
+.laneMark {
+  top: 3px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--panel);
+}
+
+.laneGapText {
+  color: #ffd27a;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .laneRow {
+    grid-template-columns: 1fr 64px 64px;
+  }
+
+  .lane {
+    grid-column: 1 / -1;
+  }
+
+  .laneRow > span:last-child {
+    grid-column: 1 / -1;
+    font-size: 13px;
+  }
+}

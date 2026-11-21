@@ -17,7 +17,8 @@ const MOST_SEEN = 0.8;
 
 type Angles = { trunk: Series; knee: Series; elbow: Series };
 export type Span = { start: number; middle: number; done: number };
-export type BackOpens = { share: number; legs: number | null };
+/** One stroke: the share of the drive gone when the back starts to open, the legs by then, and that frame. */
+export type BackOpens = { share: number; legs: number | null; frame: number };
 
 export type Handover = {
   seat: number | null;
@@ -127,7 +128,8 @@ function recoveryValues(angles: Angles, part: Part, from: number, to: number): (
 
 export function anglesFor(rower: Rower, data: FrameData, crew: boolean): Angles | null {
   const angles = crew ? data.crew?.[String(rower.seat)]?.angles : data.angles;
-  return angles ?? null;
+  // Older or failed results can keep an empty set of angles.
+  return angles && Array.isArray(angles.trunk) && Array.isArray(angles.knee) && Array.isArray(angles.elbow) ? angles : null;
 }
 
 function armsHardToSee(rower: Rower): boolean {
@@ -182,7 +184,7 @@ export function handover(rower: Rower, raw: Angles, fps: number, lead: Rower): H
       if (next !== null && next > finish + 2) backLines[part].push(progress(resample(recoveryValues(angles, part, finish, next)), false));
     }
     const opensAt = reaches(row.back ?? null, STARTED);
-    if (opensAt !== null) opens.push({ share: opensAt, legs: row.legs ? at(row.legs, opensAt) : null });
+    if (opensAt !== null) opens.push({ share: opensAt, legs: row.legs ? at(row.legs, opensAt) : null, frame: Math.round(start + opensAt * (finish - start)) });
     if (next !== null && next > finish) {
       trunks.push(resample(angles.trunk.slice(start, next + 1)));
       knees.push(resample(angles.knee.slice(start, next + 1)));

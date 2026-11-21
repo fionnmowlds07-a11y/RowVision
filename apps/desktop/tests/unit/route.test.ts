@@ -13,4 +13,10 @@ test("pages come from the hash", () => {
   expect(readRoute("#/compare/abc-1/abc-1")).toEqual({ page: "clips" });
   expect(readRoute("#/compare/abc-1")).toEqual({ page: "clips" });
   expect(readRoute("#/compare/abc-1/..%2f")).toEqual({ page: "clips" });
+  expect(readRoute("#/rowers/abc-1/2/abc-1/1")).toEqual({ page: "rowers", first: { clip: "abc-1", seat: "2" }, second: { clip: "abc-1", seat: "1" } });
+  expect(readRoute("#/rowers/abc-1/rower/def-2/rower")).toEqual({ page: "rowers", first: { clip: "abc-1", seat: "rower" }, second: { clip: "def-2", seat: "rower" } });
+  expect(readRoute("#/rowers/abc-1/2")).toEqual({ page: "rowers", first: { clip: "abc-1", seat: "2" }, second: null });
+  expect(readRoute("#/rowers/abc-1/2/abc-1/2")).toEqual({ page: "clips" });
+  expect(readRoute("#/rowers/abc-1/..%2f")).toEqual({ page: "clips" });
+  expect(readRoute("#/rowers/abc-1/2/..%2f/1")).toEqual({ page: "clips" });
 });
