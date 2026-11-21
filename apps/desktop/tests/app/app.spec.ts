@@ -5,7 +5,7 @@ import path from "node:path";
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import type { Server } from "node:http";
 import { makeServer } from "../../../../services/intake/server.mjs";
-import { CATCHES, FPS, FRAMES, OLD_CODEC, frameOf, makeClip, makeVideo } from "./fixture";
+import { CATCHES, FINISHES, FPS, FRAMES, OLD_CODEC, frameOf, makeClip, makeVideo } from "./fixture";
 
 const appDir = path.resolve(__dirname, "../..");
 const electronPath = createRequire(__filename)("electron") as unknown as string;
@@ -168,6 +168,35 @@ test("the viewer shows exactly the frame it says, stepping either way", async ()
   await expectFrame(FRAMES - 1);
   await viewer.getByRole("slider", { name: "Move through the video" }).fill("0");
   await expectFrame(0);
+});
+
+test("on a phone clip whose frames are not exactly 1/30 s apart, Forward 1 and Back 1 move one frame each", async () => {
+  const folder = makeClip(path.join(data, "clips"), "phone-clip", { phone: true });
+  try {
+    await page.evaluate(() => { window.location.hash = "#/clip/phone-clip"; });
+    const viewer = page.getByRole("region", { name: "Frame viewer" });
+    await expect(viewer).toBeVisible();
+    await expectFrame(CATCHES[0]);
+    const forward = viewer.getByRole("button", { name: "Forward 1", exact: true });
+    const back = viewer.getByRole("button", { name: "Back 1", exact: true });
+    // Past the frame where the times jump by 1/20 s, then back again.
+    for (let frame = CATCHES[0] + 1; frame <= 70; frame++) {
+      await forward.click();
+      await expectFrame(frame);
+    }
+    for (let frame = 69; frame >= 60; frame--) {
+      await back.click();
+      await expectFrame(frame);
+    }
+    await viewer.getByRole("button", { name: "Next catch" }).click();
+    await expectFrame(CATCHES[2]);
+    await viewer.getByRole("slider", { name: "Move through the video" }).fill(String(FINISHES[2]));
+    await expectFrame(FINISHES[2]);
+  } finally {
+    // Back on the clip the next test expects.
+    await page.evaluate(() => { window.location.hash = "#/clip/test-clip"; });
+    rmSync(folder, { recursive: true, force: true });
+  }
 });
 
 test("the 3D model opens", async () => {
