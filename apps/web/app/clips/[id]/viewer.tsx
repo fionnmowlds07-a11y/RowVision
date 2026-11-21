@@ -63,7 +63,8 @@ export function Viewer({ link, fps, frames, rower, scene, jump, fullScreen, onOp
   useEffect(() => {
     const element = video.current;
     if (!element) return;
-    const show = (seconds: number) => setFrame(clampFrame(Math.floor(seconds * fps + 0.01), frames));
+    // Rounded, not floored: a phone clip's frame times can sit up to a quarter of a frame early.
+    const show = (seconds: number) => setFrame(clampFrame(Math.round(seconds * fps), frames));
     if (typeof element.requestVideoFrameCallback === "function") {
       let handle = 0;
       const shown: VideoFrameRequestCallback = (_, data) => {

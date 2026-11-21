@@ -75,6 +75,9 @@ def copy_command(source: Path, target: Path, start: float, length: float, fps: F
         "-ss", f"{start:.3f}", "-i", str(source), "-t", f"{length:.3f}", "-an",
         "-vf", f"settb=expr={fps.denominator}/{fps.numerator},setpts=N",
         "-fps_mode", "passthrough",
+        # Without this a phone clip's nominal 30 fps sets the time base, frame times are rounded to
+        # 1/60 s, and the viewer can read the wrong frame (#243).
+        "-enc_time_base", f"{fps.denominator}/{fps.numerator}",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", str(QUALITY_CRF),
         "-g", str(KEYFRAME_GAP), "-keyint_min", str(KEYFRAME_GAP), "-sc_threshold", "0", "-bf", "0",
         "-pix_fmt", "yuv420p", "-movflags", "+faststart",

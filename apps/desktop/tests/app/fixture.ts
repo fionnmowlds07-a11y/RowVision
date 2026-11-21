@@ -7,6 +7,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 export const FPS = 30;
+/** A phone's rate: its videos store frame times rounded to 1/60 s, so a frame can sit a quarter of a frame early. */
+export const PHONE_FPS = 29.883573;
 export const FRAMES = 90;
 export const WIDTH = 320;
 export const HEIGHT = 180;
@@ -28,8 +30,11 @@ export function frameOf([r, g]: number[]): number | null {
   return tens * 10 + units;
 }
 
-/** Plays in Chromium unless an older codec is asked for, which only ffmpeg can read. */
-export function makeVideo(file: string, { frames = FRAMES, codec = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "10"] } = {}) {
+/**
+ * Plays in Chromium unless an older codec is asked for, which only ffmpeg can read. With `phone`, the
+ * frames come at PHONE_FPS with their times rounded to 1/60 s, as in a working copy made from phone footage.
+ */
+export function makeVideo(file: string, { frames = FRAMES, codec = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "10"], phone = false } = {}) {
   const frame = Buffer.alloc(WIDTH * HEIGHT * 3);
   const raw: Buffer[] = [];
   for (let n = 0; n < frames; n++) {
@@ -42,12 +47,16 @@ export function makeVideo(file: string, { frames = FRAMES, codec = ["-c:v", "lib
     raw.push(Buffer.from(frame));
   }
   // Keyframes a second apart, with B-frames, so stepping back has to decode from an earlier keyframe.
-  const result = spawnSync(process.env.FFMPEG ?? "ffmpeg", [
+  // Older ffmpeg (4.x on the CI machine) calls -fps_mode -vsync.
+  const run = (sync: string) => spawnSync(process.env.FFMPEG ?? "ffmpeg", [
     "-hide_banner", "-loglevel", "error", "-y",
     "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", `${WIDTH}x${HEIGHT}`, "-r", String(FPS), "-i", "pipe:0",
+    ...(phone ? ["-vf", `settb=1/60,setpts=round(N*60/${PHONE_FPS})`, sync, "vfr", "-enc_time_base", "1/60"] : []),
     ...codec, "-g", String(FPS), "-bf", "2",
     "-pix_fmt", "yuv420p", ...(file.endsWith(".mp4") ? ["-color_range", "tv", "-movflags", "+faststart"] : []), file,
   ], { input: Buffer.concat(raw) });
+  let result = run("-fps_mode");
+  if (result.status !== 0 && /fps_mode/.test(result.stderr?.toString() ?? "")) result = run("-vsync");
   if (result.status !== 0) throw new Error(`ffmpeg failed: ${result.stderr?.toString() ?? result.error}`);
 }
 
@@ -65,15 +74,16 @@ function pose(frame: number) {
   return points;
 }
 
-export function makeClip(library: string, id = "test-clip") {
+export function makeClip(library: string, id = "test-clip", { phone = false } = {}) {
   const folder = path.join(library, id);
   mkdirSync(folder, { recursive: true });
-  makeVideo(path.join(folder, "working.mp4"));
+  makeVideo(path.join(folder, "working.mp4"), { phone });
+  const fps = phone ? PHONE_FPS : FPS;
   const series = (value: (n: number) => number) => Array.from({ length: FRAMES }, (_, n) => value(n));
   const target = { low: 26, high: 31, sources: [], evidence: "Test target." };
   const summary = {
     version: "test",
-    fps: FPS,
+    fps,
     frames: FRAMES,
     view_deg: 0,
     film_closer: null,
@@ -112,7 +122,7 @@ export function makeClip(library: string, id = "test-clip") {
   };
   writeFileSync(path.join(folder, "summary.json"), JSON.stringify(summary));
   writeFileSync(path.join(folder, "frames.json"), JSON.stringify(frames));
-  writeFileSync(path.join(folder, "video.json"), JSON.stringify({ fps: FPS, frames: FRAMES, width: WIDTH, height: HEIGHT }));
+  writeFileSync(path.join(folder, "video.json"), JSON.stringify({ fps, frames: FRAMES, width: WIDTH, height: HEIGHT }));
   writeFileSync(path.join(folder, "clip.json"), JSON.stringify({ created_at: "2026-11-08T09:00:00Z", boat_class: "2-", side: "bow", seat: 2, note: "Test clip" }));
   return folder;
 }

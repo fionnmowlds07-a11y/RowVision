@@ -1,7 +1,7 @@
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, expect, test } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { existsSync } from "node:fs";
 import { deleteClip, librarySpace, listClips, readClip, removeVideo } from "../../src/main/library";
 import { cleanColours, readColours, writeColours } from "../../src/main/settings";
@@ -115,4 +115,22 @@ test("the athlete's targets score a saved clip again, and the file on disk is ne
   expect((await listClips(root, mine))[0].overall).toBe(100);
   // Without the choices, the clip reads as the engine scored it.
   expect((await readClip(root, "scored"))?.overall).toBe(60);
+});
+
+test("a clip deleted while the library is being listed is counted as empty, not an error", async () => {
+  addClip("going", { "clip.json": JSON.stringify({ created_at: "2026-11-01T10:00:00Z" }) });
+  const { promises } = await import("node:fs");
+  const real = promises.readdir;
+  // The clip's folder vanishes between being found and being counted.
+  const spy = vi.spyOn(promises, "readdir").mockImplementation(((folder: string, ...rest: unknown[]) => {
+    if (folder === path.join(root, "going")) return Promise.reject(Object.assign(new Error("gone"), { code: "ENOENT" }));
+    return (real as (...args: unknown[]) => unknown)(folder, ...rest);
+  }) as typeof promises.readdir);
+  try {
+    const clips = await listClips(root);
+    expect(clips.map((clip) => clip.id)).toEqual(["going"]);
+    expect(clips[0].bytes).toBe(0);
+  } finally {
+    spy.mockRestore();
+  }
 });

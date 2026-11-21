@@ -82,3 +82,23 @@ def test_the_copy_is_h264_with_short_gaps(tmp_path: Path) -> None:
     )  # fmt: skip
     assert "h264" in report
     assert report.count("I") >= 6
+
+
+def test_a_phone_clip_keeps_each_frame_at_its_own_time(tmp_path: Path) -> None:
+    # Phones say 30 fps but drop the odd frame, so the average is a little under. Without care the
+    # copy's frame times are rounded to 1/60 s and the viewer reads the wrong frame (#243).
+    source = tmp_path / "phone.mp4"
+    subprocess.check_call(
+        ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=60:duration=10",
+         "-vf", "select='not(mod(n\\,2))*not(eq(mod(n\\,256)\\,6))'", "-fps_mode", "vfr",
+         "-video_track_timescale", "90000", "-pix_fmt", "yuv420p", str(source)]
+    )  # fmt: skip
+    facts = media.make_working_copy(source, tmp_path / "copy.mp4", 0)
+    assert facts.fps != 30
+    times = subprocess.check_output(
+        ["ffprobe", "-v", "error", "-select_streams", "v", "-show_entries", "frame=pts_time",
+         "-of", "csv=p=0", str(tmp_path / "copy.mp4")], text=True,
+    )  # fmt: skip
+    shown = sorted(float(line.strip(", ")) for line in times.splitlines() if line.strip(", "))
+    assert len(shown) == facts.frames
+    assert max(abs(t * float(facts.fps) - n) for n, t in enumerate(shown)) < 0.01
