@@ -47,13 +47,16 @@ export function makeVideo(file: string, { frames = FRAMES, codec = ["-c:v", "lib
     raw.push(Buffer.from(frame));
   }
   // Keyframes a second apart, with B-frames, so stepping back has to decode from an earlier keyframe.
-  const result = spawnSync(process.env.FFMPEG ?? "ffmpeg", [
+  // Older ffmpeg (4.x on the CI machine) calls -fps_mode -vsync.
+  const run = (sync: string) => spawnSync(process.env.FFMPEG ?? "ffmpeg", [
     "-hide_banner", "-loglevel", "error", "-y",
     "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", `${WIDTH}x${HEIGHT}`, "-r", String(FPS), "-i", "pipe:0",
-    ...(phone ? ["-vf", `settb=1/60,setpts=round(N*60/${PHONE_FPS})`, "-fps_mode", "vfr", "-enc_time_base", "1/60"] : []),
+    ...(phone ? ["-vf", `settb=1/60,setpts=round(N*60/${PHONE_FPS})`, sync, "vfr", "-enc_time_base", "1/60"] : []),
     ...codec, "-g", String(FPS), "-bf", "2",
     "-pix_fmt", "yuv420p", ...(file.endsWith(".mp4") ? ["-color_range", "tv", "-movflags", "+faststart"] : []), file,
   ], { input: Buffer.concat(raw) });
+  let result = run("-fps_mode");
+  if (result.status !== 0 && /fps_mode/.test(result.stderr?.toString() ?? "")) result = run("-vsync");
   if (result.status !== 0) throw new Error(`ffmpeg failed: ${result.stderr?.toString() ?? result.error}`);
 }
 

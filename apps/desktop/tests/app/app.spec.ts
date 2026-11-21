@@ -171,8 +171,8 @@ test("the viewer shows exactly the frame it says, stepping either way", async ()
 });
 
 test("on a phone clip whose frames are not exactly 1/30 s apart, Forward 1 and Back 1 move one frame each", async () => {
-  const folder = makeClip(path.join(data, "clips"), "phone-clip", { phone: true });
   try {
+    makeClip(path.join(data, "clips"), "phone-clip", { phone: true });
     await page.evaluate(() => { window.location.hash = "#/clip/phone-clip"; });
     const viewer = page.getByRole("region", { name: "Frame viewer" });
     await expect(viewer).toBeVisible();
@@ -195,7 +195,7 @@ test("on a phone clip whose frames are not exactly 1/30 s apart, Forward 1 and B
   } finally {
     // Back on the clip the next test expects.
     await page.evaluate(() => { window.location.hash = "#/clip/test-clip"; });
-    rmSync(folder, { recursive: true, force: true });
+    rmSync(path.join(data, "clips", "phone-clip"), { recursive: true, force: true });
   }
 });
 
