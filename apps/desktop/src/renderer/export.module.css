@@ -144,3 +144,38 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.statsBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 26px 0;
+}
+
+.statsBar p {
+  margin: 0;
+}
+
+/* Every page of the statistics, at a third of A4 size. */
+.pages {
+  list-style: none;
+  margin: 0;
+  padding: 18px 26px 26px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.page {
+  width: calc(794px * 0.34);
+  height: calc(1123px * 0.34);
+  overflow: hidden;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 8px 24px -10px rgb(0 0 0 / 0.6);
+}
+
+.pageInner {
+  zoom: 0.34;
+}

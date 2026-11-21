@@ -351,6 +351,25 @@ test("a PDF of every catch and finish is exported in the layout the coach picks"
   await page.evaluate(() => { window.location.hash = "#/"; });
 });
 
+test("the statistics are exported as a PDF with every page shown first", async () => {
+  await page.evaluate(() => { window.location.hash = "#/clip/test-clip"; });
+  await page.getByRole("button", { name: "Export stats" }).click();
+  const dialog = page.getByRole("dialog", { name: "Export the statistics" });
+  const pages = dialog.getByRole("list", { name: "Pages" });
+  await expect(pages.getByRole("listitem")).toHaveCount(3);
+  await expect(pages.getByRole("listitem").nth(0)).toContainText("Rower statistics");
+  await expect(pages.getByRole("listitem").nth(2)).toContainText("Power hand-over");
+  if (process.env.ROWVISION_SHOT) await page.screenshot({ path: process.env.ROWVISION_SHOT.replace(".png", "-stats.png") });
+  await dialog.getByRole("button", { name: "Download PDF" }).click();
+  await expect(dialog.getByRole("status")).toContainText("Saved to");
+  const pdf = readFileSync(path.join(data, "report.pdf"));
+  expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+  expect(pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g)?.length).toBe(3);
+  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await page.evaluate(() => { window.location.hash = "#/"; });
+});
+
 test("two clips are compared side by side, the earlier one first", async () => {
   await page.evaluate(() => { window.location.hash = "#/clip/test-clip"; });
   const pick = page.getByRole("region", { name: "Compare with another clip" });

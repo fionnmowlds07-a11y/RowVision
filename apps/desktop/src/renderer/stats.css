@@ -1,0 +1,388 @@
+/* The statistics PDF. Each sheet is drawn at A4 size, 794 by 1123 CSS pixels, in the preview and the PDF. */
+.rvs-sheet {
+  box-sizing: border-box;
+  width: 794px;
+  height: 1123px;
+  padding: 32px 44px 24px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: #fff;
+  color: #0d1a12;
+  font: 13px/1.35 "DM Sans Variable", "DM Sans", "Segoe UI", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.rvs-sheet h1,
+.rvs-sheet h2,
+.rvs-sheet h3,
+.rvs-sheet h4,
+.rvs-sheet p {
+  margin: 0;
+}
+
+.rvs-sheet h3 {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.rvs-sheet h4 {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.rvs-sheet section,
+.rvs-sheet .rvs-two > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.rvs-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+  padding-bottom: 12px;
+  border-bottom: 3px solid #0b7a4b;
+}
+
+.rvs-h1,
+.rvs-h2 {
+  font: 800 32px/1 "Bricolage Grotesque Variable", "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.rvs-h2 {
+  font-size: 25px;
+}
+
+.rvs-meta {
+  margin-top: 6px !important;
+  font-size: 13px;
+  color: #3d5246;
+}
+
+.rvs-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font: 800 17px/1 "Bricolage Grotesque Variable", "Bricolage Grotesque", system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.rvs-cards {
+  display: grid;
+  gap: 14px;
+}
+
+.rvs-card {
+  border: 2px solid;
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.rvs-who {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.rvs-who i,
+.rvs-key i {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+
+.rvs-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 12px;
+  align-items: center;
+}
+
+.rvs-key span {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.rvs-key i {
+  width: 16px;
+  height: 5px;
+  border-radius: 2px;
+}
+
+.rvs-right {
+  text-align: right;
+}
+
+.rvs-score {
+  font: 800 52px/1 "Bricolage Grotesque Variable", "Bricolage Grotesque", system-ui, sans-serif;
+}
+
+.rvs-small {
+  font-size: 12px;
+  color: #3d5246;
+}
+
+.rvs-note {
+  font-size: 13px;
+  color: #3d5246;
+}
+
+.rvs-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.rvs-strip div {
+  background: #eef6f1;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.rvs-strip small {
+  display: block;
+  font-size: 12px;
+  color: #3d5246;
+}
+
+.rvs-strip b {
+  font: 800 21px/1.25 "Bricolage Grotesque Variable", "Bricolage Grotesque", system-ui, sans-serif;
+}
+
+.rvs-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.rvs-title > span {
+  font-size: 12px;
+  color: #3d5246;
+  text-align: right;
+}
+
+.rvs-svg {
+  display: block;
+  max-width: 100%;
+  font-size: 12px;
+}
+
+.rvs-grid {
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.rvs-th {
+  padding: 4px 0;
+  color: #3d5246;
+  font-size: 13px;
+}
+
+.rvs-rowname {
+  text-align: left;
+  padding: 7px 0;
+  font-weight: 700;
+}
+
+.rvs-cell {
+  border-radius: 6px;
+  padding: 7px 0;
+  background: #f3f6f4;
+}
+
+.rvs-top {
+  background: #0b7a4b;
+  color: #fff;
+  font-weight: 700;
+}
+
+.rvs-low {
+  background: #fbe3d6;
+  font-weight: 700;
+}
+
+.rvs-none {
+  color: #3d5246;
+}
+
+.rvs-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.rvs-wide {
+  grid-template-columns: 1.4fr 1fr;
+}
+
+.rvs-split {
+  grid-template-columns: 1.15fr 1fr;
+}
+
+.rvs-box {
+  background: #eef6f1;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.rvs-fade {
+  display: grid;
+  gap: 5px 10px;
+  font-size: 13px;
+  margin: 4px 0;
+}
+
+.rvs-table {
+  display: grid;
+  font-size: 12px;
+}
+
+.rvs-table > div {
+  padding: 4px 6px;
+}
+
+.rvs-table .rvs-th {
+  border-bottom: 2px solid #0b7a4b;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.rvs-zebra {
+  background: #eef6f1;
+}
+
+.rvs-lead {
+  background: #eef6f1;
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  line-height: 1.4;
+}
+
+.rvs-lead b {
+  font-size: 14px;
+}
+
+.rvs-panels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 20px;
+}
+
+.rvs-minis {
+  display: grid;
+  gap: 6px 12px;
+}
+
+.rvs-foot {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 12px;
+  color: #3d5246;
+  border-top: 1px solid #cfdcd4;
+  padding-top: 8px;
+}
+
+.rvs-foot span:last-child {
+  flex-shrink: 0;
+}
+
+
+/* One colour per rower, in the same order as SEAT_COLOURS. */
+.rvs-t0 { color: #0b7a4b; }
+.rvs-bg0 { background: #0b7a4b; }
+.rvs-bd0 { border-color: #0b7a4b; }
+.rvs-t1 { color: #1f5fbf; }
+.rvs-bg1 { background: #1f5fbf; }
+.rvs-bd1 { border-color: #1f5fbf; }
+.rvs-t2 { color: #c2410c; }
+.rvs-bg2 { background: #c2410c; }
+.rvs-bd2 { border-color: #c2410c; }
+.rvs-t3 { color: #7c3aed; }
+.rvs-bg3 { background: #7c3aed; }
+.rvs-bd3 { border-color: #7c3aed; }
+.rvs-t4 { color: #0e7490; }
+.rvs-bg4 { background: #0e7490; }
+.rvs-bd4 { border-color: #0e7490; }
+.rvs-t5 { color: #a16207; }
+.rvs-bg5 { background: #a16207; }
+.rvs-bd5 { border-color: #a16207; }
+.rvs-t6 { color: #be185d; }
+.rvs-bg6 { background: #be185d; }
+.rvs-bd6 { border-color: #be185d; }
+.rvs-t7 { color: #374151; }
+.rvs-bg7 { background: #374151; }
+.rvs-bd7 { border-color: #374151; }
+.rvs-part-legs { background: #0b7a4b; }
+.rvs-part-back { background: #7c3aed; }
+.rvs-part-arms { background: #c2410c; }
+.rvs-s80 { background: #7cc39d; }
+.rvs-s70 { background: #b6e0c6; }
+.rvs-s50 { background: #dff1e6; }
+.rvs-left { text-align: left !important; }
+.rvs-bold { font-weight: 700; }
+.rvs-soft { color: #3d5246; }
+
+/* Column counts, as classes. */
+.rvs-cards.rvs-n1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.rvs-cards.rvs-n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.rvs-cards.rvs-n3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.rvs-grid.rvs-n1 { grid-template-columns: 130px repeat(1, minmax(0, 1fr)); }
+.rvs-grid.rvs-n2 { grid-template-columns: 130px repeat(2, minmax(0, 1fr)); }
+.rvs-grid.rvs-n3 { grid-template-columns: 130px repeat(3, minmax(0, 1fr)); }
+.rvs-grid.rvs-n4 { grid-template-columns: 130px repeat(4, minmax(0, 1fr)); }
+.rvs-grid.rvs-n5 { grid-template-columns: 130px repeat(5, minmax(0, 1fr)); }
+.rvs-fade.rvs-n1 { grid-template-columns: 1.3fr repeat(1, minmax(0, 1fr)); }
+.rvs-fade.rvs-n2 { grid-template-columns: 1.3fr repeat(2, minmax(0, 1fr)); }
+.rvs-fade.rvs-n3 { grid-template-columns: 1.3fr repeat(3, minmax(0, 1fr)); }
+.rvs-fade.rvs-n4 { grid-template-columns: 1.3fr repeat(4, minmax(0, 1fr)); }
+.rvs-fade.rvs-n5 { grid-template-columns: 1.3fr repeat(5, minmax(0, 1fr)); }
+.rvs-fade.rvs-n6 { grid-template-columns: 1.3fr repeat(6, minmax(0, 1fr)); }
+.rvs-fade.rvs-n7 { grid-template-columns: 1.3fr repeat(7, minmax(0, 1fr)); }
+.rvs-fade.rvs-n8 { grid-template-columns: 1.3fr repeat(8, minmax(0, 1fr)); }
+.rvs-table.rvs-n1 { grid-template-columns: 1.5fr repeat(1, minmax(0, 1fr)) 1.2fr; }
+.rvs-table.rvs-n2 { grid-template-columns: 1.5fr repeat(2, minmax(0, 1fr)) 1.2fr; }
+.rvs-table.rvs-n3 { grid-template-columns: 1.5fr repeat(3, minmax(0, 1fr)) 1.2fr; }
+.rvs-table.rvs-n4 { grid-template-columns: 1.5fr repeat(4, minmax(0, 1fr)) 1.2fr; }
+.rvs-table.rvs-n5 { grid-template-columns: 1.5fr repeat(5, minmax(0, 1fr)) 1.2fr; }
+.rvs-table.rvs-n6 { grid-template-columns: 1.5fr repeat(6, minmax(0, 1fr)) 1.2fr; }
+.rvs-table.rvs-n7 { grid-template-columns: 1.5fr repeat(7, minmax(0, 1fr)) 1.2fr; }
+.rvs-table.rvs-n8 { grid-template-columns: 1.5fr repeat(8, minmax(0, 1fr)) 1.2fr; }
+.rvs-minis.rvs-n1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.rvs-minis.rvs-n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+@page {
+  size: A4;
+  margin: 0;
+}
+
+@media print {
+  .rvs-doc .rvs-sheet {
+    break-after: page;
+  }
+}

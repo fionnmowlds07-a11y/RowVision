@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CompareWith } from "./compare-page";
 import { ExportPdf } from "./export-dialog";
+import { ExportStats } from "./stats-dialog";
 import { SendClip } from "./send-dialog";
 import { libraryChanged } from "./use-library";
 import { Crew } from "@/app/clips/[id]/crew";
@@ -47,6 +48,7 @@ export function ClipPage({ id }: { id: string }) {
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           {summary?.rower ? <ExportPdf clip={clip} /> : null}
+          {summary?.rower ? <ExportStats clip={clip} /> : null}
           <SendClip clip={clip} onSent={() => setCount((value) => value + 1)} />
         </div>
       </div>
