@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { CompareWith } from "./compare-page";
+import { CrewBoard } from "./crew-board";
+import { HandOver } from "./handover-section";
+import { useClipStats } from "./use-clip-stats";
 import { ExportPdf } from "./export-dialog";
 import { ExportStats } from "./stats-dialog";
 import { SendClip } from "./send-dialog";
@@ -9,12 +12,18 @@ import { Results } from "@/app/clips/[id]/results";
 import { BOAT_SEATS } from "@/lib/setup";
 import { clipUrl, type ClipDetail } from "../shared/bridge";
 import { longDate, setupLine, size } from "./format";
+import styles from "./crew-stats.module.css";
 
 export function ClipPage({ id }: { id: string }) {
   const [clip, setClip] = useState<ClipDetail | null | undefined>(undefined);
   const [count, setCount] = useState(0);
   // Which seat of a measured crew is shown. Undefined until one is pressed, which means the athlete's own.
   const [seat, setSeat] = useState<number | null | undefined>(undefined);
+  // A measured crew can be read one rower at a time, or all on one board.
+  const [view, setView] = useState<"one" | "board">("one");
+  // Whose lines the hand-over shows. Null until one is pressed.
+  const [shown, setShown] = useState<string[] | null>(null);
+  const stats = useClipStats(clip ?? null);
 
   useEffect(() => {
     let live = true;
@@ -38,7 +47,16 @@ export function ClipPage({ id }: { id: string }) {
   const coach = clip.setup.coach === true;
   const own = coach ? null : summary?.rower?.seat ?? null;
   const chosen = seat === undefined ? summary?.rower?.seat ?? null : seat;
-  const shown = crew?.find((rower) => rower.seat === chosen) ?? summary?.rower ?? null;
+  const shownRower = crew?.find((rower) => rower.seat === chosen) ?? summary?.rower ?? null;
+  const many = Boolean(crew && crew.length > 1);
+  const chosenKey = String(chosen ?? "rower");
+  // A small crew shows everyone; a big one starts with the rower being read and the one the boat follows.
+  const defaultShown = stats.every.length <= 3 ? stats.every.map((item) => item.key) : [...new Set([stats.every[0]?.key, chosenKey].filter(Boolean))];
+  const lines = shown ?? defaultShown;
+  const toggle = (key: string) => setShown(stats.every.filter((item) => (item.key === key ? !lines.includes(key) : lines.includes(item.key))).map((item) => item.key));
+  const handOver = stats.ready && stats.every.some((item) => item.hand && item.hand.strokes > 0)
+    ? [{ id: "hand-over", name: "Hand-over", render: (show: ((frame: number) => void) | null) => <HandOver clipId={clip.id} every={stats.every} leadName={stats.leadName} shown={lines} onToggle={toggle} onPick={show} /> }]
+    : [];
   return (
     <>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -67,20 +85,37 @@ export function ClipPage({ id }: { id: string }) {
         {!(crew && crew.length > 1) && (BOAT_SEATS[clip.setup.boat_class ?? ""] ?? 1) > 1 && clip.hasVideo ? (
           <MeasureCrew id={clip.id} seats={BOAT_SEATS[clip.setup.boat_class ?? ""]} />
         ) : null}
-        {crew && crew.length > 1 ? <Crew crew={crew} summary={summary.crew_summary} ownSeat={own} chosen={chosen} onChoose={setSeat} /> : null}
-        {crew && crew.length > 1 ? <h2 style={{ fontSize: 24 }}>{chosen === own && !coach ? "Your results" : `Seat ${chosen ?? "unknown"}`}</h2> : null}
+        {many ? (
+          <div className={styles.viewSwitch} role="group" aria-label="How to read the crew">
+            <button type="button" aria-pressed={view === "one"} onClick={() => setView("one")}>One rower</button>
+            <button type="button" aria-pressed={view === "board"} onClick={() => setView("board")}>Crew board</button>
+          </div>
+        ) : null}
+        {many && view === "board" ? (
+          stats.ready ? <CrewBoard every={stats.every} onOpen={(item) => {
+            setSeat(item.rower.seat);
+            setView("one");
+            window.setTimeout(() => document.getElementById("hand-over")?.scrollIntoView({ block: "start" }), 0);
+          }} /> : <p className="soft" aria-busy={!stats.problem}>{stats.problem ?? "Reading the measurements…"}</p>
+        ) : (
+        <>
+        {many && crew ? <Crew crew={crew} summary={summary.crew_summary} ownSeat={own} chosen={chosen} onChoose={setSeat} /> : null}
+        {many ? <h2 style={{ fontSize: 24 }}>{chosen === own && !coach ? "Your results" : `Seat ${chosen ?? "unknown"}`}</h2> : null}
         <Results
           key={chosen ?? "own"}
           side={clip.setup.side ?? "stroke"}
           summary={summary}
-          rower={shown ?? summary.rower}
+          rower={shownRower ?? summary.rower}
           crewSeat={crew && crew.length > 1 ? chosen : null}
           videoLink={clip.hasVideo ? clipUrl(clip.id, "working.mp4") : null}
           framesLink={clip.hasVideo ? clipUrl(clip.id, "frames.json") : null}
           oldVersion={false}
           daysLeft={null}
           measuresNote={<p className="soft" style={{ margin: "12px 0", fontSize: 14 }}>You can change what counts towards the score in <a href="#/settings">Settings</a>.</p>}
+          extraSections={handOver}
         />
+        </>
+        )}
         </>
       )}
       {summary?.rower ? <CompareWith id={clip.id} /> : null}

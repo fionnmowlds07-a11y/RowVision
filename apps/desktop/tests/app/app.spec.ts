@@ -728,6 +728,48 @@ test("a whole crew is added with just the boat, then shown seat by seat", async 
   await crew.getByText("See the numbers").click();
   await expect(crew.getByRole("row", { name: /^1 / })).toContainText("About 90 ms late");
   if (process.env.ROWVISION_SHOT) await page.screenshot({ path: process.env.ROWVISION_SHOT.replace(".png", "-crew.png") });
+
+  // The hand-over shows both rowers, and says bow's back swings first in the boat.
+  const handOver = page.getByRole("region", { name: "Hand-over: legs, back, arms" });
+  await expect(handOver).toContainText("Bow's back swings first");
+  const chips = handOver.getByRole("group", { name: "Rowers in the hand-over" }).getByRole("button");
+  await expect(chips).toHaveCount(2);
+  await expect(handOver.getByRole("img", { name: /^Stroke: legs, back and arms through the drive/ })).toBeVisible();
+  await chips.nth(0).click();
+  await expect(handOver.getByRole("img", { name: /^Stroke: legs, back and arms/ })).toHaveCount(0);
+  await expect(handOver.getByRole("img", { name: /^Bow: legs, back and arms/ })).toBeVisible();
+  await chips.nth(0).click();
+  // A dot for each stroke where the back opens, which jumps the video there.
+  await expect(handOver.getByRole("button", { name: /^Bow, stroke 1: back opens/ })).toBeVisible();
+  if (process.env.ROWVISION_SHOT) await handOver.screenshot({ path: process.env.ROWVISION_SHOT.replace(".png", "-handover.png") });
+
+  // The crew board: every rower in a row, sortable, and a row opens that rower.
+  await page.getByRole("group", { name: "How to read the crew" }).getByRole("button", { name: "Crew board" }).click();
+  const board = page.getByRole("region", { name: "Every rower, every number" });
+  const rows = board.getByRole("row");
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(1)).toContainText("Stroke");
+  await board.getByRole("button", { name: "Overall" }).click();
+  await expect(rows.nth(1)).toContainText("Stroke");
+  await board.getByRole("button", { name: "Overall ↓" }).click();
+  await expect(rows.nth(1)).toContainText("Bow");
+  await expect(rows.nth(1)).toContainText("legs, back, arms in order");
+  await expect(page.getByRole("region", { name: "Body angle through one stroke" }).getByRole("status")).toContainText("At 45% of the stroke");
+  if (process.env.ROWVISION_SHOT) await page.screenshot({ path: process.env.ROWVISION_SHOT.replace(".png", "-board.png"), fullPage: true });
+  await board.getByRole("button", { name: "Bow" }).click();
+  await expect(page.getByRole("heading", { name: "Seat 1", exact: true })).toBeVisible();
+
+  // Two rowers side by side, measure by measure.
+  await handOver.getByRole("link", { name: "Compare two rowers" }).click();
+  await expect(page.getByRole("heading", { name: "Compare two rowers" })).toBeVisible();
+  const measures = page.getByRole("list", { name: "Measures" });
+  await expect(measures.getByRole("listitem", { name: /^Catch lean: Stroke 29.0°, Bow 24.0°, 5.0° apart$/ })).toBeVisible();
+  await expect(page.getByRole("img", { name: "back through the drive for Stroke and Bow" })).toBeVisible();
+  if (process.env.ROWVISION_SHOT) await page.screenshot({ path: process.env.ROWVISION_SHOT.replace(".png", "-rowers.png"), fullPage: true });
+  // Picking the second rower as the first swaps them round.
+  await page.getByRole("combobox", { name: "First rower" }).selectOption({ label: "Bow · this clip" });
+  await expect(page.getByRole("combobox", { name: "First rower" })).toHaveValue(`${id}/1`);
+  await expect(page.getByRole("combobox", { name: "Second rower" })).toHaveValue(`${id}/2`);
   await page.evaluate(() => { window.location.hash = "#/"; });
 });
 

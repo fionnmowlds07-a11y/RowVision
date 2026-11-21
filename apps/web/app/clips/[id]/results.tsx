@@ -56,9 +56,11 @@ type Props = {
   measuresNote?: ReactNode;
   /** Set when `rower` is one seat of a measured crew, whose frame data is kept under its seat number. */
   crewSeat?: number | null;
+  /** More sections across the page, before stroke by stroke. Each is given a way to jump the video to a frame. */
+  extraSections?: { id: string; name: string; render: (show: ((frame: number) => void) | null) => ReactNode }[];
 };
 
-export function Results({ side, summary, rower, videoLink, framesLink, oldVersion, daysLeft, crewSeat = null, measuresNote }: Props) {
+export function Results({ side, summary, rower, videoLink, framesLink, oldVersion, daysLeft, crewSeat = null, measuresNote, extraSections = [] }: Props) {
   const [data, setData] = useState<FrameData | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [asking, setAsking] = useState(false);
@@ -70,13 +72,16 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
   // Some sections are left out when the clip has nothing for them, so the links follow what is on the page.
   const sections = useMemo(() => {
     const charted = rower.strokes.length >= MIN_CHARTED_STROKES && strokeSeries(rower, summary.fps).length > 0;
-    return SECTIONS.filter(([id]) => (
+    const kept: (readonly [string, string])[] = SECTIONS.filter(([id]) => (
       id === "scores"
       || (id === "more-numbers" && Boolean(rower.card.extras?.length))
       || (id === "timing" && Boolean(rower.timing))
       || (id === "stroke-by-stroke" && charted)
     ));
-  }, [rower, summary.fps]);
+    const extra = extraSections.map(({ id, name }) => [id, name] as const);
+    const at = kept.findIndex(([id]) => id === "stroke-by-stroke");
+    return at < 0 ? [...kept, ...extra] : [...kept.slice(0, at), ...extra, ...kept.slice(at)];
+  }, [rower, summary.fps, extraSections]);
 
   function choose(next: View) {
     try {
@@ -290,6 +295,9 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
           ) : null}
           </div>
           </div>
+          {extraSections.map(({ id, render }) => (
+            <div key={id} id={id} className={`${styles.section} ${styles.across}`}>{render(videoLink ? show : null)}</div>
+          ))}
           <div id="stroke-by-stroke" className={`${styles.section} ${styles.across}`}>
             <Strokes rower={rower} fps={summary.fps} onPick={videoLink ? show : null} numbersOpen={view === "stats"} />
           </div>

@@ -21,7 +21,7 @@ const faint = "#eef2ef";
 
 // ---- Building the data ----
 
-function shortName(rower: Rower, seats: number, own: number | null): string {
+export function shortName(rower: Rower, seats: number, own: number | null): string {
   const { title, note } = rowerTitle(rower, seats, own);
   const base = seats === 1 ? "Rower" : note.includes("Stroke seat") ? "Stroke" : note.includes("Bow seat") ? "Bow" : title;
   return note.includes("you") ? `${base} (you)` : base;
@@ -53,17 +53,17 @@ export function statsReport(title: string, meta: string, every: StatsRower[], ch
 
 // ---- Numbers ----
 
-const minus = (text: string) => text.replace(/^-/, "−");
-const fixed = (value: number, places = 1) => minus(value.toFixed(places));
-const deg = (value: number | null | undefined, places = 1) => (value === null || value === undefined ? "—" : `${fixed(value, places)}°`);
-const pct = (value: number | null | undefined) => (value === null || value === undefined ? "—" : `${Math.round(value * 100)}%`);
-const secs = (value: number | null | undefined) => (value === null || value === undefined ? "—" : `${value.toFixed(2)} s`);
+export const minus = (text: string) => text.replace(/^-/, "−");
+export const fixed = (value: number, places = 1) => minus(value.toFixed(places));
+export const deg = (value: number | null | undefined, places = 1) => (value === null || value === undefined ? "—" : `${fixed(value, places)}°`);
+export const pct = (value: number | null | undefined) => (value === null || value === undefined ? "—" : `${Math.round(value * 100)}%`);
+export const secs = (value: number | null | undefined) => (value === null || value === undefined ? "—" : `${value.toFixed(2)} s`);
 
-function metricOf(rower: Rower, name: string): Metric | null {
+export function metricOf(rower: Rower, name: string): Metric | null {
   return [...rower.card.metrics, ...(rower.card.extras ?? [])].find((metric) => metric.name === name) ?? null;
 }
 
-function targetOf(rowers: StatsRower[], name: string): { target: Target; scored: boolean } | null {
+export function targetOf(rowers: StatsRower[], name: string): { target: Target; scored: boolean } | null {
   for (const item of rowers) {
     const metric = metricOf(item.rower, name);
     if (metric?.target) return { target: metric.target, scored: metric.score !== null };
@@ -71,7 +71,7 @@ function targetOf(rowers: StatsRower[], name: string): { target: Target; scored:
   return null;
 }
 
-const MEASURES: { name: string; label: string; show: (value: number) => string }[] = [
+export const MEASURES: { name: string; label: string; show: (value: number) => string }[] = [
   { name: "catch_lean_deg", label: "Catch lean", show: (v) => deg(v) },
   { name: "finish_lean_deg", label: "Finish lean", show: (v) => deg(v) },
   { name: "body_swing_deg", label: "Body swing", show: (v) => deg(v) },
@@ -89,7 +89,7 @@ const MEASURES: { name: string; label: string; show: (value: number) => string }
   { name: "rate_steadiness", label: "Rate steadiness", show: (v) => `within ${Math.max(1, Math.round(v))}%` },
 ];
 
-function targetText(name: string, found: { target: Target; scored: boolean } | null): string {
+export function targetText(name: string, found: { target: Target; scored: boolean } | null): string {
   if (!found) return "no target";
   const { low, high } = found.target;
   const guide = found.scored ? "" : "guide ";
@@ -517,16 +517,22 @@ function backStrip(stats: Stats): string {
     <p class="rvs-small">${escape(words)}</p></div>`;
 }
 
+/** The order coming forward, in a few words, from how far each part is a third of the way into the recovery. */
+export function recoveryWords(hand: Handover): string {
+  const reached = (part: Part) => (hand.recovery[part] ? hand.recovery[part]![Math.round(0.3 * (POINTS_OF(hand) - 1))] : null);
+  const armsAt = reached("arms");
+  const backAt = reached("back");
+  if (armsAt === null || backAt === null) return "";
+  return Math.abs(armsAt - backAt) < 0.1 ? "arms and back come over together" : armsAt > backAt ? "arms lead, then back, then slide" : "back moves before the arms";
+}
+
 function recoveryMinis(stats: Stats, columns: number): string {
   const items = stats.rowers.filter((item) => item.hand && PARTS.some((part) => item.hand!.recovery[part]));
   if (items.length === 0) return "";
   const minis = items.map((item) => {
     const hand = item.hand!;
     const lines = (["arms", "back", "legs"] as Part[]).map((part) => (hand.recovery[part] ? `<path d="${line(hand.recovery[part]!, 150, 56, 0, 1)}" fill="none" stroke="${PART_COLOURS[part]}" stroke-width="2.2"${part === "arms" && hand.armsRough ? ` stroke-dasharray="6 3"` : ""}/>` : "")).join("");
-    const reached = (part: Part) => (hand.recovery[part] ? hand.recovery[part]![Math.round(0.3 * (POINTS_OF(hand) - 1))] : null);
-    const armsAt = reached("arms");
-    const backAt = reached("back");
-    const words = armsAt === null || backAt === null ? "" : Math.abs(armsAt - backAt) < 0.1 ? "arms and back come over together" : armsAt > backAt ? "arms lead, then back, then slide" : "back moves before the arms";
+    const words = recoveryWords(hand);
     return `<div><h4 class="rvs-t${item.tone}">${escape(item.name)}</h4><svg class="rvs-svg" width="160" height="62" viewBox="0 0 160 62" aria-hidden="true"><g transform="translate(4,3)">${lines}</g></svg><p class="rvs-small">${escape(words)}</p></div>`;
   }).join("");
   return `<div><h3>Coming forward: arms, back, then legs</h3><p class="rvs-small">recovery, finish to next catch</p><div class="rvs-minis rvs-n${columns}">${minis}</div></div>`;

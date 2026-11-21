@@ -138,7 +138,31 @@ const summary = {
   rower: crew ? crew[1] : mode() === "one" ? seatResult(2, 29, null) : null,
   ...(crew ? { crew, crew_summary: { seats: [], catch_lean_range_deg: 5, finish_lean_range_deg: 1 } } : {}),
 };
-writeFileSync(path.join(folder, "frames.json"), JSON.stringify({ views: null, poses: [], angles: {} }));
+// Each seat's angles through 30-frame strokes from frame 12: legs push first, then the back swings,
+// then the arms bend. Seat 1 opens the back at the catch.
+const ease = (share, from, to) => (share <= from ? 0 : share >= to ? 1 : (1 - Math.cos(Math.PI * ((share - from) / (to - from)))) / 2);
+const seatAngles = (backFrom) => {
+  const trunk = [];
+  const knee = [];
+  const elbow = [];
+  for (let frame = 0; frame < 180; frame += 1) {
+    const at = (frame - 12 + 300) % 30;
+    if (at <= 15) {
+      const share = at / 15;
+      knee.push(55 + 120 * ease(share, 0, 0.6));
+      trunk.push(30 - 55 * ease(share, backFrom, 0.9));
+      elbow.push(170 - 90 * ease(share, 0.65, 1));
+    } else {
+      const share = (at - 15) / 15;
+      elbow.push(80 + 90 * ease(share, 0, 0.3));
+      trunk.push(-25 + 55 * ease(share, 0.1, 0.5));
+      knee.push(175 - 120 * ease(share, 0.4, 1));
+    }
+  }
+  return { trunk, knee, elbow };
+};
+const frames = crew ? { views: null, poses: [], angles: {}, crew: { 1: { angles: seatAngles(0) }, 2: { angles: seatAngles(0.3) } } } : { views: null, poses: [], angles: {} };
+writeFileSync(path.join(folder, "frames.json"), JSON.stringify(frames));
 writeFileSync(path.join(folder, "summary.json"), JSON.stringify(summary));
 send({ event: "done", version: VERSION, accuracy: null, band: null, overall: null });
 process.exit(0);

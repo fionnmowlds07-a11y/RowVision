@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import { handover, leadRower, middleOf, progress, reaches, resample, steady } from "@/lib/handover";
 import type { FrameData, Rower } from "@/lib/result";
 import { handoverNotes, statsDocument, statsPages, statsReport, statsRowers } from "../../src/renderer/stats-report";
+import { anglesAt, biggestGap, boardRows, inOrder, lanes, partSentence, sortBoard } from "../../src/renderer/rower-stats";
 
 const FPS = 50;
 const CYCLE = 100;
@@ -116,4 +117,71 @@ test("the document carries its fonts and escapes what it is given", () => {
   expect(html).toContain("Single &lt;1x&gt;");
   expect(html).not.toContain("<1x>");
   expect(html.match(/class="rvs-sheet"/g)).toHaveLength(3);
+});
+
+/** A pair where bow's back opens at the catch and reaches less far forward. */
+function pair() {
+  const stroke = rower(2, 10);
+  const bow = rower(1, 10, {
+    card: { ...rower(1, 10).card, overall: 60, metrics: [
+      { name: "catch_lean_deg", label: "Body angle at the catch", phase: "catch", value: 18, spread: 2, target, score: 20, reason: null },
+      { name: "finish_lean_deg", label: "Layback at the finish", phase: "finish", value: -24, spread: 2, target: { ...target, low: -25, high: -20 }, score: 90, reason: null },
+    ] },
+  });
+  const data: FrameData = { views: null, crew: { 2: { angles: angles(10, [0.3, 0.9]) }, 1: { angles: angles(10, [0, 0.55]) } } };
+  return statsRowers([bow, stroke], data, FPS, 2, null);
+}
+
+test("each back-opening knows its stroke's frame, so the video can jump to it", () => {
+  const [stroke] = pair();
+  const first = stroke.hand!.backOpens[0];
+  expect(first.frame).toBeGreaterThan(10);
+  expect(first.frame).toBeLessThan(10 + DRIVE);
+  expect(first.frame).toBe(Math.round(10 + first.share * DRIVE));
+});
+
+test("two rowers are put on one lane per measure, with the gap and the target", () => {
+  const [stroke, bow] = pair();
+  const rows = lanes(stroke, bow);
+  const reach = rows.find((row) => row.name === "catch_lean_deg")!;
+  expect(reach.texts).toEqual(["30.0°", "18.0°"]);
+  expect(reach.gap).toBe("12.0° apart");
+  expect(reach.wide).toBe(true);
+  expect(reach.band!.left).toBeGreaterThan(reach.at[1]!);
+  expect(reach.at[0]!).toBeGreaterThan(reach.band!.left);
+  const layback = rows.find((row) => row.name === "finish_lean_deg")!;
+  // One degree against a five-degree target is shown, but not marked.
+  expect(layback.gap).toBe("1.0° apart");
+  expect(layback.wide).toBe(false);
+  expect(biggestGap(rows)!.name).toBe("catch_lean_deg");
+  // With no target, a small gap is not marked either.
+  const bare = { ...stroke, rower: { ...stroke.rower, card: { ...stroke.rower.card, metrics: [], extras: [{ name: "body_swing_deg", label: "Body swing", phase: "drive", value: 50, spread: 1, target: null, score: null, reason: null }] } } };
+  const bareBow = { ...bare, rower: { ...bare.rower, card: { ...bare.rower.card, extras: [{ ...bare.rower.card.extras[0], value: 51 }] } } };
+  expect(lanes(bare, bareBow)[0].wide).toBe(false);
+  // A measure neither rower has is left out.
+  expect(rows.some((row) => row.name === "stroke_length")).toBe(false);
+  expect(partSentence("back", stroke, bow)).toMatch(/^Stroke's back is halfway at \d+% of the drive, Bow's at \d+%\.$/);
+  expect(partSentence("legs", stroke, bow)).toContain("legs finish their push by");
+});
+
+test("the crew board sorts by any column, and marks a rower out of order", () => {
+  const every = pair();
+  const rows = boardRows(every);
+  expect(rows.map((row) => row.texts.seat)).toEqual(["Stroke", "Bow"]);
+  expect(rows[1].outside.catch_lean).toBe(true);
+  expect(rows[0].outside.catch_lean).toBe(false);
+  expect(sortBoard(rows, "overall", true).map((row) => row.texts.seat)).toEqual(["Bow", "Stroke"]);
+  expect(sortBoard(rows, "catch_lean", false).map((row) => row.texts.seat)).toEqual(["Stroke", "Bow"]);
+  expect(inOrder(every[0].hand)).toBe(true);
+  expect(inOrder(every[1].hand)).toBe(false);
+  expect(rows[0].texts.back_opens).toMatch(/^\d+% · legs \d+%$/);
+  const start = anglesAt(every, 0);
+  expect(start).toHaveLength(2);
+  expect(start[0].value).toBeCloseTo(30, 0);
+});
+
+test("a clip whose angles were never saved has no hand-over, and doesn't fail", () => {
+  const every = statsRowers([rower(1, 10)], { views: null, angles: {} as never }, FPS, 1, 1);
+  expect(every[0].hand).toBeNull();
+  expect(handoverNotes(statsReport("Rower statistics", "", every, ["1"])).headline).toBe("The legs, back and arms could not be timed in this clip.");
 });
