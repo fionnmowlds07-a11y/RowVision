@@ -109,11 +109,19 @@ async function fileBytes(file: string): Promise<number> {
   }
 }
 
+/** A folder or file removed while it is being counted (a clip deleted meanwhile) counts as nothing. */
 async function folderBytes(folder: string): Promise<number> {
+  let entries;
+  try {
+    entries = await fs.readdir(folder, { withFileTypes: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return 0;
+    throw error;
+  }
   let total = 0;
-  for (const entry of await fs.readdir(folder, { withFileTypes: true })) {
+  for (const entry of entries) {
     const full = path.join(folder, entry.name);
-    if (entry.isFile()) total += (await fs.stat(full)).size;
+    if (entry.isFile()) total += await fileBytes(full);
     else if (entry.isDirectory()) total += await folderBytes(full);
   }
   return total;
