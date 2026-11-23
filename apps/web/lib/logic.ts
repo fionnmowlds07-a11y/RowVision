@@ -177,20 +177,27 @@ function mark(
 
 // The angles to draw on one frame. Labels use the measured value, which is corrected for camera
 // view, while the arcs follow the image, so the two can differ on oblique shots.
-export function angleMarks(pose: Pose, angles: FrameAngles, unsureLegs = false) {
+// The joint nearest the camera, as the engine reads the knee and elbow from that side alone. A rower
+// facing right shows their right side, facing left their left. With no facing known, the pair's
+// centre is used.
+function near(pose: NonNullable<Pose>, left: number, right: number, facing: number): Marked | null {
+  if (!facing) return middle(pose, left, right);
+  const joint = pose[facing < 0 ? left : right];
+  return joint ? { x: joint[0], y: joint[1], score: joint[2] } : null;
+}
+
+export function angleMarks(pose: Pose, angles: FrameAngles, unsureLegs = false, facing = 0) {
   if (!pose) return [];
   const shoulder = middle(pose, 5, 6);
-  const elbow = middle(pose, 7, 8);
-  const wrist = middle(pose, 9, 10);
   const hip = middle(pose, 11, 12);
-  const knee = middle(pose, 13, 14);
-  const ankle = middle(pose, 15, 16);
   const above = hip && { x: hip.x, y: hip.y - 30 };
+  const [nearShoulder, elbow, wrist] = [5, 7, 9].map((left) => near(pose, left, left + 1, facing));
+  const [nearHip, knee, ankle] = [11, 13, 15].map((left) => near(pose, left, left + 1, facing));
   return [
     ...mark("trunk", hip, above, shoulder, angles.trunk, formatValue("lean", angles.trunk)),
-    ...mark("knee", knee, hip, ankle, angles.knee, formatValue("knee", angles.knee))
+    ...mark("knee", knee, nearHip, ankle, angles.knee, formatValue("knee", angles.knee))
       .map((item) => ({ ...item, sure: item.sure && !unsureLegs })),
-    ...mark("elbow", elbow, shoulder, wrist, angles.elbow, formatValue("elbow", angles.elbow)),
+    ...mark("elbow", elbow, nearShoulder, wrist, angles.elbow, formatValue("elbow", angles.elbow)),
   ];
 }
 

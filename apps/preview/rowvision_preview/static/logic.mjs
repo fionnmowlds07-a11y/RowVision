@@ -174,6 +174,15 @@ function middle(pose, left, right) {
   return { x: (a[0] + b[0]) / 2, y: (a[1] + b[1]) / 2, score: Math.min(a[2], b[2]) };
 }
 
+// The joint nearest the camera, as the engine reads the knee and elbow from that side alone. A rower
+// facing right shows their right side, facing left their left. With no facing known, the pair's
+// centre is used.
+function near(pose, left, right, facing) {
+  if (!facing) return middle(pose, left, right);
+  const [x, y, score] = pose[facing < 0 ? left : right] ?? [];
+  return x === undefined ? null : { x, y, score };
+}
+
 function mark(kind, vertex, a, b, value, label) {
   if (!vertex || !a || !b || value === null || value === undefined) return [];
   const sure = Math.min(vertex.score, a.score ?? 1, b.score ?? 1) >= MIN_SCORE;
@@ -182,20 +191,18 @@ function mark(kind, vertex, a, b, value, label) {
 
 // The angles to draw on one frame. Labels use the measured value, which is corrected for camera
 // view, while the arcs follow the image, so the two can differ on oblique shots.
-export function angleMarks(pose, angles, unsureLegs = false) {
+export function angleMarks(pose, angles, unsureLegs = false, facing = 0) {
   if (!pose) return [];
   const shoulder = middle(pose, 5, 6);
-  const elbow = middle(pose, 7, 8);
-  const wrist = middle(pose, 9, 10);
   const hip = middle(pose, 11, 12);
-  const knee = middle(pose, 13, 14);
-  const ankle = middle(pose, 15, 16);
   const above = hip && { x: hip.x, y: hip.y - 30 };
+  const [nearShoulder, elbow, wrist] = [5, 7, 9].map((left) => near(pose, left, left + 1, facing));
+  const [nearHip, knee, ankle] = [11, 13, 15].map((left) => near(pose, left, left + 1, facing));
   return [
     ...mark("trunk", hip, above, shoulder, angles.trunk, formatValue("lean", angles.trunk)),
-    ...mark("knee", knee, hip, ankle, angles.knee, formatValue("knee", angles.knee))
+    ...mark("knee", knee, nearHip, ankle, angles.knee, formatValue("knee", angles.knee))
       .map((item) => ({ ...item, sure: item.sure && !unsureLegs })),
-    ...mark("elbow", elbow, shoulder, wrist, angles.elbow, formatValue("elbow", angles.elbow)),
+    ...mark("elbow", elbow, nearShoulder, wrist, angles.elbow, formatValue("elbow", angles.elbow)),
   ];
 }
 

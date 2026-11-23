@@ -202,6 +202,16 @@ test("a frame with no pose has no angle marks", () => {
   assert.deepEqual(angleMarks(null, {}), []);
 });
 
+test("the knee and elbow arcs sit on the joints nearest the camera", () => {
+  const joints = pose();
+  joints[13] = [40, 50, 0.9];
+  joints[14] = [80, 70, 0.9];
+  const right = angleMarks(joints, { trunk: 14, knee: 90, elbow: 120 }, false, 1);
+  assert.deepEqual(right.find((item) => item.kind === "knee")?.vertex, { x: 80, y: 70, score: 0.9 });
+  const left = angleMarks(joints, { trunk: 14, knee: 90, elbow: 120 }, false, -1);
+  assert.deepEqual(left.find((item) => item.kind === "knee")?.vertex, { x: 40, y: 50, score: 0.9 });
+});
+
 test("arcs take the short way round", () => {
   const vertex = { x: 0, y: 0 };
   const short = arcBetween({ vertex, a: { x: 1, y: 0 }, b: { x: 0, y: 1 } });
