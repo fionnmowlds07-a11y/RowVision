@@ -115,7 +115,7 @@ To ground it, I built a labelling tool (`apps/preview`) and hand-labelled joints
 | Body angle within 5° of the label | 48% of frames (±9 points), typical gap 5° |
 | Knee angle within 5° of the label | 21% of frames, typical gap 18° |
 
-That knee result is why knee angles are shown as a guide and never scored. The rating takes rower size in pixels, camera angle, visibility and tracking into account, and the app gives **"film closer"** or **"film side-on"** advice instead of scores when footage is not good enough.
+That knee result is why knee angles are shown as a guide and never scored. The error grows as the rower gets smaller: the typical gap is 25° when the trunk is under 22 px tall, and 9° from 34 px up. A bigger pose model (RTMPose-x) did no better, so knee angles are hidden for rowers under 34 px, with a prompt to film closer. `services/vision/scripts/knee_bench.py` scores pose setups against the labels. The rating takes rower size in pixels, camera angle, visibility and tracking into account, and the app gives **"film closer"** or **"film side-on"** advice instead of scores when footage is not good enough.
 
 Correctness is also tested against **synthetic ground truth**: `synthetic.py` generates a rower with exactly known joint angles, viewed by a virtual camera at chosen angles, and the tests check the pipeline measures those angles back.
 
