@@ -68,6 +68,12 @@ FILM_CLOSER = (
     "Film closer, so that the boat fills most of the frame width."
 )
 
+MIN_KNEE_TRUNK_PX = 34.0
+"""Below this trunk length the knee is too few pixels across to place. Against 99 hand-labelled
+frames, smaller rowers had a typical knee error of 15 to 25 degrees, and larger ones 9 (issue 249)."""
+FILM_CLOSER_FOR_KNEES = "Film closer to see knee angles. The rower is too small to place the knee."
+KNEE_MEASURES = frozenset({"catch_knee_deg", "finish_knee_deg"})
+
 FILM_SIDE_ON = (
     "Too much of this video was filmed from in front of or behind the boat, so the results are "
     "unreliable and no scores were given. Film side-on, from directly alongside the boat."
@@ -382,12 +388,22 @@ def measure_rower(
         if len(values) and len(values) >= MIN_KNOWN_SHARE * len(source):
             summary[name] = float(np.median(values))
             spread[name] = float(np.subtract(*np.percentile(values, [75, 25])))
+    small = trunk_px < MIN_KNEE_TRUNK_PX
+    if small:
+        # The knee still times legs before body, which needs only when the leg starts to open, but
+        # its angle is not shown, on the card or on the video.
+        for name in KNEE_MEASURES:
+            summary.pop(name, None)
+            spread.pop(name, None)
     steadiness = rate_steadiness(counted)
     if np.isfinite(steadiness):
         summary["rate_steadiness"] = steadiness
     card = score_stroke(
         summary, spread, len(counted), timeline.rate_spm, targets if targets is not None else load_targets()
     )
+    if small:
+        card = _knees_hidden(card)
+        angles = replace(angles, knee=np.full_like(angles.knee, np.nan))
     if angle_frames is not None and (angle_note or len(angled) < MIN_STROKES):
         body = {metric.name for metric in card.metrics} - TIMING_MEASURES
         card = without_scores(card, body, angle_note or TOO_FEW_ON_ONE_SIDE)
@@ -453,6 +469,15 @@ def _unscored(card: ScoreCard) -> ScoreCard:
         for metric in card.metrics
     ]
     return ScoreCard(metrics, {}, None, card.extras)
+
+
+def _knees_hidden(card: ScoreCard) -> ScoreCard:
+    """Return the card with the knee measures saying to film closer, instead of a vague reason."""
+    metrics = [
+        replace(metric, reason=FILM_CLOSER_FOR_KNEES) if metric.name in KNEE_MEASURES else metric
+        for metric in card.metrics
+    ]
+    return replace(card, metrics=metrics)
 
 
 def _without_end_on(angles: AngleSeries, clear: NDArray[np.bool_]) -> AngleSeries:

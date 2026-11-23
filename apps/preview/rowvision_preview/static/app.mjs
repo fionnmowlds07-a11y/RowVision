@@ -296,7 +296,7 @@ function drawAngles(target, pose, index, size, only = null) {
   if (!pose) return;
   target.font = `${11 * size}px system-ui, sans-serif`;
   target.lineWidth = 1.5 * size;
-  const marks = angleMarks(pose, anglesAt(index), legsUnsure(viewAt(result, index)));
+  const marks = angleMarks(pose, anglesAt(index), legsUnsure(viewAt(result, index)), result.facing);
   for (const item of marks.filter(({ kind }) => !only || kind === only)) {
     const { start, end, anticlockwise } = arcBetween(item);
     const { x, y } = item.vertex;

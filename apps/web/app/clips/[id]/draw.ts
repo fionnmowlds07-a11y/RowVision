@@ -47,7 +47,7 @@ export function drawAngles(target: CanvasRenderingContext2D, scene: Scene, frame
   target.font = `${11 * size}px "DM Sans Variable", sans-serif`;
   target.lineWidth = 1.5 * size;
   const angles = { trunk: trunk[frame], knee: knee[frame], elbow: elbow[frame] };
-  const marks = angleMarks(pose, angles, legsUnsure(viewOf(scene, frame)));
+  const marks = angleMarks(pose, angles, legsUnsure(viewOf(scene, frame)), facingAt(scene.facing, scene.otherSide, frame));
   for (const item of marks.filter(({ kind }) => !only || kind === only)) {
     const { start, end, anticlockwise } = arcBetween({ vertex: item.vertex, a: item.a, b: item.b });
     const { x, y } = item.vertex;
