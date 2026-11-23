@@ -5,7 +5,10 @@ from crew import crew_detections, crossing_sides_detections, distant_people, two
 from rowvision.pipeline import (
     COARSE_STEP,
     FILM_CLOSER,
+    FILM_CLOSER_FOR_KNEES,
     FILM_SIDE_ON,
+    KNEE_MEASURES,
+    MIN_KNEE_TRUNK_PX,
     OTHER_SIDE,
     Analysis,
     Request,
@@ -401,12 +404,27 @@ def panned_to_end_on() -> tuple[FloatArray, np.ndarray, StrokeTimeline]:
     return points, clear, timeline
 
 
-def measured(points: FloatArray, clear: np.ndarray | None, timeline: StrokeTimeline) -> RowerResult:
+def measured(
+    points: FloatArray, clear: np.ndarray | None, timeline: StrokeTimeline, trunk_px: float = 60.0
+) -> RowerResult:
     frames = len(points)
     return measure_rower(
         1, points, np.full((frames, 17), 0.9), 1, 0.0, np.zeros(frames), FPS, timeline,
-        trunk_px=60.0, coverage=1.0, clear=clear,
+        trunk_px=trunk_px, coverage=1.0, clear=clear,
     )  # fmt: skip
+
+
+def test_a_small_rower_gets_no_knee_angles_but_keeps_legs_before_body() -> None:
+    clip = generate(strokes=8, facing=1, pixel_noise=0.5, seed=5)
+    timeline = detect_strokes(reach_signal(clip.points, 1), FPS)
+    large = measured(clip.points, None, timeline)
+    small = measured(clip.points, None, timeline, trunk_px=MIN_KNEE_TRUNK_PX - 1)
+    assert "catch_knee_deg" in large.summary and "catch_knee_deg" not in small.summary
+    knees = {m.name: m for m in small.card.metrics if m.name in KNEE_MEASURES}
+    assert knees
+    assert all(m.value is None and m.reason == FILM_CLOSER_FOR_KNEES for m in knees.values())
+    assert small.angles is not None and np.isnan(small.angles.knee).all()
+    assert small.summary["legs_lead"] == large.summary["legs_lead"]
 
 
 def test_strokes_filmed_end_on_do_not_count_towards_body_angles() -> None:
