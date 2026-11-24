@@ -62,3 +62,4 @@ docs/home-worker.md
 docs/deployment.md
 apps/web/AGENTS.md
 .wrangler/
+*.egg-info/
