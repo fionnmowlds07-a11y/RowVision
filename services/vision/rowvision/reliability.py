@@ -128,7 +128,7 @@ def _warnings(evidence: Evidence) -> list[str]:
         warnings.append(f"Only {strokes} measured. Film at least 10.")
     if evidence.misplaced >= MISPLACED_WARNING:
         warnings.append(
-            f"Tracking slipped onto another rower for {evidence.misplaced:.0%} of the time you were "
+            f"Tracking slipped outside your boat for {evidence.misplaced:.0%} of the time you were "
             "seen. Those frames were left out, so check your results."
         )
     if evidence.crew_agreement is not None and evidence.crew_agreement < LOW_AGREEMENT:

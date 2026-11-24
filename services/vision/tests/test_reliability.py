@@ -184,5 +184,5 @@ def test_frames_on_the_wrong_person_lower_the_rating_and_warn() -> None:
 
     slipped = rate(replace(CLEAR, misplaced=0.2))
     assert slipped.accuracy == pytest.approx(rate(CLEAR).accuracy * 0.8)
-    assert any("another rower for 20%" in warning for warning in slipped.warnings)
-    assert not any("another rower" in warning for warning in rate(replace(CLEAR, misplaced=0.02)).warnings)
+    assert any("outside your boat for 20%" in warning for warning in slipped.warnings)
+    assert not any("outside your boat" in warning for warning in rate(replace(CLEAR, misplaced=0.02)).warnings)
