@@ -100,6 +100,14 @@ export function overallGap(strokes: number, phases: Record<string, unknown>, min
   return "No overall score: it needs both the catch and the finish to be scored.";
 }
 
+/** Measures read only from when the catch and finish happen, as services/vision/rowvision/pipeline.py has them. */
+export const TIMING_MEASURES = new Set(["drive_share", "drive_s", "recovery_s", "ratio", "rate_steadiness"]);
+
+/** A timing measure found from the whole crew's catches and finishes, so the same for every seat. */
+export function crewTimed(rower: { crew_timed?: boolean }, name: string) {
+  return rower.crew_timed === true && TIMING_MEASURES.has(name);
+}
+
 const isShare = (name: string) => name === "drive_share" || name === "legs_lead";
 
 const isSeconds = (name: string) => name === "drive_s" || name === "recovery_s";

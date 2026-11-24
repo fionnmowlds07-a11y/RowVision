@@ -147,9 +147,14 @@ class RowerResult:
     side: str | None = None
     """The side a sweep rower rows on, kept so the rower can be measured again."""
     no_scores: str | None = None
+    """Why no scores were given, when the footage cannot support any."""
     left_out: list[int] = field(default_factory=list)
     """Catch frames of strokes filmed end-on, which are listed but do not count."""
-    """Why no scores were given, when the footage cannot support any."""
+    unseen: list[int] = field(default_factory=list)
+    """Catch frames of strokes with no pose of this rower at the catch or finish, which do not count."""
+    crew_timed: bool = False
+    """The catches and finishes were found from the whole crew, so drive and recovery times are the
+    crew's, the same for every seat."""
 
 
 @dataclass(frozen=True)
@@ -373,7 +378,12 @@ def measure_rower(
     if clear is not None and in_clear:
         angles = _without_end_on(angles, clear)
     strokes = per_stroke(angles, timeline, fps, catch_lean_readable=readable)
-    counted = [s for s in strokes if clear is None or not in_clear or clear[s.catch_frame]] or strokes
+    # A crew's timeline gives every seat every stroke, including ones where this seat has no pose of
+    # its own. Those would add crew timing, and nothing of the rower, to the rower's results. On an
+    # eight, 14 of the stroke seat's 38 strokes had no pose at all (issue 239).
+    posed = np.isfinite(points[:, sk.LEFT_SHOULDER, 0]) | np.isfinite(points[:, sk.RIGHT_SHOULDER, 0])
+    seen = [s for s in strokes if posed[s.catch_frame] and posed[s.finish_frame]]
+    counted = [s for s in seen if clear is None or not in_clear or clear[s.catch_frame]] or seen
     # When the camera crossed the boat, body angles come only from strokes on one side, where the
     # body is seen the same way. Timing reads the same from either side, so it uses every stroke.
     angled = counted if angle_frames is None else [s for s in counted if angle_frames[s.catch_frame]]
@@ -430,7 +440,9 @@ def measure_rower(
         angles=angles,
         side=side,
         no_scores=FILM_SIDE_ON if too_end_on else None,
-        left_out=[s.catch_frame for s in strokes if all(s is not kept for kept in counted)],
+        left_out=[s.catch_frame for s in seen if all(s is not kept for kept in counted)],
+        unseen=[s.catch_frame for s in strokes if all(s is not kept for kept in seen)],
+        crew_timed=shared is not None,
     )
 
 

@@ -158,6 +158,8 @@ def rower_json(
         "rating": _rating(rower.rating),
         "no_scores": getattr(rower, "no_scores", None),
         "left_out": list(getattr(rower, "left_out", [])),
+        "unseen": list(getattr(rower, "unseen", [])),
+        "crew_timed": bool(getattr(rower, "crew_timed", False)),
         "evidence": _evidence(rower),
         "fade": {name: _finite(change) for name, change in getattr(rower, "fade", {}).items()},
     }

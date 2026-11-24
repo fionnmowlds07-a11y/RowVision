@@ -136,7 +136,12 @@ def _remeasure_one(
         clear=saved_clear(summary.get("shots"), count),
     )
     # The joints are kept as filmed, for drawing over the picture.
-    result = replace(result, timing=_saved_timing(saved.get("timing")), points=points)
+    result = replace(
+        result,
+        timing=_saved_timing(saved.get("timing")),
+        points=points,
+        crew_timed=saved.get("crew_timed") is True,
+    )
     if evidence:
         return result
     # Older results did not save what the rating came from, so the rating itself is kept.

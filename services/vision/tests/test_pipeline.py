@@ -439,6 +439,24 @@ def test_strokes_filmed_end_on_do_not_count_towards_body_angles() -> None:
     assert measured(points, None, timeline).left_out == []
 
 
+def test_strokes_without_the_rowers_own_pose_do_not_count() -> None:
+    clip = generate(strokes=10, facing=1, pixel_noise=0.5, seed=5)
+    timeline = detect_strokes(reach_signal(clip.points, 1), FPS)
+    points = clip.points.copy()
+    gone = timeline.catches[1], timeline.catches[3]
+    gone_strokes = [stroke for stroke in measured(points, None, timeline).strokes if stroke.catch_frame in gone]
+    for stroke in gone_strokes:
+        points[stroke.catch_frame - 2 : stroke.finish_frame + 3] = np.nan
+    whole = measured(clip.points, None, timeline)
+    rower = measured(points, None, timeline)
+    assert rower.unseen == list(gone)
+    assert rower.left_out == []
+    assert len(rower.strokes) == len(whole.strokes)
+    assert rower.evidence is not None and whole.evidence is not None
+    assert rower.evidence.strokes == whole.evidence.strokes - 2
+    assert rower.crew_timed and whole.unseen == []
+
+
 def test_a_clip_filmed_end_on_throughout_is_measured_as_before() -> None:
     points, _, timeline = panned_to_end_on()
     whole = np.zeros(len(points), dtype=bool)
