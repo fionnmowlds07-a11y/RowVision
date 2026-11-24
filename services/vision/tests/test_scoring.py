@@ -28,6 +28,15 @@ def card(summary: dict, spread: dict | None = None, strokes: int = 8, rate: floa
     return score_stroke(summary, spread or STEADY, strokes, rate, load_targets())
 
 
+def test_the_shin_is_a_guide_and_is_left_out_when_it_swings() -> None:
+    def shin(spread: float) -> MetricScore:
+        card = score_stroke({**GOOD, "catch_shin_deg": -13.0}, {"catch_shin_deg": spread}, 8, 24, load_targets())
+        return next(metric for metric in card.metrics if metric.name == "catch_shin_deg")
+
+    assert (shin(5.0).value, shin(5.0).score) == (-13.0, None)
+    assert shin(15.0).value is None and shin(15.0).reason == TOO_INCONSISTENT
+
+
 def test_every_target_has_a_source() -> None:
     targets = load_targets()
     assert targets.status == "provisional"

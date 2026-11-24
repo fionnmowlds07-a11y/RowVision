@@ -120,6 +120,10 @@ export function formatValue(name: string, value: number | null | undefined) {
   if (name === "rate_steadiness") return `within ${Math.max(Math.round(value), 1)}%`;
   if (name === "arms_break") return `${Math.round(value * 100)}% through the drive`;
   if (name === "stroke_length") return `${value.toFixed(1)} trunk lengths`;
+  if (name === "catch_shin_deg") {
+    const degrees = Math.round(Math.abs(value));
+    return degrees === 0 ? "vertical" : `${degrees}° ${value < 0 ? "short of" : "past"} vertical`;
+  }
   return `${Math.round(Math.abs(value))}°${leanWord(name, value)}`;
 }
 
@@ -147,6 +151,7 @@ export function formatTarget(name: string, target: Pick<Target, "low" | "high"> 
   if (!target) return "no target";
   const { low, high } = target;
   if (high === null) return `at least ${formatValue(name, low)}`;
+  if (name === "catch_shin_deg") return low === -high ? `within ${high}° of vertical` : `${formatValue(name, low)} to ${formatValue(name, high)}`;
   if (name.includes("lean") && low < 0) {
     return `${Math.round(Math.abs(high))}–${Math.round(Math.abs(low))}° back`;
   }

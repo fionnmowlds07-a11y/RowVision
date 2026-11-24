@@ -73,8 +73,8 @@ FILM_CLOSER = (
 MIN_KNEE_TRUNK_PX = 34.0
 """Below this trunk length the knee is too few pixels across to place. Against 99 hand-labelled
 frames, smaller rowers had a typical knee error of 15 to 25 degrees, and larger ones 9 (issue 249)."""
-FILM_CLOSER_FOR_KNEES = "Film closer to see knee angles. The rower is too small to place the knee."
-KNEE_MEASURES = frozenset({"catch_knee_deg", "finish_knee_deg"})
+FILM_CLOSER_FOR_KNEES = "Film closer to see leg angles. The rower is too small to place the knee."
+KNEE_MEASURES = frozenset({"catch_knee_deg", "finish_knee_deg", "catch_shin_deg"})
 
 FILM_SIDE_ON = (
     "Too much of this video was filmed from in front of or behind the boat, so the results are "
@@ -512,6 +512,7 @@ def _without_end_on(angles: AngleSeries, clear: NDArray[np.bool_]) -> AngleSerie
         np.where(clear, angles.knee, np.nan),
         np.where(clear, angles.elbow, np.nan),
         None if angles.reach is None else np.where(clear, angles.reach, np.nan),
+        None if angles.shin is None else np.where(clear, angles.shin, np.nan),
     )
 
 

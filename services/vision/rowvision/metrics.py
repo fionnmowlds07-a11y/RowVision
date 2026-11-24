@@ -18,6 +18,9 @@ MIN_SHIN_TO_THIGH, MAX_SHIN_TO_THIGH = 0.5, 1.7
 CATCH_KNEE_RANGE = (30.0, 115.0)
 FINISH_KNEE_RANGE = (130.0, 185.0)
 """What a body can do at each moment. Values outside are misplaced joints, not poor technique."""
+CATCH_SHIN_RANGE = (-40.0, 30.0)
+"""Wider than any real catch, so this only drops a misplaced ankle. Where the knee on the same
+stroke was not believed, the shin is not either, as it is read from the same joints."""
 CATCH_ELBOW_RANGE = (130.0, 185.0)
 FINISH_ELBOW_RANGE = (20.0, 110.0)
 """The hands are at the body at the finish, which no arm can do without bending well past a right
@@ -63,6 +66,9 @@ class AngleSeries:
     elbow: FloatArray
     reach: FloatArray | None = None
     """How far the hands are ahead of the knees along the boat, in trunk lengths."""
+    shin: FloatArray | None = None
+    """How far the shin leans from vertical. Negative is short of vertical, with the knee still
+    towards the bow from the ankle. Positive is past it."""
 
 
 @dataclass(frozen=True)
@@ -90,6 +96,8 @@ class StrokeMetrics:
     """How far through the drive the arms start to bend, as a share of the drive."""
     stroke_length: float = float("nan")
     """How far the hands travel along the boat from catch to finish, in trunk lengths."""
+    catch_shin_deg: float = float("nan")
+    """How far the shin leans from vertical at the catch. Negative is short of vertical."""
 
 
 MEASURES = tuple(
@@ -200,16 +208,21 @@ def angle_series(
     # The knee is read from the near leg alone. Averaging in the far leg, which the model often loses,
     # dragged the angle up or down by the same amount the far knee was misplaced.
     knee = joint_angle(*sk.near_leg(side_on, facing))
+    believable = legs_believable(side_on, facing)
+    _, knee_point, ankle_point = sk.near_leg(side_on, facing)
     sweep = side in ("stroke", "bow")
     return AngleSeries(
         trunk_lean=_sweep_lean(points, facing, view_deg, str(side), turn)
         if sweep
         else lean_from_vertical(hip, shoulder, facing),
-        knee=np.where(legs_believable(side_on, facing), knee, np.nan),
+        knee=np.where(believable, knee, np.nan),
         # The elbow is read from the near arm alone, for the same reason. The midpoint of two arms that
         # sit apart in the picture is a point on neither of them.
         elbow=joint_angle(*sk.near_arm(side_on, facing)),
         reach=_reach(side_on, facing, view_deg),
+        # From the picture's vertical, as the body angle is. The line of the boat would not do as a
+        # level: off side-on it slopes by perspective, up to 47 degrees on real clips (issue 253).
+        shin=np.where(believable, lean_from_vertical(ankle_point, knee_point, facing), np.nan),
     )
 
 
@@ -249,6 +262,13 @@ def _catch_lean(trunk_lean: FloatArray, catch: int) -> float:
     if not np.isfinite(window).any():
         return float("nan")
     return float(np.nanmedian(window))
+
+
+def _catch_shin(angles: AngleSeries, catch: int) -> float:
+    """Return the shin's lean at the catch, or NaN where the leg was not one a body could make."""
+    if angles.shin is None or not np.isfinite(_catch_knee(angles.knee, catch)):
+        return float("nan")
+    return _within(_catch_lean(angles.shin, catch), CATCH_SHIN_RANGE)
 
 
 def _catch_knee(knee: FloatArray, catch: int) -> float:
@@ -323,6 +343,7 @@ def per_stroke(
                 catch_elbow_deg=catch_elbow,
                 arms_break=_arms_break(angles.elbow, catch, finish) if arms_seen else float("nan"),
                 stroke_length=_stroke_length(angles.reach, catch, finish),
+                catch_shin_deg=_catch_shin(angles, catch),
             )
         )
     return results
