@@ -52,8 +52,11 @@ export function viewAt(result: ViewSource | null | undefined, frame: number) {
   return result?.views?.[frame] ?? result?.view_deg ?? 0;
 }
 
-export function legsUnsure(viewDeg: number) {
-  return viewDeg >= UNSURE_LEGS_VIEW_DEG;
+// A missing knee angle on a frame with a pose means the engine did not believe the leg: an ankle up by
+// the hands, a shin the wrong length, or a rower too small to place the knee. Drawing that leg solid
+// would show as a measurement what the numbers have already thrown out (issue 241).
+export function legsUnsure(viewDeg: number, knee?: number | null) {
+  return viewDeg >= UNSURE_LEGS_VIEW_DEG || knee === null;
 }
 
 export function limbSegments(pose: Pose, unsureLegs = false) {

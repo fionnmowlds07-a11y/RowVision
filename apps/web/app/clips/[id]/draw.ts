@@ -25,11 +25,15 @@ function viewOf(scene: Scene, frame: number): number {
   return viewAt({ views: scene.views, view_deg: scene.viewDeg }, frame);
 }
 
+function legsUnsureAt(scene: Scene, frame: number): boolean {
+  return legsUnsure(viewOf(scene, frame), scene.angles.knee[frame] ?? null);
+}
+
 /** `size` keeps lines and labels the same on screen at any zoom. */
 export function drawPose(target: CanvasRenderingContext2D, scene: Scene, frame: number, size: number) {
   target.lineWidth = 1.5 * size;
   target.lineCap = "round";
-  for (const { start, end, side, sure } of limbSegments(scene.poses[frame], legsUnsure(viewOf(scene, frame)))) {
+  for (const { start, end, side, sure } of limbSegments(scene.poses[frame], legsUnsureAt(scene, frame))) {
     target.strokeStyle = COLOURS[side as keyof typeof COLOURS];
     target.setLineDash(sure ? [] : [3 * size, 3 * size]);
     target.beginPath();
@@ -47,7 +51,7 @@ export function drawAngles(target: CanvasRenderingContext2D, scene: Scene, frame
   target.font = `${11 * size}px "DM Sans Variable", sans-serif`;
   target.lineWidth = 1.5 * size;
   const angles = { trunk: trunk[frame], knee: knee[frame], elbow: elbow[frame] };
-  const marks = angleMarks(pose, angles, legsUnsure(viewOf(scene, frame)), facingAt(scene.facing, scene.otherSide, frame));
+  const marks = angleMarks(pose, angles, legsUnsureAt(scene, frame), facingAt(scene.facing, scene.otherSide, frame));
   for (const item of marks.filter(({ kind }) => !only || kind === only)) {
     const { start, end, anticlockwise } = arcBetween({ vertex: item.vertex, a: item.a, b: item.b });
     const { x, y } = item.vertex;

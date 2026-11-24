@@ -474,6 +474,12 @@ test("legs are doubted once the camera is well off side-on", () => {
   assert.equal(legsUnsure(25), true);
 });
 
+test("legs are doubted on a frame where the engine threw out the knee", () => {
+  assert.equal(legsUnsure(10, null), true);
+  assert.equal(legsUnsure(10, 95), false);
+  assert.equal(legsUnsure(10), false);
+});
+
 test("the view comes from the frame, then the clip", () => {
   assert.equal(viewAt({ views: [10, 40], view_deg: 20 }, 1), 40);
   assert.equal(viewAt({ views: [null, 40], view_deg: 20 }, 0), 20);
