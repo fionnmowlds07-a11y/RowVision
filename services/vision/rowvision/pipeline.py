@@ -571,7 +571,7 @@ def _leave_out_misplaced(
     order = sorted(seats)
     if not order or not len(nearest):
         return {}
-    wrong = misplaced([seats[seat].centre() for seat in order], [seats[seat].trunk() for seat in order], order)
+    wrong = misplaced([seats[seat].centre() for seat in order], [seats[seat].trunk() for seat in order])
     later = np.minimum(nearest + 1, wrong.shape[1] - 1)
     shares: dict[int | None, float] = {}
     for row, seat in enumerate(order):

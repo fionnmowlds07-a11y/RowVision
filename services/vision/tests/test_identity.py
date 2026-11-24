@@ -21,7 +21,7 @@ def crew(frames: int = 20, spacing: float = 150.0, slope: float = 0.0, shrink: f
 
 
 def flagged(centres: list[np.ndarray]) -> np.ndarray:
-    return misplaced(centres, [TRUNK] * len(centres), SEATS)
+    return misplaced(centres, [TRUNK] * len(centres))
 
 
 def test_a_clean_crew_is_left_alone_even_at_an_angle_and_in_perspective() -> None:
@@ -37,23 +37,11 @@ def test_a_seat_on_a_rower_in_another_boat_is_found() -> None:
     assert not wrong[:, :5].any() and not np.delete(wrong, 6, axis=0).any()
 
 
-def test_seats_numbered_one_along_over_a_missing_seat_are_found() -> None:
-    centres = crew()
-    shifted = [line.copy() for line in centres]
-    shifted[7][5:15] = centres[6][5:15]
-    shifted[6][5:15] = centres[5][5:15]
-    shifted[5][5:15] = np.nan
-    wrong = flagged(shifted)
-    assert wrong[6, 5:15].all() and wrong[7, 5:15].all()
-    assert not wrong[:5].any()
-
-
-def test_two_seats_on_one_rower_are_found() -> None:
-    centres = crew()
-    centres[7][:, 0] = centres[6][:, 0] + 20
-    wrong = flagged(centres)
-    assert wrong[6:].any(axis=0).all()
-    assert not wrong[:5].any()
+def test_seats_on_the_wrong_rower_in_their_own_boat_are_left_alone() -> None:
+    # It cannot be told which of them is right, so none are dropped (issue 240).
+    shared = crew()
+    shared[0][:] = shared[1]
+    assert not flagged(shared).any()
 
 
 def test_too_few_seats_say_nothing() -> None:
@@ -62,7 +50,7 @@ def test_too_few_seats_say_nothing() -> None:
         line[:] = np.nan
     centres[2][:, 1] -= 3 * TRUNK
     assert not flagged(centres).any()
-    assert not misplaced(crew()[:3], [TRUNK] * 3, [1, 2, 3]).any()
+    assert not misplaced(crew()[:3], [TRUNK] * 3).any()
 
 
 def test_frames_on_someone_else_are_left_out_of_the_measured_seat() -> None:
