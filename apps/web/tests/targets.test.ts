@@ -108,4 +108,12 @@ describe("checks on a range", () => {
     expect(cleanTargets({ ...GENERAL_TARGETS, catch_lean_deg: { low: 26, high: 31, counts: "yes" } })).toBeNull();
     expect(cleanTargets("nope")).toBeNull();
   });
+
+  it("keeps choices saved before the shin was measured, with the shin shown only", () => {
+    const before = Object.fromEntries(Object.entries(mine({ catch_knee_deg: { low: 70, high: 75, counts: true } })).filter(([name]) => name !== "catch_shin_deg"));
+    const kept = cleanTargets(before);
+    expect(kept?.catch_knee_deg).toEqual({ low: 70, high: 75, counts: true });
+    expect(kept?.catch_shin_deg).toEqual(GENERAL_TARGETS.catch_shin_deg);
+    expect(cleanTargets({ ...GENERAL_TARGETS, finish_knee_deg: undefined })).toBeNull();
+  });
 });

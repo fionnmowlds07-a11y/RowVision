@@ -118,6 +118,10 @@ test("values read in rowing terms", () => {
   assert.equal(formatValue("catch_lean_deg", 25.4), "25° forward");
   assert.equal(formatValue("finish_lean_deg", -22.6), "23° back");
   assert.equal(formatValue("catch_knee_deg", 50.2), "50°");
+  assert.equal(formatValue("catch_shin_deg", -13.2), "13° short of vertical");
+  assert.equal(formatValue("catch_shin_deg", 3.4), "3° past vertical");
+  assert.equal(formatValue("catch_shin_deg", 0.2), "vertical");
+  assert.equal(formatTarget("catch_shin_deg", { low: -2, high: 2 }), "within 2° of vertical");
   assert.equal(formatValue("drive_share", 0.42), "42%");
   assert.equal(formatValue("catch_knee_deg", null), "not measured");
 });

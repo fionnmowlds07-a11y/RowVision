@@ -8,7 +8,7 @@
 
 import type { Metric, Rower } from "./result";
 
-export type TargetName = "catch_lean_deg" | "finish_lean_deg" | "catch_knee_deg" | "finish_knee_deg";
+export type TargetName = "catch_lean_deg" | "finish_lean_deg" | "catch_knee_deg" | "catch_shin_deg" | "finish_knee_deg";
 export type TargetChoice = { low: number; high: number; counts: boolean };
 export type TargetChoices = Record<TargetName, TargetChoice>;
 
@@ -24,14 +24,16 @@ export const TARGET_METRICS: { name: TargetName; label: string; help: string; ph
   { name: "catch_lean_deg", label: "Body angle at the catch", help: "Trunk from vertical, forward is positive", phase: "catch", min: 0, max: 60 },
   { name: "finish_lean_deg", label: "Body angle at the finish", help: "Leaning back is negative", phase: "finish", min: -50, max: 10 },
   { name: "catch_knee_deg", label: "Knee angle at the catch", help: "Inner angle, 180 is a straight leg. The boat often hides the feet, so this is partly a guess", phase: "catch", min: 20, max: 100 },
+  { name: "catch_shin_deg", label: "Shin angle at the catch", help: "From vertical, 0 is vertical and short of it is negative. The boat often hides the ankle, so this can be 10° out or more", phase: "catch", min: -30, max: 30 },
   { name: "finish_knee_deg", label: "Knee angle at the finish", help: "Inner angle, 180 is a straight leg. The boat often hides the feet, so this is partly a guess", phase: "finish", min: 120, max: 185 },
 ];
 
-/** Knees are shown as a rough guide until the athlete chooses to count them. */
+/** Knees and shins are shown as a rough guide until the athlete chooses to count them. */
 export const GENERAL_TARGETS: TargetChoices = {
   catch_lean_deg: { low: 26, high: 31, counts: true },
   finish_lean_deg: { low: -25, high: -20, counts: true },
   catch_knee_deg: { low: 50, high: 55, counts: false },
+  catch_shin_deg: { low: -2, high: 2, counts: false },
   finish_knee_deg: { low: 167, high: 172, counts: false },
 };
 
@@ -61,7 +63,8 @@ export function cleanTargets(value: unknown): TargetChoices | null {
   const saved = value as Record<string, unknown>;
   const result = {} as TargetChoices;
   for (const { name } of TARGET_METRICS) {
-    const item = saved[name];
+    // Choices saved before the shin was measured keep everything else the athlete set.
+    const item = saved[name] ?? (name === "catch_shin_deg" ? GENERAL_TARGETS[name] : undefined);
     if (!item || typeof item !== "object") return null;
     const { low, high, counts } = item as Record<string, unknown>;
     if (typeof low !== "number" || typeof high !== "number" || typeof counts !== "boolean") return null;

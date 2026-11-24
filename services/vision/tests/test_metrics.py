@@ -396,3 +396,34 @@ def test_a_sculler_is_measured_as_before() -> None:
     clip = generate(strokes=4, view_deg=30)
     plain = angle_series(clip.points, clip.facing, 30).trunk_lean
     assert np.allclose(angle_series(clip.points, clip.facing, 30, "scull").trunk_lean, plain)
+
+
+@pytest.mark.parametrize("facing", [1, -1])
+def test_the_shin_is_measured_from_vertical_and_past_it_is_positive(facing: int) -> None:
+    clip = generate(strokes=4, facing=facing, pixel_noise=0.0, seed=1)
+    for lean in (-15.0, 0.0, 8.0):
+        points = clip.points.copy()
+        knee = points[:, [13, 14]]
+        drop = np.linalg.norm(points[:, [13, 14]] - points[:, [11, 12]], axis=-1, keepdims=True)
+        along = np.array([facing * np.sin(np.radians(lean)), -np.cos(np.radians(lean))])
+        points[:, [15, 16]] = knee - along * drop
+        shin = angle_series(points, facing, 0.0).shin
+        assert shin is not None
+        assert np.nanmedian(shin) == pytest.approx(lean, abs=0.5)
+
+
+def test_a_shin_the_engine_does_not_believe_is_left_out() -> None:
+    clip = generate(strokes=4, facing=1, pixel_noise=0.0, seed=1)
+    points = clip.points.copy()
+    points[:, [15, 16], 1] = points[:, [11, 12], 1] - 50
+    shin = angle_series(points, 1, 0.0).shin
+    assert shin is not None and np.isnan(shin).all()
+
+
+@pytest.mark.parametrize(("lean", "knee"), [(-55.0, 80.0), (45.0, 80.0), (-10.0, 150.0)])
+def test_a_shin_no_body_could_make_at_the_catch_is_left_out(lean: float, knee: float) -> None:
+    flat = np.full(400, 80.0)
+    angles = AngleSeries(flat, np.full(400, knee), flat, shin=np.full(400, lean))
+    assert all(np.isnan(stroke.catch_shin_deg) for stroke in per_stroke(angles, TIMELINE))
+    fine = AngleSeries(flat, flat, flat, shin=np.full(400, -10.0))
+    assert all(stroke.catch_shin_deg == -10.0 for stroke in per_stroke(fine, TIMELINE))

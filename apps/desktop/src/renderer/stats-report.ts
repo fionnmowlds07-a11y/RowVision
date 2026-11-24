@@ -76,6 +76,7 @@ export const MEASURES: { name: string; label: string; show: (value: number) => s
   { name: "finish_lean_deg", label: "Finish lean", show: (v) => deg(v) },
   { name: "body_swing_deg", label: "Body swing", show: (v) => deg(v) },
   { name: "catch_knee_deg", label: "Catch knee", show: (v) => deg(v) },
+  { name: "catch_shin_deg", label: "Catch shin from vertical", show: (v) => deg(v) },
   { name: "finish_knee_deg", label: "Finish knee", show: (v) => deg(v) },
   { name: "catch_elbow_deg", label: "Elbow at the catch", show: (v) => deg(v, 0) },
   { name: "finish_elbow_deg", label: "Elbow at the finish", show: (v) => deg(v, 0) },

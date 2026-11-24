@@ -8,6 +8,7 @@ status: provisional  # Not yet reviewed by a coach
 angle_conventions:
   trunk_lean_deg: Hip-to-shoulder line from vertical. Forward towards the stern is positive.
   knee_deg: Inner angle at the knee. 180 is a straight leg.
+  shin_deg: Ankle-to-knee line from vertical. Past vertical towards the stern is positive.
   drive_share: Drive time as a share of the full stroke cycle.
 
 targets:
@@ -32,6 +33,13 @@ targets:
     sources: ["24146710", "40708773"]
     evidence: project judgement, near the studies' 167 to 169
     note: Legs are flat at the finish, but the knee never reads a full 180 as the thigh slopes down to the seat.
+  catch_shin_deg:
+    min: -2
+    max: 2
+    sources:
+      - https://rowingcanada.org/uploads/2020/11/Canadian-Rowing-Model-Technique_FINAL.pdf
+    evidence: coaching
+    note: The source says shins perpendicular at full reach. The 2 degrees either side is project judgement.
   drive_share:
     by_rate_spm:
       22: 0.394

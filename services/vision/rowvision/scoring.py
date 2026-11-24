@@ -10,6 +10,9 @@ from rowvision.reference import Target, Targets
 MIN_STROKES = 3
 ANGLE_FALLOFF_DEG = 10.0
 ROUGH_GUIDE = "Shown as a rough guide. Knee angles depend on body proportions and are hard to measure."
+SHIN_GUIDE = (
+    "Shown as a rough guide. The boat often hides the ankle, so this is often 10 degrees out or more."
+)
 NEEDED_FOR_OVERALL = ("catch", "finish")
 SHOWN_ONLY = "Shown only. There is no published target for this yet, so it is not scored."
 ELBOW_GUIDE = "Shown as a rough guide. The arm is small in the picture, so this varies a lot."
@@ -39,6 +42,9 @@ RULES = {
     "catch_lean_deg": MetricRule(Phase.CATCH, "Body angle at the catch", ANGLE_FALLOFF_DEG, 10.0),
     "catch_knee_deg": MetricRule(
         Phase.CATCH, "Knee angle at the catch", ANGLE_FALLOFF_DEG, 10.0, scored=False
+    ),
+    "catch_shin_deg": MetricRule(
+        Phase.CATCH, "Shin angle at the catch", ANGLE_FALLOFF_DEG, 10.0, scored=False
     ),
     "legs_lead": MetricRule(Phase.DRIVE, "Legs before body", 0.2, 0.3),
     "finish_lean_deg": MetricRule(Phase.FINISH, "Layback at the finish", ANGLE_FALLOFF_DEG, 10.0),
@@ -111,6 +117,10 @@ def _score_metric(
     value = summary.get(name)
     if value is None or not np.isfinite(value):
         return skip("Could not be seen reliably in this video.")
+    if name == "catch_shin_deg":
+        # The ankle wanders more than any other joint, so a shin that swings is not shown at all.
+        unsteady = spread.get(name, 0.0) > rule.max_spread
+        return skip(TOO_INCONSISTENT) if unsteady else skip(SHIN_GUIDE, value)
     if not rule.scored:
         return skip(ROUGH_GUIDE, value)
     if strokes < MIN_STROKES:
