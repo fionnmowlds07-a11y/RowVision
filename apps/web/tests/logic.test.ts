@@ -21,6 +21,7 @@ import {
   labelSpot,
   laneMarks,
   legsUnsure,
+  crewTimed,
   limbSegments,
   measureKind,
   median,
@@ -472,6 +473,18 @@ test("a missing overall score says what it needs", () => {
 test("legs are doubted once the camera is well off side-on", () => {
   assert.equal(legsUnsure(24.9), false);
   assert.equal(legsUnsure(25), true);
+});
+
+test("timing measures are the crew's when the crew was timed together", () => {
+  assert.equal(crewTimed({ crew_timed: true }, "drive_s"), true);
+  assert.equal(crewTimed({ crew_timed: true }, "catch_lean_deg"), false);
+  assert.equal(crewTimed({}, "drive_s"), false);
+});
+
+test("legs are doubted on a frame where the engine threw out the knee", () => {
+  assert.equal(legsUnsure(10, null), true);
+  assert.equal(legsUnsure(10, 95), false);
+  assert.equal(legsUnsure(10), false);
 });
 
 test("the view comes from the frame, then the clip", () => {

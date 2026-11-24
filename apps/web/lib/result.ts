@@ -60,6 +60,10 @@ export type Rower = {
   no_scores?: string | null;
   /** Catch frames of strokes filmed end-on, which are listed but do not count. */
   left_out?: number[];
+  /** Catch frames of strokes where this rower had no pose of their own, which do not count. */
+  unseen?: number[];
+  /** Strokes were timed from the whole crew, so drive and recovery times are the same for every seat. */
+  crew_timed?: boolean;
   evidence?: Evidence | null;
   /** The change in each measure from the first half of the strokes to the second. */
   fade?: Record<string, number | null>;

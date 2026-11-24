@@ -26,6 +26,9 @@ MIN_FULL_STROKES = 5
 MIN_STROKES_FOR_SPREAD = 3
 LOW_AGREEMENT = 0.5
 LOW_COVERAGE = 0.7
+MISPLACED_WARNING = 0.05
+"""From this share of frames on the wrong person, the rower is told, as the frames left near them
+may be wrong too."""
 OBLIQUE_VIEW_DEG = 25.0
 
 
@@ -64,6 +67,8 @@ class Evidence:
     """Share of the boat's frames where this rower was measured."""
     strokes: int
     crew_agreement: float | None = None
+    misplaced: float = 0.0
+    """Share of this rower's frames left out because their tracking sat on someone else."""
 
 
 @dataclass(frozen=True)
@@ -121,6 +126,11 @@ def _warnings(evidence: Evidence) -> list[str]:
     if evidence.strokes < MIN_FULL_STROKES:
         strokes = "1 full stroke was" if evidence.strokes == 1 else f"{evidence.strokes} full strokes were"
         warnings.append(f"Only {strokes} measured. Film at least 10.")
+    if evidence.misplaced >= MISPLACED_WARNING:
+        warnings.append(
+            f"Tracking slipped onto another rower for {evidence.misplaced:.0%} of the time you were "
+            "seen. Those frames were left out, so check your results."
+        )
     if evidence.crew_agreement is not None and evidence.crew_agreement < LOW_AGREEMENT:
         warnings.append("Tracking did not follow the crew's rhythm well, so check your results.")
     return warnings
@@ -135,7 +145,9 @@ def rate(evidence: Evidence, calibration: Calibration | None = None) -> Rating:
     observed = 0.0
     if evidence.strokes >= MIN_STROKES_FOR_SPREAD:
         observed = evidence.stroke_spread_deg / 1.35
-    accuracy = share_within_tolerance(max(modelled, observed))
+    # Frames on the wrong person are measurements of someone else. They are left out, but tracking
+    # that slipped is less likely to be right around them, so the accuracy falls by their share.
+    accuracy = share_within_tolerance(max(modelled, observed)) * (1.0 - min(max(evidence.misplaced, 0.0), 1.0))
     return Rating(
         accuracy, band_for(accuracy), used.calibrated, _warnings(evidence), used.labelled_frames
     )

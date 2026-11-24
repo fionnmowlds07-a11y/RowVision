@@ -2,7 +2,7 @@
 
 import { useEffect, useEffectEvent, useMemo, useRef, useState, type ChangeEvent, type MouseEvent, type ReactNode } from "react";
 import {
-  clockTime, firstTrim, looksCompressed, refuseLength, tapPoint, trimEnd, trimStart, type Trim, type VideoFacts,
+  clockTime, firstTrim, leftOutNote, looksCompressed, refuseLength, tapPoint, trimEnd, trimStart, type Trim, type VideoFacts,
 } from "@/lib/clip-checks";
 import { BOAT_NAMES, BOAT_SEATS, SIDE_NAMES, fitSetup, seatsFor, sidesFor, type Setup } from "@/lib/setup";
 import styles from "./add.module.css";
@@ -175,6 +175,7 @@ export function ClipForm({ file, choice, onChange, onRefuse, cannotShowNote, chi
                 End {clockTime(trim.end)}
                 <input type="range" className={styles.range} min={0} max={facts.duration} step={0.5} value={trim.end} onChange={(e) => moveEnd(Number(e.target.value))} />
               </label>
+              {leftOutNote(facts.duration, trim) ? <p className="soft" style={{ fontSize: 14 }}>{leftOutNote(facts.duration, trim)}</p> : null}
             </div>
             {crew ? null : (
             <>

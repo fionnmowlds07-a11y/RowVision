@@ -52,8 +52,11 @@ export function viewAt(result: ViewSource | null | undefined, frame: number) {
   return result?.views?.[frame] ?? result?.view_deg ?? 0;
 }
 
-export function legsUnsure(viewDeg: number) {
-  return viewDeg >= UNSURE_LEGS_VIEW_DEG;
+// A missing knee angle on a frame with a pose means the engine did not believe the leg: an ankle up by
+// the hands, a shin the wrong length, or a rower too small to place the knee. Drawing that leg solid
+// would show as a measurement what the numbers have already thrown out (issue 241).
+export function legsUnsure(viewDeg: number, knee?: number | null) {
+  return viewDeg >= UNSURE_LEGS_VIEW_DEG || knee === null;
 }
 
 export function limbSegments(pose: Pose, unsureLegs = false) {
@@ -95,6 +98,14 @@ export function overallGap(strokes: number, phases: Record<string, unknown>, min
   if (strokes < minStrokes) return `No overall score: it needs at least ${minStrokes} full strokes.`;
   if (Object.keys(phases).length === 0) return "No overall score: nothing could be measured reliably.";
   return "No overall score: it needs both the catch and the finish to be scored.";
+}
+
+/** Measures read only from when the catch and finish happen, as services/vision/rowvision/pipeline.py has them. */
+export const TIMING_MEASURES = new Set(["drive_share", "drive_s", "recovery_s", "ratio", "rate_steadiness"]);
+
+/** A timing measure found from the whole crew's catches and finishes, so the same for every seat. */
+export function crewTimed(rower: { crew_timed?: boolean }, name: string) {
+  return rower.crew_timed === true && TIMING_MEASURES.has(name);
 }
 
 const isShare = (name: string) => name === "drive_share" || name === "legs_lead";

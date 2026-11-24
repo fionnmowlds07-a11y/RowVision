@@ -114,6 +114,7 @@ def _evidence(rower: RowerResult) -> dict[str, Any] | None:
         "trunk_px": _finite(evidence.trunk_px),
         "coverage": _finite(evidence.coverage),
         "agreement": _optional(evidence.crew_agreement),
+        "misplaced": _finite(evidence.misplaced),
     }
 
 
@@ -158,6 +159,8 @@ def rower_json(
         "rating": _rating(rower.rating),
         "no_scores": getattr(rower, "no_scores", None),
         "left_out": list(getattr(rower, "left_out", [])),
+        "unseen": list(getattr(rower, "unseen", [])),
+        "crew_timed": bool(getattr(rower, "crew_timed", False)),
         "evidence": _evidence(rower),
         "fade": {name: _finite(change) for name, change in getattr(rower, "fade", {}).items()},
     }

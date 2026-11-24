@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { evidenceFrames, formatTarget, formatValue, laneMarks, modelFits, overallGap, overallVisible, ratingNote, sourceLink, timingText } from "@/lib/logic";
+import { crewTimed, evidenceFrames, formatTarget, formatValue, laneMarks, modelFits, overallGap, overallVisible, ratingNote, sourceLink, timingText } from "@/lib/logic";
 import type { FrameData, Metric, Rower, Summary } from "@/lib/result";
 import { strokeSeries } from "@/lib/strokes";
 import { workOnNext } from "@/lib/work-on-next";
@@ -253,7 +253,7 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
                       <strong>{metric.score === null ? "Not scored" : Math.round(metric.score)}</strong>
                     </span>
                     <small>
-                      You {formatValue(metric.name, metric.value)}. {metric.target ? `Target ${formatTarget(metric.name, metric.target)}.` : "No target yet."}
+                      {crewTimed(rower, metric.name) ? "Crew" : "You"} {formatValue(metric.name, metric.value)}. {metric.target ? `Target ${formatTarget(metric.name, metric.target)}.` : "No target yet."}
                       {metric.score === null && metric.reason ? ` ${metric.reason}` : ""}
                     </small>
                     <MiniLane metric={metric} />
@@ -278,6 +278,9 @@ export function Results({ side, summary, rower, videoLink, framesLink, oldVersio
                 </li>
               ))}
             </ul>
+            {card.metrics.some((metric) => crewTimed(rower, metric.name)) ? (
+              <p className="soft" style={{ fontSize: 13 }}>Drive and recovery are timed from the whole crew, so they are the same for every seat.</p>
+            ) : null}
             {measuresNote}
             {firstModel ? <button type="button" className="button quiet" onClick={() => setModel(firstModel.name)}>See the 3D model</button> : null}
           </section>

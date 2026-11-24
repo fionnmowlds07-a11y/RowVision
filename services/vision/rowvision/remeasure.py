@@ -131,12 +131,18 @@ def _remeasure_one(
         trunk_px=float(evidence["trunk_px"]) if evidence else 1.0,
         coverage=float(evidence["coverage"]) if evidence else 1.0,
         agreement=evidence.get("agreement") if evidence else None,
+        misplaced=float(evidence.get("misplaced") or 0.0) if evidence else 0.0,
         side=saved.get("side"),
         turns=turns,
         clear=saved_clear(summary.get("shots"), count),
     )
     # The joints are kept as filmed, for drawing over the picture.
-    result = replace(result, timing=_saved_timing(saved.get("timing")), points=points)
+    result = replace(
+        result,
+        timing=_saved_timing(saved.get("timing")),
+        points=points,
+        crew_timed=saved.get("crew_timed") is True,
+    )
     if evidence:
         return result
     # Older results did not save what the rating came from, so the rating itself is kept.

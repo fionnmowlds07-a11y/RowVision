@@ -15,6 +15,7 @@ import logging
 import os
 import sys
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -150,6 +151,8 @@ def progress_sender(send: Send) -> Callable[[str, float | None], None]:
     def report(stage: str, progress: float | None) -> None:
         nonlocal last
         moved = progress is None or last[1] is None or abs(progress - last[1]) >= PROGRESS_STEP
+        if stage != last[0]:
+            log.info("stage: %s", stage)
         if stage != last[0] or moved:
             last = (stage, progress)
             send({"event": "stage", "stage": stage, "progress": progress})
@@ -160,18 +163,33 @@ def progress_sender(send: Send) -> Callable[[str, float | None], None]:
 def run(job: DesktopJob, engine: Engine, send: Send, stopped: Callable[[], bool]) -> int:
     job.folder.mkdir(parents=True, exist_ok=True)
     (job.folder / "pause.json").unlink(missing_ok=True)
+    setup = job.setup
+    log.info(
+        "engine %s on %s, threads %s, priority %s: %s, %s %s seat %d, rig %s, tap %s",
+        code_version(), job.device, job.threads or "all", job.priority, setup.boat_class, setup.scope,
+        "coach" if setup.coach else "athlete", setup.seat, ",".join(setup.rig) if setup.rig else "none",
+        "yes" if setup.tap else "no",
+    )
+    started = time.monotonic()
     try:
         video = prepare(job, send)
+        log.info(
+            "working copy: %d frames at %.4f fps, %dx%d, from %.1f s for up to %.1f s",
+            video.frames, video.fps, video.width, video.height, job.start, job.length,
+        )
         if stopped():
             raise Cancelled
         outcome = engine.run(video, job.setup, progress_sender(send), stopped)
         if isinstance(outcome, NeedsTap):
             write_json(job.folder / "pause.json", outcome.pause)
+            log.info("waiting for a tap after %.0f s", time.monotonic() - started)
             send({"event": "needs_tap", "pause": outcome.pause})
             return NEEDS_TAP
         save(job.folder, outcome, send)
+        log.info("finished in %.0f s", time.monotonic() - started)
         return FINISHED
     except Cancelled:
+        log.info("cancelled after %.0f s", time.monotonic() - started)
         send({"event": "cancelled"})
         return CANCELLED
     except Exception:  # noqa: BLE001 - the app needs a message, not a traceback
@@ -185,6 +203,10 @@ def save(folder: Path, done: Done, send: Send) -> None:
     write_json(folder / "frames.json", frames)
     write_json(folder / "summary.json", {"version": done.version, **summary})
     accuracy, band, overall = headline(summary)
+    log.info(
+        "result: accuracy %s, band %s, overall %s, warnings %s",
+        accuracy, band, overall, summary.get("warnings"),
+    )
     send({"event": "done", "version": done.version, "accuracy": accuracy, "band": band, "overall": overall})
 
 

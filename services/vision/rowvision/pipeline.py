@@ -1,5 +1,6 @@
 """Run the full analysis: find rowers and shots coarsely, then measure the chosen rowers finely."""
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
@@ -22,6 +23,7 @@ from rowvision.boats import (
     preview_frame,
 )
 from rowvision.cox import beyond_neighbour, facing_backwards, seat_spacing
+from rowvision.identity import misplaced
 from rowvision.metrics import (
     MEASURES,
     AngleSeries,
@@ -100,6 +102,16 @@ FrameReader = Callable[[int], Any]
 """Return the frame at an index."""
 
 
+log = logging.getLogger(__name__)
+
+
+def _runs(seen: NDArray[np.bool_], step: int = 1) -> str:
+    """Describe the stretches of frames where something was seen, for the log."""
+    edges = np.flatnonzero(np.diff(np.concatenate([[0], seen.astype(int), [0]])))
+    spans = [f"{start * step}-{end * step}" for start, end in zip(edges[::2], edges[1::2], strict=True)]
+    return " ".join(spans[:12]) + (" ..." if len(spans) > 12 else "") if spans else "none"
+
+
 class Scope(StrEnum):
     SEAT = "seat"
     CREW = "crew"
@@ -147,9 +159,14 @@ class RowerResult:
     side: str | None = None
     """The side a sweep rower rows on, kept so the rower can be measured again."""
     no_scores: str | None = None
+    """Why no scores were given, when the footage cannot support any."""
     left_out: list[int] = field(default_factory=list)
     """Catch frames of strokes filmed end-on, which are listed but do not count."""
-    """Why no scores were given, when the footage cannot support any."""
+    unseen: list[int] = field(default_factory=list)
+    """Catch frames of strokes with no pose of this rower at the catch or finish, which do not count."""
+    crew_timed: bool = False
+    """The catches and finishes were found from the whole crew, so drive and recovery times are the
+    crew's, the same for every seat."""
 
 
 @dataclass(frozen=True)
@@ -348,6 +365,7 @@ def measure_rower(
     clear: NDArray[np.bool_] | None = None,
     angle_frames: NDArray[np.bool_] | None = None,
     angle_note: str | None = None,
+    misplaced: float = 0.0,
 ) -> RowerResult:
     """Measure one rower's strokes from their joints, and score and rate the result.
 
@@ -373,7 +391,12 @@ def measure_rower(
     if clear is not None and in_clear:
         angles = _without_end_on(angles, clear)
     strokes = per_stroke(angles, timeline, fps, catch_lean_readable=readable)
-    counted = [s for s in strokes if clear is None or not in_clear or clear[s.catch_frame]] or strokes
+    # A crew's timeline gives every seat every stroke, including ones where this seat has no pose of
+    # its own. Those would add crew timing, and nothing of the rower, to the rower's results. On an
+    # eight, 14 of the stroke seat's 38 strokes had no pose at all (issue 239).
+    posed = np.isfinite(points[:, sk.LEFT_SHOULDER, 0]) | np.isfinite(points[:, sk.RIGHT_SHOULDER, 0])
+    seen = [s for s in strokes if posed[s.catch_frame] and posed[s.finish_frame]]
+    counted = [s for s in seen if clear is None or not in_clear or clear[s.catch_frame]] or seen
     # When the camera crossed the boat, body angles come only from strokes on one side, where the
     # body is seen the same way. Timing reads the same from either side, so it uses every stroke.
     angled = counted if angle_frames is None else [s for s in counted if angle_frames[s.catch_frame]]
@@ -408,7 +431,7 @@ def measure_rower(
         body = {metric.name for metric in card.metrics} - TIMING_MEASURES
         card = without_scores(card, body, angle_note or TOO_FEW_ON_ONE_SIDE)
     evidence = Evidence(
-        trunk_px, view, spread.get("catch_lean_deg", 0.0), coverage, len(counted), agreement
+        trunk_px, view, spread.get("catch_lean_deg", 0.0), coverage, len(counted), agreement, misplaced
     )
     rating = _with_lean_warning(rate(evidence, calibration), readable)
     if too_end_on:
@@ -430,7 +453,9 @@ def measure_rower(
         angles=angles,
         side=side,
         no_scores=FILM_SIDE_ON if too_end_on else None,
-        left_out=[s.catch_frame for s in strokes if all(s is not kept for kept in counted)],
+        left_out=[s.catch_frame for s in seen if all(s is not kept for kept in counted)],
+        unseen=[s.catch_frame for s in strokes if all(s is not kept for kept in seen)],
+        crew_timed=shared is not None,
     )
 
 
@@ -524,8 +549,42 @@ def _leave_out_cox(
         neighbour = seats[beside].centre()[nearest]
         wrong = facing_backwards(as_one_side(points, flipped), facing)
         wrong |= beyond_neighbour(points, neighbour, spacing)
+        log.info("seat %d: %d frames taken as the cox and left out", end, int((wrong & np.isfinite(points[:, sk.LEFT_SHOULDER, 0])).sum()))
         points[wrong] = np.nan
         scores[wrong] = 0
+
+
+def _leave_out_misplaced(
+    fine: dict[int | None, tuple[FloatArray, FloatArray]],
+    seats: dict[int, Track],
+    nearest: NDArray[np.intp],
+    clear: NDArray[np.bool_],
+) -> dict[int | None, float]:
+    """Take out the frames where a seat's tracking sat on someone else, and return their share.
+
+    Checked on the sampled frames, for every seat of the boat even when only one is measured, as
+    a seat can only be seen to be out of place against the rest of the crew. A full-rate frame is
+    left out when the sample on either side of it was out of place. End-on frames are not checked:
+    the crew overlaps in the picture there, so seat order cannot be read.
+    """
+    order = sorted(seats)
+    if not order or not len(nearest):
+        return {}
+    wrong = misplaced([seats[seat].centre() for seat in order], [seats[seat].trunk() for seat in order], order)
+    later = np.minimum(nearest + 1, wrong.shape[1] - 1)
+    shares: dict[int | None, float] = {}
+    for row, seat in enumerate(order):
+        if seat not in fine:
+            continue
+        points, scores = fine[seat]
+        posed = np.isfinite(points[:, sk.LEFT_SHOULDER, 0])
+        out = (wrong[row][nearest] | wrong[row][later]) & posed & clear
+        shares[seat] = float(out.sum()) / max(int(posed.sum()), 1)
+        if out.any():
+            log.info("seat %d: on someone else in frames %s, left out", seat, _runs(out))
+        points[out] = np.nan
+        scores[out] = 0
+    return shares
 
 
 def scout(read: FrameReader, frames: int, fps: float, backend: PoseBackend) -> Scouting:
@@ -557,6 +616,11 @@ def _seats_of(
     ]
     fitted, added = fill_from_spare(fit_to_seats(crew, seats), spare, seats, fps)
     assignment = assign_seats(fitted, seats, fps, added)
+    log.info(
+        "seats: %d rowers in the shot, %d spare seen with them, %d brought in, %d seats filled of %d, "
+        "%d over, complete %s",
+        len(crew), len(spare), len(added), len(assignment.seats), seats, assignment.surplus, assignment.complete,
+    )
     return assignment, assignment.complete and not added and not assignment.surplus
 
 
@@ -634,6 +698,10 @@ def analyse(
 ) -> Analysis:
     """Measure the requested rowers, or stop and ask if the athlete must choose a boat first."""
     found = scouting if scouting is not None else scout(read, frames, fps, backend)
+    log.info(
+        "scouting: %d people tracked, boats of %s people, camera crossed the boat at sampled frames %s",
+        len(found.tracks), [len(b.rowers) for b in found.boats], found.side_changes,
+    )
     if needs_boat_choice(found, request):
         return Analysis(
             fps,
@@ -672,6 +740,12 @@ def analyse(
             seats={seat: joined(track, also.seats[seat]) for seat, track in assignment.seats.items()},
         )
     rowers = list(assignment.seats.values())
+    for number, held in sorted(assignment.seats.items()):
+        seen = np.isfinite(held.centre()[:, 0])
+        log.info(
+            "seat %d: seen in %.0f%% of sampled frames, trunk %.0f px, frames %s",
+            number, 100 * seen.mean() if len(seen) else 0, held.trunk(), _runs(seen, COARSE_STEP),
+        )
     level = [Track(as_one_side(track.points, coarse_flipped), track.scores) for track in rowers]
 
     coarse_views = view_by_frame(rowers, coarse_fps)
@@ -769,6 +843,7 @@ def analyse(
         scores[dropped] = 0
         fine[seat] = points, scores
     _leave_out_cox(fine, assignment.seats, assignment.facing, nearest, flipped)
+    wrong_person = _leave_out_misplaced(fine, assignment.seats, nearest, clear)
     one_side = {seat: as_one_side(points, flipped) for seat, (points, _) in fine.items()}
 
     targets_file, calibration = load_targets(), load_calibration()
@@ -798,6 +873,7 @@ def analyse(
             clear=clear,
             angle_frames=angle_frames,
             angle_note=angle_note,
+            misplaced=wrong_person.get(seat, 0.0),
         )
         if seat in leaders:
             leader = leaders[seat]
