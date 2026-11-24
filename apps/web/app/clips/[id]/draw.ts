@@ -26,7 +26,8 @@ function viewOf(scene: Scene, frame: number): number {
 }
 
 function legsUnsureAt(scene: Scene, frame: number): boolean {
-  return legsUnsure(viewOf(scene, frame), scene.angles.knee[frame] ?? null);
+  // A result with no knee series at all says nothing about any one leg.
+  return legsUnsure(viewOf(scene, frame), scene.angles.knee?.[frame]);
 }
 
 /** `size` keeps lines and labels the same on screen at any zoom. */
