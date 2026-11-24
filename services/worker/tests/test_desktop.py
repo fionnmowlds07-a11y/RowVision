@@ -79,6 +79,18 @@ def test_a_finished_clip_leaves_everything_in_its_folder(tmp_path: Path, copies:
     assert events[-1]["band"] == "Good"
 
 
+def test_a_finished_run_leaves_a_log_to_check_afterwards(
+    tmp_path: Path, copies: list[Path], caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level("INFO", logger=desktop.__name__)
+    desktop.run(job_in(tmp_path), FakeEngine(), lambda _: None, lambda: False)
+    text = caplog.text
+    assert "2-, seat athlete seat 2" in text
+    assert "working copy: 240 frames at 30.0000 fps" in text
+    assert "result: accuracy" in text
+    assert "finished in" in text
+
+
 def test_a_rerun_reuses_the_working_copy(tmp_path: Path, copies: list[Path]) -> None:
     desktop.run(job_in(tmp_path), FakeEngine(), lambda _: None, lambda: False)
     code = desktop.run(job_in(tmp_path, source=None), FakeEngine(), lambda _: None, lambda: False)

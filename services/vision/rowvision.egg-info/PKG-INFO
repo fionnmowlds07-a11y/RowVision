@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: rowvision
+Version: 0.1.0
+Summary: Rowing biomechanics analysis pipeline
+Requires-Python: <3.13,>=3.12
+Requires-Dist: numpy<3,>=2.0
+Requires-Dist: opencv-python-headless<5,>=4.10
+Requires-Dist: onnxruntime<2,>=1.20
+Requires-Dist: rtmlib>=0.0.13
+Requires-Dist: pyyaml<7,>=6
+Provides-Extra: dev
+Requires-Dist: pytest>=8; extra == "dev"
+Requires-Dist: pytest-cov>=5; extra == "dev"
+Requires-Dist: hypothesis>=6; extra == "dev"
+Requires-Dist: ruff>=0.6; extra == "dev"
+Requires-Dist: mypy>=1.11; extra == "dev"
+Requires-Dist: types-PyYAML; extra == "dev"

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   MAX_UPLOAD_BYTES, clockTime, looksCompressed, refuseFile,
-  refuseLength, firstTrim, trimEnd, trimStart, submitError, tapPoint,
+  refuseLength, firstTrim, leftOutNote, trimEnd, trimStart, submitError, tapPoint,
 } from "@/lib/clip-checks";
 
 const facts = (width: number, height: number) => ({ duration: 30, width, height });
@@ -44,6 +44,12 @@ describe("trimming", () => {
   test("starts with as much as can be analysed", () => {
     expect(firstTrim(30)).toEqual({ start: 0, end: 30 });
     expect(firstTrim(200)).toEqual({ start: 0, end: 60 });
+  });
+
+  test("says how much of a clip over 60 seconds is left out", () => {
+    expect(leftOutNote(66.2, firstTrim(66.2))).toMatch(/6 seconds of this video will be left out/);
+    expect(leftOutNote(30, { start: 5, end: 20 })).toBeNull();
+    expect(leftOutNote(60.3, firstTrim(60.3))).toBeNull();
   });
 
   test("moving the start pushes the end to stay at 60 seconds or less", () => {

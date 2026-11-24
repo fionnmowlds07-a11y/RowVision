@@ -24,6 +24,14 @@ export function looksCompressed(name: string, facts: VideoFacts): boolean {
 
 export type Trim = { start: number; end: number };
 
+/** Said when a clip is longer than can be analysed, so the cut is never a surprise. */
+export function leftOutNote(duration: number, trim: Trim): string | null {
+  const left = duration - (trim.end - trim.start);
+  if (duration <= SECTION_SECONDS + 0.5 || left < 0.5) return null;
+  const seconds = Math.round(left);
+  return `Only the part between Start and End is analysed. ${seconds} second${seconds === 1 ? "" : "s"} of this video will be left out. Move Start and End to choose which part.`;
+}
+
 /** Start with as much of the clip as we can analyse. */
 export function firstTrim(duration: number): Trim {
   return { start: 0, end: Math.min(SECTION_SECONDS, duration) };
