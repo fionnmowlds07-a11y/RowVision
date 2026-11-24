@@ -177,3 +177,12 @@ def test_the_repository_uses_the_measured_error() -> None:
     assert loaded.keypoint_error_px != ASSUMED_KEYPOINT_ERROR_PX
     assert loaded.labelled_frames >= 100
     assert loaded.calibrated
+
+
+def test_frames_on_the_wrong_person_lower_the_rating_and_warn() -> None:
+    from dataclasses import replace
+
+    slipped = rate(replace(CLEAR, misplaced=0.2))
+    assert slipped.accuracy == pytest.approx(rate(CLEAR).accuracy * 0.8)
+    assert any("another rower for 20%" in warning for warning in slipped.warnings)
+    assert not any("another rower" in warning for warning in rate(replace(CLEAR, misplaced=0.02)).warnings)

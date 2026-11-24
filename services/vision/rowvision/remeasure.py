@@ -131,6 +131,7 @@ def _remeasure_one(
         trunk_px=float(evidence["trunk_px"]) if evidence else 1.0,
         coverage=float(evidence["coverage"]) if evidence else 1.0,
         agreement=evidence.get("agreement") if evidence else None,
+        misplaced=float(evidence.get("misplaced") or 0.0) if evidence else 0.0,
         side=saved.get("side"),
         turns=turns,
         clear=saved_clear(summary.get("shots"), count),

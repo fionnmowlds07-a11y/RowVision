@@ -114,6 +114,7 @@ def _evidence(rower: RowerResult) -> dict[str, Any] | None:
         "trunk_px": _finite(evidence.trunk_px),
         "coverage": _finite(evidence.coverage),
         "agreement": _optional(evidence.crew_agreement),
+        "misplaced": _finite(evidence.misplaced),
     }
 
 

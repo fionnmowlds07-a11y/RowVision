@@ -5,6 +5,7 @@ rowvision/blades.py
 rowvision/boats.py
 rowvision/cox.py
 rowvision/geometry.py
+rowvision/identity.py
 rowvision/metrics.py
 rowvision/pipeline.py
 rowvision/pose.py
@@ -35,6 +36,7 @@ tests/test_blades.py
 tests/test_boats.py
 tests/test_cox.py
 tests/test_geometry.py
+tests/test_identity.py
 tests/test_metrics.py
 tests/test_pipeline.py
 tests/test_pose_threads.py
