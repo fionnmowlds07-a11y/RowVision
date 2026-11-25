@@ -13,11 +13,14 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.request
 from pathlib import Path
 
 CLIP = "https://downloads.rowvision.app/media/single-a.mp4"
+LIMIT_SECONDS = 600
+"""An engine that hangs is ended here, so the check fails with its log."""
 NAME = "Seán Ó Briain – Áine"
 
 
@@ -44,14 +47,17 @@ def main() -> None:
     # Closing its input stops the engine, so the input stays open until it has finished.
     child = subprocess.Popen([str(engine), str(clip / "job.json")], stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=env)
     assert child.stdout is not None
+    killer = threading.Timer(LIMIT_SECONDS, child.kill)
+    killer.start()
     # The model library prints lines of its own, which the app skips too.
     events = [json.loads(line) for line in child.stdout if line.startswith(b"{")]
     code = child.wait()
+    killer.cancel()
     print(f"{os.cpu_count()} cores, {time.monotonic() - started:.0f} s for a 10 s clip, exit code {code}: {events[-1]}")
     assert code == 0 and events[-1]["event"] == "done"
     for name in ("working.mp4", "summary.json", "frames.json"):
         assert (clip / name).stat().st_size > 0
-    again = subprocess.run([str(engine), "--remeasure", str(clip)], stdout=subprocess.PIPE, env=env, check=True)
+    again = subprocess.run([str(engine), "--remeasure", str(clip)], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, env=env, check=True)
     assert b'"event": "done"' in again.stdout
     # Nothing is left holding the folder open, or the app could not delete the clip.
     shutil.rmtree(home)
