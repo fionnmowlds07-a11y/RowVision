@@ -1,7 +1,7 @@
 """Put ffmpeg and ffprobe next to the measuring program, for the installer.
 
 The engine cuts every clip down with ffmpeg and reads it with ffprobe. The build is pinned to one
-release and checked against the checksums published with it. It has to be a GPL build, as the
+release and checked against the checksums below. It has to be a GPL build, as the
 working copy is made with libx264.
 
     python scripts/fetch-ffmpeg.py engine
@@ -17,10 +17,14 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-RELEASE = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-11-08-12-35"
-LINUX = "ffmpeg-n8.1.3-34-ga35157abb9-linux64-gpl-8.1.tar.xz"
-WINDOWS = "ffmpeg-n8.1.3-34-ga35157abb9-win64-gpl-8.1.zip"
-CHECKSUMS = "checksums.sha256"
+# Pin the last build of a month only: the others are deleted after two weeks, month ends after about two years.
+RELEASE = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-31-12-59"
+LINUX = "ffmpeg-n8.1.3-27-g8dca1586f4-linux64-gpl-8.1.tar.xz"
+WINDOWS = "ffmpeg-n8.1.3-27-g8dca1586f4-win64-gpl-8.1.zip"
+CHECKSUMS = {
+    LINUX: "41e9c565594c390622cf968d82fa4135d9e9a11d06c1515644288cbc844e3380",
+    WINDOWS: "401dffcf14c301082e1fc03b0bc876b92ea676bfc521fc56e80a1537d137034f",
+}
 
 
 def download(url: str) -> bytes:
@@ -33,13 +37,9 @@ def main(target: Path) -> None:
     name = WINDOWS if windows else LINUX
     wanted = {"ffmpeg.exe", "ffprobe.exe"} if windows else {"ffmpeg", "ffprobe"}
 
-    sums = {}
-    for line in download(f"{RELEASE}/{CHECKSUMS}").decode().splitlines():
-        digest, _, file = line.partition("  ")
-        sums[file.strip().lstrip("*")] = digest
     data = download(f"{RELEASE}/{name}")
-    if hashlib.sha256(data).hexdigest() != sums.get(name):
-        raise SystemExit(f"{name} does not match its published checksum")
+    if hashlib.sha256(data).hexdigest() != CHECKSUMS[name]:
+        raise SystemExit(f"{name} does not match its checksum")
 
     target.mkdir(parents=True, exist_ok=True)
     found = set()
