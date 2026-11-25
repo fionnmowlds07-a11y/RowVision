@@ -1,6 +1,6 @@
 # RowVision marketing site
 
-Static Vite site with nine pages: the home page film (`index.html`), How it works, What it measures, Accuracy, Filming, Boats and crews, Reports, Your video and Download.
+Static Vite site with eleven pages: the home page film (`index.html`), How it works, What it measures, Accuracy, Filming, Boats and crews, Reports, Privacy, Terms, Licences and Download.
 
 Every page shares one header and footer, kept in `partials/` and written into the HTML by a small plugin in `vite.config.js`, so each page is whole without script. Home, How it works, Reports and Download sit in the header, and every other page is under More. To add a page, add its name to `PAGES` there and link it from `partials/nav.html` and `partials/foot.html`.
 
@@ -48,6 +48,10 @@ The clips are cleared for the owner's own preview only. Ask before any of them g
 
 - `node pipeline/make_reports.mjs stats` prints the statistics sheet of a made-up crew (`pipeline/sample-crew.ts`) into `public/reports/`, which is in git. The numbers quoted in `reports.html` are read off it, so check them when it changes. It must stay labelled as made up.
 - `node pipeline/make_reports.mjs frames <clip folder> <seat> <seats> <boat>` prints the photo report of one real rower into `public/media/reports/`, which is never in git. Only use a clip cleared for the public site.
+
+## Privacy, terms and licences
+
+Mail to privacy@rowvision.app is forwarded by Cloudflare Email Routing. When ffmpeg is pinned to another build, put its source and build scripts in the bucket under `sources/` and list them on `licences.html` before the installer goes out. Installers that can still be downloaded must stay listed. If anything new is collected, or anyone else handles data, change `privacy.html` first.
 
 ## Going live
 

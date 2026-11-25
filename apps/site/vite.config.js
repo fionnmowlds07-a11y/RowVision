@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig, loadEnv } from 'vite';
 
-const PAGES = ['index', 'how', 'measures', 'accuracy', 'filming', 'boats', 'reports', 'privacy', 'download'];
+const PAGES = ['index', 'how', 'measures', 'accuracy', 'filming', 'boats', 'reports', 'privacy', 'terms', 'licences', 'download'];
 const part = name => readFileSync(resolve(import.meta.dirname, 'partials', `${name}.html`), 'utf8');
 
 // Every page shares one header and footer. They are written into the HTML when it is served or built,
