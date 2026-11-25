@@ -56,7 +56,7 @@ async function frames(clip, seat, seats, boat) {
   const layouts = await page.evaluate(([seat, seats, boat]) => window.makeReport(seat, seats, boat), [+seat, +seats, boat]);
   for (const { id, pages } of layouts) {
     await page.evaluate(html => { document.getElementById('sheet').innerHTML = html; return Promise.all([...document.images].map(i => i.decode())); }, pages[0]);
-    await page.locator('.rvr-sheet').screenshot({ path: join(out, `${id}.jpg`), type: 'jpeg', quality: 84 });
+    await page.locator('.rvr-sheet').screenshot({ path: join(out, `pair-${id}.jpg`), type: 'jpeg', quality: 84 });
   }
   server.close();
 }
