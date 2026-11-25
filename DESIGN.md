@@ -93,17 +93,20 @@ Inline SVG, 2.5px rounded stroke, drawn in one set.
 
 **Type.** Bricolage Grotesque 800 for headings, up to 210px for the single words Legs, Back and Arms. DM Sans for everything else.
 
-**The other pages.** Ten shorter pages sit beside the film: How it works, What it measures, Accuracy, Filming, Boats and crews, Your video, Where it is now, Questions, About and Download. They share one header and footer, and the same water moves behind them at the film's opening colours.
+**The other pages.** Ten shorter pages sit beside the film: How it works, What it measures, Accuracy, Filming, Boats and crews, Reports, Privacy, Terms, Licences and Download. They share one header and footer, and the same water moves behind them at the film's opening colours.
 
-- **The mark.** The app icon sits beside the name in the header and footer, and large on About. It is never redrawn or recoloured.
+- **The header.** Home, How it works, Reports and Download. Everything else is under More. Reports stays in view on a phone, as it is a main feature (owner, 2026-11-25).
+- **Few words.** A page shows the thing and says one short line about it.
+- **The mark.** The app icon sits beside the name in the header and footer. It is never redrawn or recoloured.
 - **The bench.** A black stage with a drawing on the left, its readings in large green figures on the right and its controls underneath. Used for the stroke explorer and the camera dial. Every bench has a slider as well as dragging, so it works from the keyboard.
 - **Rows.** A term on the left and what it means on the right, ruled between. Used where a page lists measures or facts. No cards.
+- **Papers.** Printed pages are shown white on the water, the only white ground on the site. A chart cut from a page sits on its own white strip beside the question it answers.
 - **Camera ring.** Green for side-on, amber for corrected, red for end-on. Each state also has its name beside it, so colour never carries the meaning alone.
 - **Messages.** Words the app really says are shown in the app's caution colours.
 - Pages cross-fade into each other where the browser can, and not at all under reduced motion.
 
 **Rules.**
-- Every number on screen is measured from the clip on screen, or comes from the measuring code's own limits. No invented scores, results or quotes.
+- Every number on screen is measured from the clip on screen, or comes from the measuring code's own limits. No invented scores, results or quotes. The one exception is the sample statistics sheet on Reports, whose crew is made up and labelled so on the page and on the sheet (owner, 2026-11-25).
 - Catches are round marks and finishes are square, as in the app.
 - Cautions use the app's caution colours (`#fff1d6` on `#6b4700`).
 - Footage never goes in the repository, and no clip goes public without the owner's say.

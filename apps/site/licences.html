@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Licences. RowVision</title>
+<meta name="description" content="The open source software inside RowVision, with its licences and source code.">
+<!--head-->
+</head>
+<body>
+<canvas id="water" aria-hidden="true"></canvas>
+<!--nav-->
+<main id="main" class="page">
+  <h1>Open source inside.</h1>
+  <p class="lead">RowVision stands on other people’s work. Thank you.</p>
+
+  <h2>ffmpeg.</h2>
+  <p>The installers include ffmpeg and ffprobe, unmodified builds by <a href="https://github.com/BtbN/FFmpeg-Builds">BtbN</a> with x264 and x265, under the <a href="/licences/gpl-3.0.txt">GNU General Public License, version 3</a>. They run as separate programs. They come with no warranty, and you may copy, change and share them under that licence.</p>
+  <dl class="rows">
+    <div><dt>RowVision 0.2.0</dt><dd><a href="https://downloads.rowvision.app/sources/ffmpeg-a35157abb9.tar.gz">ffmpeg n8.1.3-34-ga35157abb9</a>, <a href="https://downloads.rowvision.app/sources/ffmpeg-builds-c9fe511.tar.gz">build scripts</a></dd></div>
+    <div><dt>RowVision 0.3.0</dt><dd><a href="https://downloads.rowvision.app/sources/ffmpeg-8dca1586f4.tar.gz">ffmpeg n8.1.3-27-g8dca1586f4</a>, <a href="https://downloads.rowvision.app/sources/ffmpeg-builds-5031c6f.tar.gz">build scripts</a></dd></div>
+    <div><dt>Both</dt><dd><a href="https://downloads.rowvision.app/sources/x264-0480cb05.tar.gz">x264</a>, <a href="https://downloads.rowvision.app/sources/x265-5143a2a0.tar.gz">x265</a></dd></div>
+    <div><dt>Other libraries in it</dt><dd>Each file in <code>scripts.d</code> of the build scripts names the source and the exact version. If you can’t get one, email <a href="mailto:privacy@rowvision.app">privacy@rowvision.app</a> and we will send it.</dd></div>
+  </dl>
+
+  <h2>The rest.</h2>
+  <dl class="rows">
+    <div><dt>Measuring</dt><dd>RTMPose and the YOLOX person detector from OpenMMLab (Apache 2.0 code; the detector is trained on Human-Art, shared for non-commercial use), rtmlib (Apache 2.0), ONNX Runtime (MIT), OpenCV (Apache 2.0), NumPy (BSD), Python (PSF).</dd></div>
+    <div><dt>The app</dt><dd>Electron, React and three.js (MIT), and Chromium (BSD and others, listed in the installed app).</dd></div>
+    <div><dt>Type</dt><dd>Bricolage Grotesque and DM Sans (SIL Open Font License 1.1).</dd></div>
+  </dl>
+</main>
+<!--foot-->
+<script type="module" src="/src/water.js"></script>
+</body>
+</html>
