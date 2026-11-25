@@ -27,6 +27,29 @@ CHECKSUMS = {
 }
 
 
+# ffmpeg is GPL, so its licence and where to get its source go in the installer with it. The sources are copies of
+# exactly these versions, kept in the site's bucket. Pin another build and they, licences.html and this change too.
+SOURCES = "https://downloads.rowvision.app/sources"
+NOTICE = f"""ffmpeg and ffprobe, in this folder, are unmodified builds by BtbN (https://github.com/BtbN/FFmpeg-Builds) of
+
+    {LINUX}
+    {WINDOWS}
+
+They include x264 and x265 and are under the GNU General Public License, version 3, in ffmpeg-LICENSE.txt.
+They come with no warranty. RowVision runs them as separate programs.
+
+Source code:
+
+    ffmpeg         {SOURCES}/ffmpeg-8dca1586f4.tar.gz
+    build scripts  {SOURCES}/ffmpeg-builds-5031c6f.tar.gz
+    x264           {SOURCES}/x264-0480cb05.tar.gz
+    x265           {SOURCES}/x265-5143a2a0.tar.gz
+
+Each file in scripts.d of the build scripts names the source and exact version of one of the other libraries inside.
+If you can't get one, write to privacy@rowvision.app and we will send it. More at https://rowvision.app/licences
+"""
+
+
 def download(url: str) -> bytes:
     with urllib.request.urlopen(url, timeout=600) as reply:  # noqa: S310 - fixed https address above
         return reply.read()
@@ -47,6 +70,9 @@ def main(target: Path) -> None:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             for member in archive.namelist():
                 base = Path(member).name
+                if base == "LICENSE.txt":
+                    (target / "ffmpeg-LICENSE.txt").write_bytes(archive.read(member))
+                    found.add(base)
                 if base in wanted and "/bin/" in member:
                     (target / base).write_bytes(archive.read(member))
                     found.add(base)
@@ -54,14 +80,21 @@ def main(target: Path) -> None:
         with tarfile.open(fileobj=io.BytesIO(data), mode="r:xz") as archive:
             for member in archive.getmembers():
                 base = Path(member.name).name
+                if base == "LICENSE.txt" and member.isfile():
+                    text = archive.extractfile(member)
+                    assert text is not None
+                    (target / "ffmpeg-LICENSE.txt").write_bytes(text.read())
+                    found.add(base)
                 if base in wanted and "/bin/" in member.name and member.isfile():
                     file = archive.extractfile(member)
                     assert file is not None
                     (target / base).write_bytes(file.read())
                     (target / base).chmod(0o755)
                     found.add(base)
-    if found != wanted:
-        raise SystemExit(f"missing {sorted(wanted - found)} in {name}")
+    missing = (wanted | {"LICENSE.txt"}) - found
+    if missing:
+        raise SystemExit(f"missing {sorted(missing)} in {name}")
+    (target / "ffmpeg-SOURCE.txt").write_text(NOTICE, encoding="utf-8")
 
     # It must really make the video the engine asks for.
     encoders = subprocess.run([str(target / sorted(wanted)[0]), "-hide_banner", "-encoders"], capture_output=True, text=True, check=True).stdout
