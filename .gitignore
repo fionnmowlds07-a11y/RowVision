@@ -32,6 +32,8 @@ outputs/
 .env
 .env.local
 reports/
+# The sample sheet on the site, which is made up
+!apps/site/public/reports/
 playwright-report/
 test-results/
 
