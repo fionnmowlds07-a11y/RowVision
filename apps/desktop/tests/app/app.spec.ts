@@ -805,7 +805,7 @@ test("the model is chosen when adding, remembered, and a clip measured with the 
   await page.locator("input[type=file]").setInputFiles(path.join(sources, "row.mp4"));
   const choice = page.getByRole("region", { name: "Accuracy" });
   await expect(choice.getByRole("button", { name: "More accurate" })).toHaveAttribute("aria-pressed", "true");
-  await expect(choice).toContainText("takes up to five times as long");
+  await expect(choice).toContainText("takes about two to three times as long");
   await choice.getByRole("button", { name: "Faster" }).click();
   await expect(choice).toContainText("knees and legs are rougher");
   await page.getByRole("region", { name: "Your boat" }).locator("select").first().selectOption("1x");

@@ -148,7 +148,7 @@ function AnalyseAccurately({ id }: { id: string }) {
   return (
     <section className="card stack" aria-labelledby="accurate-title">
       <h2 id="accurate-title" style={{ fontSize: 19 }}>Measure it more accurately</h2>
-      <p className="soft">This clip used the faster model. The more accurate one places knees and legs better and takes longer, up to five times as long for a crew. If you stop it, these results come back.</p>
+      <p className="soft">This clip used the faster model. The more accurate one places knees and legs better and takes about two to three times as long. Scores may change. If you stop it, these results come back.</p>
       {problem ? <p className="error" role="alert">{problem}</p> : null}
       <div>
         <button type="button" className="button primary" disabled={busy} onClick={() => void go()}>{busy ? "Starting" : "Analyse again"}</button>

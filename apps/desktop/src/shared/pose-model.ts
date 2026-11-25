@@ -12,9 +12,9 @@ export const POSE_MODELS: { id: PoseModel; name: string; about: string }[] = [
   {
     id: "accurate",
     name: "More accurate",
-    about: "Uses a larger model that places knees and legs better. One rower takes about twice as long. A crew takes up to five times as long, so an eight can take half an hour or more. Body angles are about the same.",
+    about: "Uses a larger model that places knees and legs better. It takes about two to three times as long, and longest for a big crew. Some legs can still be wrong.",
   },
-  { id: "standard", name: "Faster", about: "Uses a smaller model. Body angles and timing are about as good, and knees and legs are rougher." },
+  { id: "standard", name: "Faster", about: "Uses a smaller model. Body angles are about as good overall, and knees and legs are rougher." },
 ];
 
 /** What the larger model needs, for anyone who has not downloaded it yet. */
