@@ -105,6 +105,36 @@ jobs:
           after=$(find "$models/hub/checkpoints" -type f | wc -l)
           test "$before" = "$after"
 
+      - name: Analyse a real clip with the bundled engine, from a folder with accents in its name
+        run: |
+          unpacked=apps/desktop/release/$([ "$RUNNER_OS" = "Linux" ] && echo linux-unpacked || echo win-unpacked)
+          python apps/desktop/scripts/check-installed.py "$unpacked/resources/engine" "$RUNNER_TEMP/rowvision-data/models/rtmlib"
+
+      - name: Install it, start it, analyse a clip with it, and take it off again
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem apps/desktop/release/RowVision-Setup-*.exe | Select-Object -First 1
+          $target = Join-Path $env:LOCALAPPDATA "Programs\Seán\RowVision"
+          # NSIS wants /D last, unquoted.
+          Start-Process -Wait $setup.FullName -ArgumentList "/S", "/D=$target"
+          foreach ($file in "RowVision.exe", "resources\app.asar", "resources\engine\rowvision-engine.exe", "resources\engine\ffmpeg.exe") {
+            if (-not (Test-Path (Join-Path $target $file))) { Get-ChildItem -Recurse -Depth 2 (Split-Path $target); throw "$file was not installed" }
+          }
+          $links = Get-ChildItem -Recurse "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" -Filter "RowVision*.lnk"
+          if (-not $links) { throw "no Start menu entry" }
+          $app = Start-Process -PassThru (Join-Path $target "RowVision.exe")
+          Start-Sleep 15
+          if ($app.HasExited) { throw "the installed app closed by itself, exit code $($app.ExitCode)" }
+          Get-Process RowVision | Stop-Process -Force
+          Start-Sleep 3
+          python apps/desktop/scripts/check-installed.py (Join-Path $target "resources\engine") "$env:RUNNER_TEMP/rowvision-data/models/rtmlib"
+          if ($LASTEXITCODE -ne 0) { throw "the installed engine did not analyse the clip" }
+          $remove = Get-ChildItem $target -Filter "Uninstall*.exe" | Select-Object -First 1
+          Start-Process -Wait $remove.FullName -ArgumentList "/S"
+          foreach ($try in 1..30) { if (-not (Test-Path (Join-Path $target "RowVision.exe"))) { break }; Start-Sleep 2 }
+          if (Test-Path (Join-Path $target "RowVision.exe")) { throw "it was not taken off" }
+
       - uses: actions/upload-artifact@v4
         with:
           name: RowVision-${{ runner.os }}

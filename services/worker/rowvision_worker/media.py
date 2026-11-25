@@ -64,7 +64,8 @@ def parse_probe(report: dict[str, object]) -> Facts:
 def probe(path: Path) -> Facts:
     output = subprocess.check_output(
         ["ffprobe", "-v", "error", "-print_format", "json", "-show_streams", "-show_format", str(path)],
-        text=True,
+        # Windows would otherwise read it in its own code page, and a tag with an accent could stop the clip.
+        encoding="utf-8", errors="replace",
     )
     return parse_probe(json.loads(output))
 
