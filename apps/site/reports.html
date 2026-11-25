@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Reports you can print. RowVision</title>
+<title>Reports. RowVision</title>
 <meta name="description" content="Print every catch and finish as photos with the angles drawn on, or a statistics sheet with scores, timing and how each rower passes the drive from legs to back to arms.">
 <!--head-->
 </head>
@@ -11,22 +11,20 @@
 <canvas id="water" aria-hidden="true"></canvas>
 <!--nav-->
 <main id="main" class="page">
-  <h1>Take the result off the screen.</h1>
-  <p class="lead">Any analysed clip saves as an A4 PDF. One kind is photos of every catch and finish with the angles drawn on. The other is the numbers: scores, timing, and how each rower passes the drive from legs to back to arms.</p>
-  <p class="note">The photo report is in today’s download. The statistics sheet comes with version 0.3.0.</p>
+  <h1>Print every stroke.</h1>
+  <p class="lead">Save any result as a PDF, for one rower, one side or the whole crew.</p>
 
-  <h2>Every catch and finish, as photos.</h2>
-  <p>Each rower is cropped from your video on the exact frame, with their joints and angles drawn over them. You see all four layouts side by side and save the one you want.</p>
+  <h2>Every catch and finish.</h2>
+  <p>Pick the layout you like.</p>
   <ul class="papers four">
     <li><a href="%MEDIA%/media/reports/pair-contact.jpg"><img src="%MEDIA%/media/reports/pair-contact.jpg" width="1260" height="1782" loading="lazy" alt="White page with four strokes, each a photo of the catch beside the finish, with the body, knee and elbow angles drawn on"></a><h3>Contact sheet</h3><p>A row for each stroke, catch beside finish.</p></li>
     <li><a href="%MEDIA%/media/reports/pair-frames.jpg"><img src="%MEDIA%/media/reports/pair-frames.jpg" width="1260" height="1782" loading="lazy" alt="Dark page with three strokes and each angle below its photo, green inside the target and amber outside it"></a><h3>Big frames</h3><p>Three strokes a page. Green is inside the target, amber is outside.</p></li>
     <li><a href="%MEDIA%/media/reports/pair-summary.jpg"><img src="%MEDIA%/media/reports/pair-summary.jpg" width="1260" height="1782" loading="lazy" alt="Green page with the rower’s averages at the top, then every catch and every finish in rows"></a><h3>Report with summary</h3><p>Averages first, then every catch and every finish.</p></li>
     <li><a href="%MEDIA%/media/reports/pair-stroke.jpg"><img src="%MEDIA%/media/reports/pair-stroke.jpg" width="1260" height="1782" loading="lazy" alt="Page for one stroke, with a large catch photo over a large finish photo and a table of angles against targets"></a><h3>One stroke per page</h3><p>The biggest pictures, with that stroke’s numbers against the targets.</p></li>
   </ul>
-  <p class="note">A real report on the stroke seat of a pair, filmed on a phone from a launch. The camera was about 27° off side-on and the accuracy rating came out Poor, so the report leaves the overall score blank.</p>
 
-  <h2>The statistics sheet.</h2>
-  <p>Three pages for a single or a pair, five for a four or an eight. Everyone is on it, one colour for each seat.</p>
+  <h2>Every number.</h2>
+  <p>The whole crew on one statistics sheet. <span class="tag">Coming in 0.3.0</span></p>
   <ul class="papers five">
     <li><a href="/reports/statistics-1.svg"><img src="/reports/statistics-1.svg" width="595" height="842" loading="lazy" alt="Page 1, overall scores, the crew’s body angle through one stroke, and scores at each part of the stroke"></a><h3>Crew at a glance</h3></li>
     <li><a href="/reports/statistics-2.svg"><img src="/reports/statistics-2.svg" width="595" height="842" loading="lazy" alt="Page 2, angles at the catch and finish, knees, first half against second half, and timing"></a><h3>In detail</h3></li>
@@ -35,68 +33,43 @@
     <li><a href="/reports/statistics-5.svg"><img src="/reports/statistics-5.svg" width="595" height="842" loading="lazy" alt="Page 5, legs, back and arms through the drive, rower by rower"></a><h3>Rower by rower</h3></li>
   </ul>
   <p class="gets"><a class="btn" href="/reports/sample-statistics.pdf">Open the sample PDF</a></p>
-  <p class="note">A sample. The crew and all its numbers are made up, and the pages were made by the app itself.</p>
+  <p class="note">Sample report. The crew and its numbers are made up.</p>
 
-  <h2>What you can pull out of it.</h2>
-  <p>These are cut from the sample sheet. Each one answers something a coach asks from the launch.</p>
+  <h2>What it shows you.</h2>
   <div class="finds">
     <section>
       <div class="cut" tabindex="0" role="group" aria-label="Chart, scrolls sideways on a small screen"><div style="--x:20;--y:65;--w:555;--h:152"><img src="/reports/statistics-2.svg" loading="lazy" alt="Body angle at the catch and finish for each rower, against the target band"></div></div>
-      <div><h3>Who is short, and who is over-reaching?</h3><p>Each dot is a rower’s typical stroke and the line through it is how much it varies. The shaded band is the target and a hollow dot is outside it. Here seat 2 reaches only 21.7° while bow lays back to 28.5°.</p></div>
+      <div><h3>Who is short, and who is over-reaching?</h3><p>Hollow dots are outside the target. Seat 2 is short at the catch.</p></div>
     </section>
     <section>
       <div class="cut" tabindex="0" role="group" aria-label="Chart, scrolls sideways on a small screen"><div style="--x:20;--y:242;--w:555;--h:265"><img src="/reports/statistics-1.svg" loading="lazy" alt="Body angle through one stroke, with a line for each rower laid over the others"></div></div>
-      <div><h3>Where does the crew come apart?</h3><p>Everyone’s stroke, laid over each other from catch to next catch. Seat 3’s line falls away first on the drive, and bow’s finish comes after everyone else’s.</p></div>
+      <div><h3>Where does the crew come apart?</h3><p>Everyone’s stroke, laid over each other.</p></div>
     </section>
     <section>
       <div class="cut" tabindex="0" role="group" aria-label="Chart, scrolls sideways on a small screen"><div style="--x:20;--y:174;--w:555;--h:216"><img src="/reports/statistics-4.svg" loading="lazy" alt="Bars showing when each rower’s legs, back and arms move, in seconds after stroke’s catch"></div></div>
-      <div><h3>Who opens the back too soon?</h3><p>When the legs (green), back (purple) and arms (orange) move in the boat, on one clock. Seat 3 is the one with purple ahead of green, and the sheet says so in a sentence at the top of the page.</p></div>
+      <div><h3>Who opens the back too soon?</h3><p>Legs, back and arms on one clock, read from body angles. Seat 3’s back goes before the legs.</p></div>
     </section>
     <section>
       <div class="cut" tabindex="0" role="group" aria-label="Chart, scrolls sideways on a small screen"><div style="--x:20;--y:395;--w:555;--h:225"><img src="/reports/statistics-4.svg" loading="lazy" alt="Every stroke’s back opening as a dot, and the order each rower comes forward on the recovery"></div></div>
-      <div><h3>Is it every stroke, or just some?</h3><p>One dot for each stroke, showing how much of the drive has gone when the back starts to open. Beside it is the order each rower comes forward: arms, back, then legs.</p></div>
+      <div><h3>Is it every stroke, or just some?</h3><p>One dot for each stroke.</p></div>
     </section>
     <section>
       <div class="cut" tabindex="0" role="group" aria-label="Chart, scrolls sideways on a small screen"><div style="--x:20;--y:508;--w:555;--h:122"><img src="/reports/statistics-2.svg" loading="lazy" alt="Each rower’s catch and finish timing against stroke, in thousandths of a second"></div></div>
-      <div><h3>Who is early, and who is late?</h3><p>Every catch and finish against the rower the boat is timed from, and how steady that gap is. Seat 2 catches 60 ms late here. Timing is good to about 50 ms, so it is shown and never scored.</p></div>
+      <div><h3>Who is early, and who is late?</h3><p>Every catch and finish against stroke, good to about 50 ms.</p></div>
     </section>
     <section>
       <div class="cut" tabindex="0" role="group" aria-label="Chart, scrolls sideways on a small screen"><div class="slim" style="--x:343;--y:220;--w:232;--h:288"><img src="/reports/statistics-2.svg" loading="lazy" alt="Table of how each rower’s angles, rhythm and length changed from the first half to the second"></div></div>
-      <div><h3>Does it hold when they tire?</h3><p>The first half of the clip against the second, rower by rower. The biggest change is picked out: bow’s layback grew by 4.3°.</p></div>
+      <div><h3>Does it hold when they tire?</h3><p>First half against second. Bow’s layback grew by 4.3°.</p></div>
     </section>
     <section>
       <div class="cut" tabindex="0" role="group" aria-label="Chart, scrolls sideways on a small screen"><div style="--x:20;--y:508;--w:555;--h:162"><img src="/reports/statistics-1.svg" loading="lazy" alt="Scores for each rower at the catch, drive, finish and rhythm, shaded darker for higher"></div></div>
-      <div><h3>What should each rower work on?</h3><p>Scores at the catch, the drive, the finish and for rhythm. The pale cell in a row is where that rower loses most: the drive for seat 3, the catch for seat 2, the finish for bow.</p></div>
+      <div><h3>What should each rower work on?</h3><p>The palest cell is where they lose most.</p></div>
+    </section>
+    <section>
+      <div class="cut" tabindex="0" role="group" aria-label="Table, scrolls sideways on a small screen"><div style="--x:15;--y:64;--w:565;--h:340"><img src="/reports/statistics-3.svg" loading="lazy" alt="Table of sixteen measures for each rower beside their targets"></div></div>
+      <div><h3>And every number behind it.</h3><p>Sixteen measures for each rower, beside the targets.</p></div>
     </section>
   </div>
-
-  <h2>Every number, for every rower.</h2>
-  <p>The sheet ends its detail with one table. Anything outside a scored target is in bold, and anything that could not be seen reliably is a dash.</p>
-  <dl class="rows">
-    <div><dt>Catch</dt><dd>Body angle, knee angle, shin from vertical and elbow angle.</dd></div>
-    <div><dt>Drive</dt><dd>How far the legs lead the back, when the arms start to bend, how far the body swings, and stroke length in lengths of the rower’s own trunk.</dd></div>
-    <div><dt>Finish</dt><dd>Layback, knee angle and elbow angle.</dd></div>
-    <div><dt>Rhythm</dt><dd>Stroke rate and how steady it is, drive and recovery in seconds, recovery against drive, and the drive’s share of the stroke.</dd></div>
-    <div><dt>In the crew</dt><dd>Catch and finish against the rower you are timed from, and how much each gap varies.</dd></div>
-    <div><dt>Hand-over</dt><dd>When the back opens, how far the legs are down by then, when the legs are done, and the order on the recovery.</dd></div>
-    <div><dt>With every result</dt><dd>The targets used, the strokes measured, and an accuracy rating for each rower.</dd></div>
-  </dl>
-
-  <h2>Choose who is on it.</h2>
-  <dl class="rows">
-    <div><dt>The whole boat</dt><dd>Every seat, stroke first, for the crew talk.</dd></div>
-    <div><dt>One side</dt><dd>Only stroke side, or only bow side, to see how well the rowers on that side match.</dd></div>
-    <div><dt>One rower</dt><dd>Their own sheet to take home.</dd></div>
-    <div><dt>Any boat</dt><dd>Singles to eights, sculling or sweep.</dd></div>
-  </dl>
-
-  <h2>What it will not claim.</h2>
-  <ul class="plain">
-    <li>The hand-over is worked out from body angles, not force. It shows when each part moves, not how hard.</li>
-    <li>Knees and shins are a rough guide and never scored.</li>
-    <li>A short clip has no first half and second half, and the sheet says so.</li>
-    <li>PDFs are made on your computer and saved where you choose. The photo report shows people’s faces, so ask your crew before you pass it on.</li>
-  </ul>
 
   <div class="next"><a class="btn" href="/download.html">Get the desktop app</a><p>Free, for Windows and Linux. Linux now, Windows soon.</p></div>
 </main>
