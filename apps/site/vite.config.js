@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig, loadEnv } from 'vite';
 
-const PAGES = ['index', 'how', 'measures', 'accuracy', 'filming', 'boats', 'privacy', 'roadmap', 'faq', 'about', 'download'];
+const PAGES = ['index', 'how', 'measures', 'accuracy', 'filming', 'boats', 'reports', 'privacy', 'roadmap', 'faq', 'about', 'download'];
 const part = name => readFileSync(resolve(import.meta.dirname, 'partials', `${name}.html`), 'utf8');
 
 // Every page shares one header and footer. They are written into the HTML when it is served or built,
@@ -31,8 +31,15 @@ const downloads = {
   },
 };
 
+// The report photos are footage, so like the clips they are never in git and are served from the bucket.
+const media = {
+  name: 'media-address',
+  configResolved(c) { media.base = c.env.VITE_MEDIA_BASE ?? ''; },
+  transformIndexHtml: { order: 'pre', handler: html => html.replaceAll('%MEDIA%', media.base) },
+};
+
 export default defineConfig({
-  plugins: [chrome, downloads],
+  plugins: [chrome, media, downloads],
   // es2022: the film waits for its pose data at the top of the module
   build: { target: 'es2022', rollupOptions: { input: Object.fromEntries(PAGES.map(n => [n, resolve(import.meta.dirname, `${n}.html`)])) } },
 });
