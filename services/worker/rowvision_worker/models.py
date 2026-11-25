@@ -1,9 +1,10 @@
 """The measuring models the engine needs, and how to fetch them once.
 
-The engine uses the "balanced" pair from rtmlib: a person detector and a pose model. rtmlib looks for
-them in its cache folder and downloads them silently when they are missing. The desktop app does not want
-that: it fetches them here, with real progress and a check of every file, and the engine only runs once
-they are in place. The file names, sizes and checksums are those of the files rtmlib itself produces.
+The engine uses the "balanced" pair from rtmlib: a person detector and a pose model. A larger pose model
+is only used for clips analysed with the more accurate model. rtmlib looks for them in its cache folder
+and downloads them silently when they are missing. The desktop app does not want that: it fetches them
+here, with real progress and a check of every file, and the engine only runs once they are in place.
+The file names, sizes and checksums are those of the files rtmlib itself produces.
 """
 
 import hashlib
@@ -36,7 +37,7 @@ class Model:
     sha256: str
 
 
-MODELS = (
+STANDARD_MODELS = (
     Model(
         "yolox_m_8xb8-300e_humanart-c2c7a14a.zip",
         94_223_081,
@@ -52,6 +53,15 @@ MODELS = (
         "5c0a4bf67953e6d2ac43ce15e77dc9d5d354ae18430a47d2c5963a7bc5683e3c",
     ),
 )
+ACCURATE_MODEL = Model(
+    "rtmpose-x_simcc-body7_pt-body7_700e-384x288-71d7b7e9_20230629.zip",
+    184_294_200,
+    "rtmpose-x_simcc-body7_pt-body7_700e-384x288-71d7b7e9_20230629.onnx",
+    197_660_326,
+    "df0c0fa91e9870b1515dcaff741fd76cc753dcfb12786862f61b243bae81cd52",
+)
+MODELS = (*STANDARD_MODELS, ACCURATE_MODEL)
+"""The standard ones first, so a clip that only needs those can start even if the rest can't be fetched."""
 
 
 class ModelError(Exception):
@@ -84,6 +94,7 @@ def status(folder: Path) -> dict[str, Any]:
     return {
         "event": "status",
         "ready": not absent,
+        "standard_ready": not any(model in STANDARD_MODELS for model in absent),
         "download_bytes": sum(model.zip_bytes for model in absent),
         "total_bytes": sum(model.zip_bytes for model in MODELS),
     }

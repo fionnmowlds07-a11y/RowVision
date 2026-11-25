@@ -8,7 +8,7 @@ from typing import Any, Protocol
 import numpy as np
 from rowvision.boats import boat_at
 from rowvision.pipeline import COARSE_STEP, Request, Scope, Scouting, analyse, scout
-from rowvision.pose import PoseBackend, RtmBackend
+from rowvision.pose import AccurateJoints, JointFinder, PoseBackend, RtmBackend
 from rowvision.report import analysis_json, boat_choices_json
 from rowvision.seats import track_at
 from rowvision.version import code_version
@@ -124,16 +124,24 @@ def pause_for(scouting: Scouting, video: Video) -> NeedsTap:
     )
 
 
+STANDARD, ACCURATE = "standard", "accurate"
+"""Which model finds the joints that are measured. Accurate takes longer and places legs better."""
+
+
 class RealEngine:
-    def __init__(self, device: str, threads: int | None = None) -> None:
+    def __init__(self, device: str, threads: int | None = None, model: str = STANDARD) -> None:
         self._device = device
         self._threads = threads
+        self._model = model
         self._backend: PoseBackend | None = None
+        self._joints: JointFinder | None = None
 
     def _get_backend(self, report: Report) -> PoseBackend:
         if self._backend is None:
             report("Loading the pose model", None)
             self._backend = RtmBackend(device=self._device, threads=self._threads)
+            if self._model == ACCURATE:
+                self._joints = AccurateJoints(device=self._device, threads=self._threads)
         return self._backend
 
     def run(
@@ -156,7 +164,8 @@ class RealEngine:
         if request is None:
             return pause_for(scouting, video)
         analysis = analyse(
-            watched(MEASURING[request.scope]), video.frames, video.fps, request, backend, scouting
+            watched(MEASURING[request.scope]), video.frames, video.fps, request, backend, scouting,
+            self._joints,
         )
         if analysis.needs_boat_choice or (scouting.boats and not analysis.rowers and _unseen(analysis)):
             return pause_for(scouting, video)
@@ -234,5 +243,7 @@ def fake_report(video: Video) -> dict[str, Any]:
     }
 
 
-def make_engine(kind: str, device: str, threads: int | None = None) -> Engine:
-    return FakeEngine() if kind == "fake" else RealEngine(device, threads)
+def make_engine(
+    kind: str, device: str, threads: int | None = None, model: str = STANDARD
+) -> Engine:
+    return FakeEngine() if kind == "fake" else RealEngine(device, threads, model)

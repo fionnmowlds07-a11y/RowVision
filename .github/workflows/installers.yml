@@ -158,6 +158,6 @@ jobs:
           path: |
             apps/desktop/release/*.exe
             apps/desktop/release/*.AppImage
-            ${{ runner.temp }}/windows.png
+            ${{ runner.temp }}/windows*.png
           retention-days: 7
           if-no-files-found: error

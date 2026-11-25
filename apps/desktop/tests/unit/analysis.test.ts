@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { Analyser, BEFORE_CREW, CREW_SEAT_SHARE, FIRST_SPEED, MOVED, UNEXPECTED, clipWork, jobFor, overallProgress, secondsLeft } from "../../src/main/analysis";
+import { Analyser, ACCURATE_SEAT_SHARE, BEFORE, CREW_SEAT_SHARE, FIRST_SPEED, MOVED, UNEXPECTED, clipWork, jobFor, measuringLeft, overallProgress } from "../../src/main/analysis";
 import { readClip } from "../../src/main/library";
 import type { Analysis } from "../../src/shared/bridge";
 import type { Effort } from "../../src/shared/effort";
@@ -16,10 +16,12 @@ let notices: string[];
 let speed: number | null;
 let engine: string[] | null;
 let modelsReady = true;
+let accurateReady = true;
 let effort: Effort = "balanced";
 
 beforeEach(() => {
   modelsReady = true;
+  accurateReady = true;
   effort = "balanced";
   root = mkdtempSync(path.join(tmpdir(), "rowvision-analysis-"));
   library = path.join(root, "clips");
@@ -50,7 +52,7 @@ function make(): Analyser {
     saveSpeed: async (_, value) => { speed = value; },
     effort: async () => effort,
     cores: () => 8,
-    modelsReady: () => modelsReady,
+    modelsReady: (model) => modelsReady && (model === "standard" || accurateReady),
   });
   return analyser;
 }
@@ -73,14 +75,14 @@ test("progress runs across the stages and never goes back", () => {
   expect(overallProgress("Measuring your rower", 1, 0)).toBe(1);
   expect(overallProgress("Finding boats", 0, 0.5)).toBe(0.5);
   expect(overallProgress("Something new", 0.9, 0.3)).toBe(0.3);
-  expect(secondsLeft(0.1, 60)).toBeNull();
-  expect(secondsLeft(0.5, 60)).toBe(60);
+  expect(measuringLeft(0.01, 60)).toBeNull();
+  expect(measuringLeft(0.5, 60)).toBe(60);
 });
 
 test("the job file carries the trim, and leaves the length out when the page could not play it", () => {
   const clip = { source: "/v.mp4", section_start: 3, section_length: 20, boat_class: "2-", side: "bow", seat: 2, tap: null };
   expect(jobFor("/lib/a", clip, "real")).toEqual({
-    folder: "/lib/a", source: "/v.mp4", start: 3, length: 20, boat_class: "2-", side: "bow", seat: 2, tap: null, engine: "real", device: "cpu", scope: "seat",
+    folder: "/lib/a", source: "/v.mp4", start: 3, length: 20, boat_class: "2-", side: "bow", seat: 2, tap: null, engine: "real", device: "cpu", scope: "seat", model: "standard",
   });
   expect(jobFor("/lib/a", { ...clip, section_length: null }, "real")).not.toHaveProperty("length");
 });
@@ -180,7 +182,7 @@ test("a clip measured for one rower can be measured again for the whole crew", a
   await vi.waitFor(() => expect(runner.snapshot().running).toBeNull());
   await settled("one", "done");
   expect(JSON.parse(readFileSync(path.join(library, "one", "job.json"), "utf8")).scope).toBe("crew");
-  expect(existsSync(path.join(library, "one", BEFORE_CREW))).toBe(false);
+  expect(existsSync(path.join(library, "one", BEFORE))).toBe(false);
   expect(await runner.measureCrew("one")).toBe("The whole crew is already measured.");
 });
 
@@ -230,13 +232,67 @@ test("clips wait for the measuring models, and start once they are there", async
   addClip("a", "2026-11-08T09:00:00Z");
   const a = make();
   await a.start();
-  expect(a.snapshot()).toMatchObject({ running: null, engineMissing: false, modelsMissing: true });
+  expect(a.snapshot()).toMatchObject({ running: null, engineMissing: false, waiting: [{ id: "a", modelMissing: true }] });
   expect(a.snapshot().waiting.map((item) => item.id)).toEqual(["a"]);
   expect(await state("a")).toBe("waiting");
   modelsReady = true;
   await a.next();
   await settled("a", "done");
-  expect(a.snapshot().modelsMissing).toBe(false);
+  expect(a.snapshot().waiting).toEqual([]);
+});
+
+test("a clip waiting for the more accurate model does not hold up one that needs only the standard one", async () => {
+  accurateReady = false;
+  addClip("accurate", "2026-11-08T09:00:00Z", { model: "accurate" });
+  addClip("standard", "2026-11-08T10:00:00Z");
+  const a = make();
+  await a.start();
+  await settled("standard", "done");
+  await vi.waitFor(() => expect(a.snapshot().running).toBeNull());
+  expect(a.snapshot().waiting).toMatchObject([{ id: "accurate", modelMissing: true }]);
+  accurateReady = true;
+  await a.next();
+  await settled("accurate", "done");
+  expect(JSON.parse(readFileSync(path.join(library, "accurate", "job.json"), "utf8")).model).toBe("accurate");
+});
+
+test("a clip can be analysed again with the more accurate model, keeping its crew", async () => {
+  addClip("one", "2026-11-08T10:00:00Z", { scope: "crew" });
+  const runner = make();
+  await runner.start();
+  await settled("one", "done");
+  await vi.waitFor(() => expect(runner.snapshot().running).toBeNull());
+  expect(await runner.analyseAccurately("one")).toBeNull();
+  await vi.waitFor(() => expect(runner.snapshot().running).toBeNull());
+  await settled("one", "done");
+  expect(JSON.parse(readFileSync(path.join(library, "one", "job.json"), "utf8"))).toMatchObject({ scope: "crew", model: "accurate" });
+  expect(existsSync(path.join(library, "one", BEFORE))).toBe(false);
+  expect(await runner.analyseAccurately("one")).toBe("This clip already used the more accurate model.");
+});
+
+test("a more accurate run that is stopped gives back the results and the model it had", async () => {
+  addClip("one", "2026-11-08T10:00:00Z", { scope: "crew" });
+  const runner = make();
+  await runner.start();
+  await settled("one", "done");
+  await vi.waitFor(() => expect(runner.snapshot().running).toBeNull());
+  const before = readFileSync(path.join(library, "one", "summary.json"), "utf8");
+  writeFileSync(control, "hang");
+  expect(await runner.analyseAccurately("one")).toBeNull();
+  await vi.waitFor(() => expect(runner.snapshot().running?.id).toBe("one"));
+  await runner.stop("one");
+  await settled("one", "done");
+  expect(readFileSync(path.join(library, "one", "summary.json"), "utf8")).toBe(before);
+  const clip = JSON.parse(readFileSync(path.join(library, "one", "clip.json"), "utf8"));
+  expect(clip).toMatchObject({ scope: "crew", model: "standard" });
+  expect(clip).not.toHaveProperty("before");
+});
+
+test("the more accurate model is expected to take longer, and a crew longer still", () => {
+  const clip = { boat_class: "8+", section_length: 10 };
+  expect(clipWork({ ...clip, model: "accurate" })).toBe(clipWork(clip) + 10 * ACCURATE_SEAT_SHARE);
+  const crew = { ...clip, scope: "crew" };
+  expect(clipWork({ ...crew, model: "accurate" })).toBe(clipWork(crew) + 80 * ACCURATE_SEAT_SHARE);
 });
 
 test("a crew job asks the engine for every seat, and is expected to take longer", () => {

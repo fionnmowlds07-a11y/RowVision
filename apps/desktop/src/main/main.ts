@@ -58,22 +58,23 @@ function notify(title: string, body: string, id: string) {
 /** The engine keeps its models in the app's own folder, so removing the app's data removes them too. */
 const engineSettings = () => ({ TORCH_HOME: path.join(app.getPath("userData"), "models", "rtmlib") });
 
-let modelsWereReady = false;
+let modelsWereReady = "false,false";
 const models = new Models({
   engine: engineCommand,
   env: engineSettings,
   onChange: (state: ModelsState) => {
     for (const window of BrowserWindow.getAllWindows()) window.webContents.send(CHANNELS.modelsChanged, state);
     // Clips that were waiting for the models can start now, or must wait again.
-    if (models.ready() !== modelsWereReady) {
-      modelsWereReady = models.ready();
+    const ready = [models.ready("standard"), models.ready("accurate")].join();
+    if (ready !== modelsWereReady) {
+      modelsWereReady = ready;
       void analyser.next();
     }
   },
 });
 
 const analyser = new Analyser({
-  modelsReady: () => models.ready(),
+  modelsReady: (model) => models.ready(model),
   env: engineSettings,
   library,
   engine: engineCommand,
@@ -223,6 +224,7 @@ void app.whenReady().then(async () => {
   handle(CHANNELS.removeVideo, (id) => removeVideo(library(), clipId(id)));
   handle(CHANNELS.stopClip, (id) => analyser.stop(clipId(id)));
   handle(CHANNELS.startClip, (id) => analyser.restart(clipId(id)));
+  handle(CHANNELS.analyseAccurately, (id) => analyser.analyseAccurately(clipId(id)));
   handle(CHANNELS.measureCrew, (id) => analyser.measureCrew(clipId(id)));
   // Where the last report was saved, so the page can show it without naming any path itself.
   let lastReport: string | null = null;

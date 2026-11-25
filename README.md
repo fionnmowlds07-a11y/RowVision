@@ -159,7 +159,7 @@ flowchart TB
 
 - **Library on disk.** Each clip is a folder. Its state is read from which files exist (`summary.json` done, `pause.json` needs a tap, `state.json` stopped), so a clip cut off by closing the app simply restarts. The user's original video is never copied or changed.
 - **Engine as a separate process.** The Electron main process writes a job file, starts the bundled engine and reads progress lines. A fake engine that speaks the same protocol makes the app fully testable without models.
-- **Models on first run.** The ~145 MB of models are downloaded on first run with progress, cancel and retry, from the official mirror with a fallback, and every file is checked against a pinned SHA-256 before use.
+- **Models on first run.** The ~329 MB of models are downloaded on first run with progress, cancel and retry, from the official mirror with a fallback, and every file is checked against a pinned SHA-256 before use.
 - **Installers.** A Linux AppImage and `.deb`, built to run on glibc 2.30 and later, with a static AppImage runtime so FUSE is not needed. A Windows NSIS installer builds in CI and is still being tested.
 
 ## Technology

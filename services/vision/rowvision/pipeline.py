@@ -34,7 +34,7 @@ from rowvision.metrics import (
     per_stroke,
     rate_steadiness,
 )
-from rowvision.pose import PoseBackend
+from rowvision.pose import JointFinder, PoseBackend
 from rowvision.reference import Targets, load_targets
 from rowvision.reliability import Calibration, Evidence, Rating, load_calibration, rate
 from rowvision.scoring import MIN_STROKES, ScoreCard, score_stroke, without_scores
@@ -281,7 +281,7 @@ def _boxes_for(track: Track, frames: int) -> FloatArray:
 
 
 def _fine_pass(
-    read: FrameReader, frames: int, tracks: list[Track], backend: PoseBackend
+    read: FrameReader, frames: int, tracks: list[Track], joint_finder: JointFinder
 ) -> list[tuple[FloatArray, FloatArray]]:
     """Find the joints of every given person on every frame, reading each frame once.
 
@@ -295,7 +295,7 @@ def _fine_pass(
         wanted = [person for person, box in enumerate(boxes) if np.isfinite(box[index]).all()]
         if not wanted:
             continue
-        found, confidence = backend.estimate(
+        found, confidence = joint_finder.estimate(
             read(index), np.stack([boxes[person][index] for person in wanted])
         )
         for person, joints, score in zip(wanted, found, confidence, strict=False):
@@ -696,8 +696,12 @@ def analyse(
     request: Request,
     backend: PoseBackend,
     scouting: Scouting | None = None,
+    joint_finder: JointFinder | None = None,
 ) -> Analysis:
-    """Measure the requested rowers, or stop and ask if the athlete must choose a boat first."""
+    """Measure the requested rowers, or stop and ask if the athlete must choose a boat first.
+
+    `joint_finder` finds the joints that are measured, or the backend does when it is left out.
+    """
     found = scouting if scouting is not None else scout(read, frames, fps, backend)
     log.info(
         "scouting: %d people tracked, boats of %s people, camera crossed the boat at sampled frames %s",
@@ -838,7 +842,7 @@ def analyse(
         wanted.setdefault(leader, assignment.seats[leader])
     fine: dict[int | None, tuple[FloatArray, FloatArray]] = {}
     for seat, (points, scores) in zip(
-        wanted, _fine_pass(read, frames, list(wanted.values()), backend), strict=True
+        wanted, _fine_pass(read, frames, list(wanted.values()), joint_finder or backend), strict=True
     ):
         points[dropped] = np.nan
         scores[dropped] = 0

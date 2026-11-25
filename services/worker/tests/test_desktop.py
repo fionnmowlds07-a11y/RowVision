@@ -277,3 +277,9 @@ def test_the_priority_asked_for_is_the_one_given(
     monkeypatch.setattr(desktop.os, "nice", given.append)
     desktop.lower_priority(priority)
     assert given == ([] if nice is None else [nice])
+
+
+def test_the_accurate_model_is_used_only_when_asked_for() -> None:
+    assert job_in(Path("clip")).model == "standard"
+    assert job_in(Path("clip"), model="accurate").model == "accurate"
+    assert job_in(Path("clip"), model="huge").model == "standard"

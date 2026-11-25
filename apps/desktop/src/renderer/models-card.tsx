@@ -1,3 +1,4 @@
+import { ACCURATE_DOWNLOAD } from "../shared/pose-model";
 import { megabytes, percent, useModels } from "./use-models";
 
 /** The measuring models in Settings: what is on this computer, and a way to fetch them. */
@@ -12,7 +13,9 @@ export function ModelsCard() {
       {models.state === "no_engine" ? <p className="soft">The measuring part of RowVision isn&apos;t installed in this test version yet, so there is nothing to download.</p> : null}
       {models.state === "missing" ? (
         <>
-          <p className="soft">Not downloaded yet. RowVision needs them once{models.totalBytes > 0 ? `, about ${megabytes(models.totalBytes)}` : ""}, and clips wait until they are here.</p>
+          {models.standardReady
+            ? <p className="soft">The faster model is here. The more accurate model isn&apos;t downloaded yet, {ACCURATE_DOWNLOAD}, and clips that use it wait until it is.</p>
+            : <p className="soft">Not downloaded yet. RowVision needs them once{models.totalBytes > 0 ? `, about ${megabytes(models.totalBytes)}` : ""}, and clips wait until they are here.</p>}
           <button type="button" className="button primary" onClick={() => void window.rowvision.downloadModels()}>Download</button>
         </>
       ) : null}

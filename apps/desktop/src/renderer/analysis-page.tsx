@@ -4,6 +4,7 @@ import { clipUrl, type ClipDetail, type ClipItem } from "../shared/bridge";
 import { CREW_STAGE, STAGES, stageIndex } from "../shared/stages";
 import { shortDate, setupLine } from "./format";
 import { minutesText, useAnalysis } from "./use-analysis";
+import { percent, useModels } from "./use-models";
 import styles from "./analysis.module.css";
 
 const HEADINGS = {
@@ -17,6 +18,7 @@ const HEADINGS = {
 
 export function AnalysisPage({ id }: { id: string }) {
   const analysis = useAnalysis();
+  const models = useModels();
   const [clip, setClip] = useState<ClipDetail | null | undefined>(undefined);
   const [clips, setClips] = useState<ClipItem[]>([]);
   const [confirming, setConfirming] = useState(false);
@@ -61,7 +63,7 @@ export function AnalysisPage({ id }: { id: string }) {
 
   let timeText = "";
   if (mine) timeText = mine.secondsLeft !== null ? `${minutesText(mine.secondsLeft)} left` : "Working out how long";
-  else if (state === "waiting" && place) timeText = analysis.engineMissing || analysis.modelsMissing ? "Not started" : `Starts in ${minutesText(place.secondsUntil)}`;
+  else if (state === "waiting" && place) timeText = analysis.engineMissing || place.modelMissing ? "Not started" : `Starts in ${minutesText(place.secondsUntil)}`;
   else if (state === "needs_tap") timeText = "Paused";
 
   function tapFrame(event: MouseEvent<HTMLButtonElement>) {
@@ -130,8 +132,12 @@ export function AnalysisPage({ id }: { id: string }) {
             })}
           </ol>
 
-          {!analysis.engineMissing && analysis.modelsMissing && state === "waiting" ? (
-            <p className={styles.caution}>The measuring models aren&apos;t downloaded yet, so clips wait here until they are. <a href="#/settings">Download them in Settings</a>.</p>
+          {!analysis.engineMissing && place?.modelMissing && state === "waiting" ? (
+            <p className={styles.caution}>
+              {models?.state === "downloading"
+                ? `Downloading the measuring models, ${percent(models)}%. This clip starts when they are here.`
+                : <>{models?.standardReady ? "The more accurate model isn't downloaded yet, so this clip waits here until it is." : "The measuring models aren't downloaded yet, so clips wait here until they are."} <a href="#/settings">Download them in Settings</a>.</>}
+            </p>
           ) : null}
           {analysis.engineMissing && state === "waiting" ? (
             <p className={styles.caution}>The measuring part of RowVision isn&apos;t installed on this computer yet, so clips wait here until it is.</p>
@@ -158,7 +164,7 @@ export function AnalysisPage({ id }: { id: string }) {
                 {others.map((other) => (
                   <li key={other.id}>
                     <a href={`#/analysis/${other.id}`}>{nameOf(other.id)}</a>
-                    <span className="soft">{analysis.engineMissing || analysis.modelsMissing ? "" : `in ${minutesText(other.secondsUntil)}`}</span>
+                    <span className="soft">{analysis.engineMissing || other.modelMissing ? "" : `in ${minutesText(other.secondsUntil)}`}</span>
                     <button type="button" className="button quiet" aria-label={`Remove ${nameOf(other.id)} from the queue`} onClick={() => void window.rowvision.stopClip(other.id)}>Remove</button>
                   </li>
                 ))}

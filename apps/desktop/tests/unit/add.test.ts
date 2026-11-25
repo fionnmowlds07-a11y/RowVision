@@ -25,7 +25,7 @@ const good = () => ({
 });
 
 test("a good request comes through tidied", () => {
-  expect(cleanAdd(good())).toEqual({ ...good(), note: "Saturday", scope: "seat", coach: false });
+  expect(cleanAdd(good())).toEqual({ ...good(), note: "Saturday", scope: "seat", coach: false, model: "standard" });
   expect(cleanAdd({ ...good(), section: { start: 0, length: null }, tap: null })).not.toBeNull();
 });
 
@@ -46,6 +46,7 @@ test("anything odd is refused", () => {
     { ...good(), section: { start: Number.NaN, length: 30 } },
     { ...good(), tap: { t: 1, x: 1.5, y: 0.5 } },
     { ...good(), tap: "middle" },
+    { ...good(), model: "huge" },
   ];
   for (const request of bad) expect(cleanAdd(request), JSON.stringify(request)).toBeNull();
 });
@@ -57,9 +58,14 @@ test("adding writes the clip's folder and leaves the video where it is", async (
   const clip = JSON.parse(readFileSync(path.join(library, id, "clip.json"), "utf8"));
   expect(clip).toEqual({
     created_at: "2026-11-08T10:00:00.000Z", filmed_at: "2026-11-08T09:30:00.000Z", source: video, source_bytes: 18,
-    boat_class: "2-", side: "bow", seat: 2, note: "Saturday", section_start: 4.5, section_length: 30, tap: { t: 1.2, x: 0.4, y: 0.6 }, scope: "seat",
+    boat_class: "2-", side: "bow", seat: 2, note: "Saturday", section_start: 4.5, section_length: 30, tap: { t: 1.2, x: 0.4, y: 0.6 }, scope: "seat", model: "standard",
   });
   expect(readFileSync(video, "utf8")).toBe("not really a video");
+});
+
+test("the model asked for is kept, and older pages get the standard one", () => {
+  expect(cleanAdd({ ...good(), model: "accurate" })?.model).toBe("accurate");
+  expect(cleanAdd(good())?.model).toBe("standard");
 });
 
 test("a missing video is refused", async () => {

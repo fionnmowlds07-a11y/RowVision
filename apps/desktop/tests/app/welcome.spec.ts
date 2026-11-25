@@ -161,6 +161,23 @@ test("the download can be cancelled and picked up again from Settings", async ()
   await expect(card).toContainText("Downloaded.");
 });
 
+test("a clip for the more accurate model waits for it, and says so, when only the faster one is here", async () => {
+  const control = path.join(data, "models-control");
+  writeFileSync(control, "standard");
+  writeFileSync(path.join(data, "settings.json"), JSON.stringify({ welcomed: true }));
+  const folder = path.join(data, "clips", "waiting-clip");
+  mkdirSync(folder, { recursive: true });
+  writeFileSync(path.join(data, "source.mp4"), "pretend video");
+  writeFileSync(path.join(folder, "clip.json"), JSON.stringify({ created_at: "2026-11-09T09:00:00Z", source: path.join(data, "source.mp4"), boat_class: "2-", side: "bow", seat: 2, section_start: 0, section_length: 10, model: "accurate" }));
+  await launch(withFake(control));
+  await page.evaluate(() => { window.location.hash = "#/analysis/waiting-clip"; });
+  await expect(page.getByText("The more accurate model isn't downloaded yet")).toBeVisible();
+  await page.getByRole("link", { name: "Download them in Settings" }).click();
+  await expect(page.getByTestId("models-card")).toContainText("The faster model is here.");
+  await page.getByTestId("models-card").getByRole("button", { name: "Download" }).click();
+  await expect.poll(() => page.evaluate(async () => (await window.rowvision.listClips())[0].state), { timeout: 20_000 }).toBe("done");
+});
+
 test("clips wait for the models, and are measured once they are downloaded", async () => {
   const control = path.join(data, "models-control");
   writeFileSync(control, "missing");

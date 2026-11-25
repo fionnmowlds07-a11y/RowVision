@@ -3,6 +3,8 @@ import { ClipForm, PickCard, freshChoice, useVideoDrop, type Choice } from "@/ap
 import { fitRig, hasRig, isRig, type Rig } from "@/lib/rigs";
 import { BOAT_SEATS } from "@/lib/setup";
 import type { Scope } from "../shared/bridge";
+import { DEFAULT_MODEL, poseModel, type PoseModel } from "../shared/pose-model";
+import { ModelPicker } from "./model-picker";
 import { RigPicker } from "./rig-picker";
 import styles from "@/app/add/add.module.css";
 
@@ -23,6 +25,24 @@ function keepRig(boat: string, rig: Rig) {
   }
 }
 
+/** The last choice is offered again on this computer. */
+const MODEL_KEY = "rowvision.model";
+function savedModel(): PoseModel {
+  try {
+    const saved = window.localStorage.getItem(MODEL_KEY);
+    return saved === null ? DEFAULT_MODEL : poseModel(saved);
+  } catch {
+    return DEFAULT_MODEL;
+  }
+}
+function keepModel(model: PoseModel) {
+  try {
+    window.localStorage.setItem(MODEL_KEY, model);
+  } catch {
+    // Storage is blocked, so the usual choice is offered next time.
+  }
+}
+
 const VIDEO_NAME = /\.(mp4|mov|m4v|avi|mkv|webm|mts|m2ts|3gp)$/i;
 
 /** No size limit here, as nothing is uploaded. */
@@ -37,6 +57,7 @@ export function AddPage() {
   const [scope, setScope] = useState<Scope>("seat");
   // Each boat's rig, bow seat first. Starts on the last one used, or the normal rig.
   const [rigs, setRigs] = useState<Record<string, unknown>>(savedRigs);
+  const [model, setModel] = useState<PoseModel>(savedModel);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dragging = useVideoDrop(file ? null : take);
@@ -72,6 +93,7 @@ export function AddPage() {
     const seat = crew ? seats : setup.seat;
     const side = rig ? rig[seat - 1] : crew ? "scull" : setup.side;
     if (rig) keepRig(setup.boat, rig);
+    keepModel(model);
     try {
       const id = await window.rowvision.addClip({
         source: window.rowvision.pathForFile(file),
@@ -83,7 +105,10 @@ export function AddPage() {
         scope: crew ? "crew" : "seat",
         coach: crew,
         ...(rig ? { rig } : {}),
+        model,
       });
+      // Does nothing when every model is already here.
+      if (model === "accurate") void window.rowvision.downloadModels();
       window.location.hash = `#/analysis/${id}`;
     } catch {
       setError("We couldn't add this clip. Check the video is still there, then try again.");
@@ -132,6 +157,7 @@ export function AddPage() {
           crew={crew ? crewField : undefined}
           side={!crew && seats > 2 ? rigPicker ?? undefined : undefined}
         >
+          <ModelPicker model={model} disabled={saving} onChange={setModel} />
           <section className={`card stack ${styles.send}`} aria-label="Add the clip">
             <div className={styles.row}>
               <strong>{file.name}</strong>

@@ -46,6 +46,7 @@ test("the installed app starts, knows it is packaged, and tells the truth about 
     const checkpoints = path.join(data, "models", "rtmlib", "hub", "checkpoints");
     expect(readdirSync(checkpoints).filter((name) => name.endsWith(".onnx")).sort()).toEqual([
       "rtmpose-m_simcc-body7_pt-body7_420e-256x192-e48f03d0_20230504.onnx",
+      "rtmpose-x_simcc-body7_pt-body7_700e-384x288-71d7b7e9_20230629.onnx",
       "yolox_m_8xb8-300e_humanart-c2c7a14a.onnx",
     ]);
     expect(readdirSync(checkpoints).filter((name) => name.startsWith("."))).toEqual([]);
@@ -58,13 +59,18 @@ test("the installed app starts, knows it is packaged, and tells the truth about 
     await page.locator("input[type=file]").setInputFiles(clip);
     await expect(page.getByRole("group", { name: "Trim your clip" })).toBeVisible();
     await page.getByRole("region", { name: "Your boat" }).locator("select").first().selectOption("1x");
+    // The larger model is the first choice, so this is also the real test that it loads and runs.
+    await expect(page.getByRole("region", { name: "Accuracy" }).getByRole("button", { name: "More accurate" })).toHaveAttribute("aria-pressed", "true");
+    if (process.env.PACKAGED_SHOT) await page.screenshot({ path: process.env.PACKAGED_SHOT.replace(/\.png$/, "-add.png"), fullPage: true });
     await page.getByRole("button", { name: "Add to your clips" }).click();
     await expect(page).toHaveURL(/#\/analysis\/[a-z0-9-]+$/);
     const id = /#\/analysis\/([a-z0-9-]+)$/.exec(page.url())![1];
     await expect(page.getByRole("heading", { name: "Analysed" })).toBeVisible({ timeout: 10 * 60_000 });
     const folder = path.join(data, "clips", id);
     expect(readdirSync(folder)).toEqual(expect.arrayContaining(["engine.log", "frames.json", "summary.json", "working.mp4"]));
-    console.log(readFileSync(path.join(folder, "engine.log"), "utf8"));
+    const log = readFileSync(path.join(folder, "engine.log"), "utf8");
+    console.log(log);
+    expect(log).toContain("accurate model");
     await page.getByRole("link", { name: "See your results" }).click();
     const viewer = page.getByRole("region", { name: "Frame viewer" });
     await expect(viewer).toBeVisible();

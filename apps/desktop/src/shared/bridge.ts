@@ -4,6 +4,7 @@ import type { Summary } from "../../../web/lib/result";
 import type { Setup } from "../../../web/lib/setup";
 import type { TargetChoices } from "../../../web/lib/targets";
 import type { Effort } from "./effort";
+import type { PoseModel } from "./pose-model";
 
 export type Colours = { ground: string | null; highlight: string | null };
 
@@ -19,6 +20,8 @@ export type ClipSetup = {
   scope?: string;
   /** Added as a whole crew with no one rower as "you". */
   coach?: boolean;
+  /** Which model finds the joints. Left out on clips from before there was a choice, which used the standard one. */
+  model?: PoseModel;
 };
 
 /** What the add page hands over. The video stays where it is and is read from there. */
@@ -36,6 +39,8 @@ export type AddRequest = {
   coach?: boolean;
   /** Each seat's side, bow seat first, for a sweep boat that may not be rigged with sides alternating. */
   rig?: ("stroke" | "bow")[];
+  /** Which model finds the joints. Older pages send none, which is the standard one. */
+  model?: PoseModel;
 };
 
 export type Scope = "seat" | "crew";
@@ -55,12 +60,10 @@ export type Running = {
 export type Analysis = {
   running: Running | null;
   /** Clips waiting their turn, first in line first, with a rough wait each. */
-  waiting: { id: string; secondsUntil: number }[];
+  waiting: { id: string; secondsUntil: number; modelMissing: boolean }[];
   onBattery: boolean;
   /** The measuring program is not installed, so nothing can be analysed yet. */
   engineMissing: boolean;
-  /** The measuring models are not downloaded yet, so clips wait for them. */
-  modelsMissing: boolean;
   /** How hard the running clip works the computer, or the next one will. */
   effort: Effort;
 };
@@ -68,6 +71,8 @@ export type Analysis = {
 /** The measuring models the engine needs, and whether they are on this computer. */
 export type ModelsState = {
   state: "checking" | "ready" | "missing" | "downloading" | "failed" | "no_engine";
+  /** The standard models are here, so clips that only need those can be analysed. "ready" is every model. */
+  standardReady: boolean;
   downloadedBytes: number;
   totalBytes: number;
   /** Why it failed, in plain words. */
@@ -147,6 +152,8 @@ export type Bridge = {
   setEffort(effort: Effort): Promise<void>;
   /** Measures every seat of a clip that was measured for one rower. Returns why not, or null once it is queued. */
   measureCrew(id: string): Promise<string | null>;
+  /** Analyses a clip again with the more accurate model. Returns why not, or null once it is queued. */
+  analyseAccurately(id: string): Promise<string | null>;
   /** Says which rower is you, then carries on. */
   tapAgain(id: string, tap: { t: number; x: number; y: number }): Promise<void>;
   getSpace(): Promise<Space>;
@@ -187,6 +194,7 @@ export const CHANNELS = {
   stopClip: "analysis:stop",
   startClip: "analysis:start",
   measureCrew: "analysis:crew",
+  analyseAccurately: "analysis:accurate",
   exportPdf: "report:export",
   showReport: "report:show",
   getEffort: "effort:get",

@@ -55,6 +55,25 @@ class FakeBackend:
         return people[chosen], self.scores[frame][chosen]
 
 
+def test_a_given_joint_finder_measures_the_rowers_and_the_backend_finds_them() -> None:
+    backend = FakeBackend(1)
+    asked: list[int] = []
+
+    class Finder:
+        def estimate(self, frame: int, boxes: FloatArray) -> tuple[FloatArray, FloatArray]:
+            asked.append(frame)
+            points, scores = backend.estimate(frame, boxes)
+            return points + 1.0, scores
+
+    request = Request(boat_seats=1, seat=1)
+    plain = run(backend, request).rowers[0].points
+    found = analyse(
+        lambda index: index, len(backend.points), FPS, request, backend, joint_finder=Finder()
+    )
+    assert len(asked) > 200
+    assert np.allclose(found.rowers[0].points, plain + 1.0, equal_nan=True)
+
+
 def run(backend: FakeBackend, request: Request) -> Analysis:
     return analyse(lambda index: index, len(backend.points), FPS, request, backend)
 
