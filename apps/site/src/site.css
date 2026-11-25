@@ -37,6 +37,7 @@ small { font-size: 14px; color: var(--soft); }
 .foot { position: relative; z-index: 2; background: var(--ground); border-top: 1px solid var(--line); padding: 64px var(--pad) 44px; display: grid; grid-template-columns: minmax(240px, 1fr) minmax(0, 2fr); gap: 44px clamp(32px, 6vw, 96px); font-size: 15px; color: var(--soft); }
 .foot .mark { font-size: 26px; color: var(--text); }
 .foot .sign p { margin-top: 18px; max-width: 24em; }
+.foot .by a { color: var(--text); text-underline-offset: 5px; margin-right: 16px; display: inline-block; padding: 8px 0; }
 .foot nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px 24px; }
 .foot nav div { display: grid; gap: 10px; align-content: start; }
 .foot h2 { font: 700 14px 'DM Sans', sans-serif; letter-spacing: 0; color: var(--soft); margin-bottom: 4px; }
