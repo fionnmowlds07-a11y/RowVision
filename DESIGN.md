@@ -93,7 +93,7 @@ Inline SVG, 2.5px rounded stroke, drawn in one set.
 
 **Type.** Bricolage Grotesque 800 for headings, up to 210px for the single words Legs, Back and Arms. DM Sans for everything else.
 
-**The other pages.** Eight shorter pages sit beside the film: How it works, What it measures, Accuracy, Filming, Boats and crews, Reports, Your video and Download. They share one header and footer, and the same water moves behind them at the film's opening colours.
+**The other pages.** Ten shorter pages sit beside the film: How it works, What it measures, Accuracy, Filming, Boats and crews, Reports, Privacy, Terms, Licences and Download. They share one header and footer, and the same water moves behind them at the film's opening colours.
 
 - **The header.** Home, How it works, Reports and Download. Everything else is under More. Reports stays in view on a phone, as it is a main feature (owner, 2026-11-25).
 - **Few words.** A page shows the thing and says one short line about it.

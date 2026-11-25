@@ -72,6 +72,7 @@ small { font-size: 14px; color: var(--soft); }
 .plain { padding: 0; margin: 26px 0 0; list-style: none; display: grid; gap: 14px; max-width: 38em; }
 .plain li { padding-left: 26px; position: relative; }
 .plain li::before { content: ''; position: absolute; left: 0; top: .62em; width: 10px; height: 10px; border-radius: 50%; background: var(--hl); }
+.page pre { overflow-x: auto; margin-top: 14px; padding: 14px 16px; background: var(--panel); border-radius: 10px; }
 .gets { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 40px; }
 .gets .btn { font-size: 18px; padding: 18px 24px; }
 .note { margin-top: 16px; color: var(--soft); }
