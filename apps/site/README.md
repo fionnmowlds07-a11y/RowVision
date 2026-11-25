@@ -12,6 +12,8 @@ Three pages have something to try, each fed by real figures and none by invented
 
 If the engine's limits, messages or follow rule change, change them here too.
 
+`src/viewer.js` opens the pages on Reports over the site, so nobody leaves it to look at one. The Back button closes it.
+
 ```
 npm install
 npm run dev        # work on it
