@@ -25,7 +25,7 @@ const downloads = {
   name: 'download-addresses',
   generateBundle() {
     const env = loadEnv('production', import.meta.dirname, 'VITE_');
-    const files = { deb: env.VITE_DEB_URL, appimage: env.VITE_LINUX_URL };
+    const files = { deb: env.VITE_DEB_URL, appimage: env.VITE_LINUX_URL, windows: env.VITE_WINDOWS_URL };
     for (const [file, url] of Object.entries(files)) if (!url) this.error(`No address for the ${file} download in .env`);
     this.emitFile({ type: 'asset', fileName: 'downloads.json', source: JSON.stringify(files) });
   },
