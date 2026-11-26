@@ -40,7 +40,7 @@ from rowvision.reliability import Calibration, Evidence, Rating, load_calibratio
 from rowvision.scoring import MIN_STROKES, ScoreCard, score_stroke, without_scores
 from rowvision.seats import SeatAssignment, assign_seats, seat_holding, track_at
 from rowvision.shots import OBLIQUE_LIMIT_DEG, Shot, ShotKind, clear_frames, split_shots
-from rowvision.sides import as_one_side, side_changes, split_at
+from rowvision.sides import as_one_side, scores_one_side, side_changes, split_at
 from rowvision.skeleton import FloatArray
 from rowvision.strokes import StrokeTimeline, crew_reach, detect_strokes, reach_signal
 from rowvision.timing import FollowTiming, follow_timing, leader_seat, seat_side
@@ -75,6 +75,12 @@ MIN_KNEE_TRUNK_PX = 34.0
 frames, smaller rowers had a typical knee error of 15 to 25 degrees, and larger ones 9 (issue 249)."""
 FILM_CLOSER_FOR_KNEES = "Film closer to see leg angles. The rower is too small to place the knee."
 KNEE_MEASURES = frozenset({"catch_knee_deg", "finish_knee_deg", "catch_shin_deg"})
+LEG_SCORE_FLOORS = {"accurate": 0.5}
+"""Below this confidence in the near hip, knee or ankle, the leg's angles are not shown. Only for the
+larger model, as the standard one's confidence did not tell good legs from bad. On 112 legs labelled by
+hand it left out 12: 7 more than 15 degrees out, including 3 of the 4 out by more than 45, and 5 good
+ones. The knee is not scored, so a good leg lost costs little and a wild one shown costs trust
+(issue 249)."""
 
 FILM_SIDE_ON = (
     "Too much of this video was filmed from in front of or behind the boat, so the results are "
@@ -366,6 +372,8 @@ def measure_rower(
     angle_frames: NDArray[np.bool_] | None = None,
     angle_note: str | None = None,
     misplaced: float = 0.0,
+    leg_floor: float | None = None,
+    flipped: NDArray[np.bool_] | None = None,
 ) -> RowerResult:
     """Measure one rower's strokes from their joints, and score and rate the result.
 
@@ -391,6 +399,11 @@ def measure_rower(
     if clear is not None and in_clear:
         angles = _without_end_on(angles, clear)
     strokes = per_stroke(angles, timeline, fps, catch_lean_readable=readable)
+    if leg_floor is not None:
+        # Legs before body only needs when the leg starts to open, so it keeps every frame.
+        angles, strokes = _unsure_legs_hidden(
+            angles, strokes, scores_one_side(scores, flipped), facing, leg_floor, timeline, fps, readable
+        )
     # A crew's timeline gives every seat every stroke, including ones where this seat has no pose of
     # its own. Those would add crew timing, and nothing of the rower, to the rower's results. On an
     # eight, 14 of the stroke seat's 38 strokes had no pose at all (issue 239).
@@ -503,6 +516,31 @@ def _knees_hidden(card: ScoreCard) -> ScoreCard:
         for metric in card.metrics
     ]
     return replace(card, metrics=metrics)
+
+
+def _unsure_legs_hidden(
+    angles: AngleSeries,
+    strokes: list[StrokeMetrics],
+    scores: FloatArray,
+    facing: int,
+    floor: float,
+    timeline: StrokeTimeline,
+    fps: float,
+    readable: bool,
+) -> tuple[AngleSeries, list[StrokeMetrics]]:
+    """Blank the knee and shin where the model was unsure of the near leg, often an ankle behind the hull."""
+    sure = scores[:, list(sk.near_leg_joints(facing))].min(axis=1) >= floor
+    shown = replace(
+        angles,
+        knee=np.where(sure, angles.knee, np.nan),
+        shin=None if angles.shin is None else np.where(sure, angles.shin, np.nan),
+    )
+    blanked = per_stroke(shown, timeline, fps, catch_lean_readable=readable)
+    legs_only = ("catch_knee_deg", "finish_knee_deg", "catch_shin_deg")
+    return shown, [
+        replace(stroke, **{name: getattr(blank, name) for name in legs_only})
+        for stroke, blank in zip(strokes, blanked, strict=True)
+    ]
 
 
 def _without_end_on(angles: AngleSeries, clear: NDArray[np.bool_]) -> AngleSeries:
@@ -697,6 +735,7 @@ def analyse(
     backend: PoseBackend,
     scouting: Scouting | None = None,
     joint_finder: JointFinder | None = None,
+    leg_floor: float | None = None,
 ) -> Analysis:
     """Measure the requested rowers, or stop and ask if the athlete must choose a boat first.
 
@@ -878,6 +917,8 @@ def analyse(
             clear=clear,
             angle_frames=angle_frames,
             angle_note=angle_note,
+            leg_floor=leg_floor,
+            flipped=flipped,
             misplaced=wrong_person.get(seat, 0.0),
         )
         if seat in leaders:

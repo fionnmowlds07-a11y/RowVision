@@ -15,7 +15,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from rowvision import skeleton as sk
-from rowvision.pipeline import RowerResult, measure_rower
+from rowvision.pipeline import LEG_SCORE_FLOORS, RowerResult, measure_rower
 from rowvision.reliability import Band, Rating
 from rowvision.report import crew_summary, own_rower, rower_json
 from rowvision.shots import ShotKind
@@ -119,9 +119,10 @@ def _remeasure_one(
     fps = float(summary["fps"])
     points, scores = saved_points(poses, count)
     evidence = saved.get("evidence")
+    flipped = saved_other_side(summary.get("other_side"), count)
     result = measure_rower(
         saved.get("seat"),
-        as_one_side(points, saved_other_side(summary.get("other_side"), count)),
+        as_one_side(points, flipped),
         scores,
         int(summary["facing"]),
         float(summary.get("view_deg") or 0.0),
@@ -135,6 +136,8 @@ def _remeasure_one(
         side=saved.get("side"),
         turns=turns,
         clear=saved_clear(summary.get("shots"), count),
+        leg_floor=LEG_SCORE_FLOORS.get(str(summary.get("pose_model"))),
+        flipped=flipped,
     )
     # The joints are kept as filmed, for drawing over the picture.
     result = replace(

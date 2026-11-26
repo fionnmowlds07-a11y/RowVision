@@ -7,7 +7,7 @@ from typing import Any, Protocol
 
 import numpy as np
 from rowvision.boats import boat_at
-from rowvision.pipeline import COARSE_STEP, Request, Scope, Scouting, analyse, scout
+from rowvision.pipeline import COARSE_STEP, LEG_SCORE_FLOORS, Request, Scope, Scouting, analyse, scout
 from rowvision.pose import AccurateJoints, JointFinder, PoseBackend, RtmBackend
 from rowvision.report import analysis_json, boat_choices_json
 from rowvision.seats import track_at
@@ -166,10 +166,12 @@ class RealEngine:
         analysis = analyse(
             watched(MEASURING[request.scope]), video.frames, video.fps, request, backend, scouting,
             self._joints,
+            LEG_SCORE_FLOORS.get(self._model),
         )
         if analysis.needs_boat_choice or (scouting.boats and not analysis.rowers and _unseen(analysis)):
             return pause_for(scouting, video)
-        return Done(analysis_json(analysis), code_version())
+        # Measuring again needs to know which model found the joints.
+        return Done({**analysis_json(analysis), "pose_model": self._model}, code_version())
 
 
 def _unseen(analysis: Any) -> bool:

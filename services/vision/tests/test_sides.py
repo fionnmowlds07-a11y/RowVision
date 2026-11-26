@@ -1,8 +1,9 @@
 import numpy as np
 from crew import crew_detections, crossing_sides_detections
 
+from rowvision import skeleton as sk
 from rowvision.metrics import angle_series
-from rowvision.sides import as_one_side, crew_facing, side_changes, split_at
+from rowvision.sides import as_one_side, crew_facing, scores_one_side, side_changes, split_at
 from rowvision.strokes import facing_direction
 from rowvision.synthetic import generate
 from rowvision.tracking import track_people
@@ -62,3 +63,12 @@ def test_frames_from_the_usual_side_are_left_alone() -> None:
     part = as_one_side(clip.points, half)
     np.testing.assert_array_equal(part[~half], clip.points[~half])
     assert not np.allclose(part[half], clip.points[half])
+
+
+def test_confidences_are_named_as_the_mirrored_joints_are() -> None:
+    scores = np.tile(np.arange(17, dtype=float), (3, 1))
+    flipped = np.array([False, True, False])
+    out = scores_one_side(scores, flipped)
+    assert (out[0] == scores[0]).all()
+    assert out[1, sk.LEFT_ANKLE] == sk.RIGHT_ANKLE and out[1, sk.RIGHT_KNEE] == sk.LEFT_KNEE
+    assert scores_one_side(scores, None) is scores
