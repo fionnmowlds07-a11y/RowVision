@@ -104,7 +104,7 @@ test("the page has no Node access and only the narrow bridge", async () => {
     bridge: Object.keys(window.rowvision).sort(),
     origin: location.origin,
   }));
-  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["addClip", "analyseAccurately", "canSend", "cancelModels", "changeClipsFolder", "deleteClip", "downloadModels", "engineVersion", "exportPdf", "finishWelcome", "getAnalysis", "getClip", "getColours", "getEffort", "getModels", "getSetup", "getSpace", "getTargets", "getWelcome", "listClips", "measureAgain", "measureCrew", "onAnalysis", "onModels", "onSendProgress", "pathForFile", "removeVideo", "sendClip", "setColours", "setEffort", "setTargets", "showReport", "startClip", "stopClip", "tapAgain"], origin: "app://rowvision" });
+  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["addClip", "analyseAccurately", "canSend", "cancelModels", "changeClipsFolder", "deleteClip", "downloadModels", "engineVersion", "exportPdf", "finishWelcome", "getAnalysis", "getClip", "getColours", "getEffort", "getModels", "getSetup", "getSpace", "getTargets", "getUpdate", "getUpdateCheck", "getWelcome", "listClips", "measureAgain", "measureCrew", "onAnalysis", "onModels", "onSendProgress", "pathForFile", "removeVideo", "sendClip", "setColours", "setEffort", "setTargets", "setUpdateCheck", "showReport", "skipUpdate", "startClip", "stopClip", "tapAgain"], origin: "app://rowvision" });
   const prefs = await app.evaluate(({ BrowserWindow }) => {
     // Not in Electron's types, but it reports the settings the page really runs with.
     const contents = BrowserWindow.getAllWindows()[0].webContents as unknown as { getLastWebPreferences(): Electron.WebPreferences | null };

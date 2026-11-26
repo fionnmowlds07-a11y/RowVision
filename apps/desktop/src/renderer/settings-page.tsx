@@ -3,6 +3,7 @@ import type { Colours as Saved } from "../shared/bridge";
 import { ModelsCard } from "./models-card";
 import { SpeedCard } from "./speed-card";
 import { TargetsCard } from "./targets-card";
+import { UpdatesCard } from "./updates-card";
 
 type Props = { colours: Saved; save: (ground: string | null, highlight: string | null) => Promise<void> };
 
@@ -15,6 +16,7 @@ export function SettingsPage({ colours, save }: Props) {
       <TargetsCard />
       <SpeedCard />
       <ModelsCard />
+      <UpdatesCard />
     </>
   );
 }

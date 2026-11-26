@@ -25,6 +25,10 @@ type Settings = {
   clipsDir: string | null;
   /** The athlete's own ranges, and which measures count towards the score. */
   targets: TargetChoices;
+  /** Look for a new version when the app opens. */
+  checkUpdates: boolean;
+  /** A new version the user chose not to be told about again. */
+  skippedVersion: string | null;
 };
 
 /** Null means the design system's own colour. */
@@ -59,9 +63,11 @@ async function readSettings(file: string): Promise<Settings> {
       }
     }
     const effort = isEffort(saved.effort) ? saved.effort : DEFAULT_EFFORT;
-    return { colours: cleanColours(saved.colours) ?? NONE, setup: cleanSetup(saved.setup) ?? FIRST_SETUP, speed, speeds, effort, welcomed, clipsDir, targets: cleanTargets(saved.targets) ?? GENERAL_TARGETS };
+    const checkUpdates = saved.checkUpdates !== false;
+    const skippedVersion = typeof saved.skippedVersion === "string" ? saved.skippedVersion : null;
+    return { colours: cleanColours(saved.colours) ?? NONE, setup: cleanSetup(saved.setup) ?? FIRST_SETUP, speed, speeds, effort, welcomed, clipsDir, targets: cleanTargets(saved.targets) ?? GENERAL_TARGETS, checkUpdates, skippedVersion };
   } catch {
-    return { colours: NONE, setup: FIRST_SETUP, speed: null, speeds: {}, effort: DEFAULT_EFFORT, welcomed: false, clipsDir: null, targets: GENERAL_TARGETS };
+    return { colours: NONE, setup: FIRST_SETUP, speed: null, speeds: {}, effort: DEFAULT_EFFORT, welcomed: false, clipsDir: null, targets: GENERAL_TARGETS, checkUpdates: true, skippedVersion: null };
   }
 }
 
@@ -92,6 +98,11 @@ export function saveSpeed(file: string, effort: Effort, value: number): Promise<
 
 export async function readEffort(file: string): Promise<Effort> {
   return (await readSettings(file)).effort;
+}
+
+export async function readUpdates(file: string): Promise<{ checkUpdates: boolean; skippedVersion: string | null }> {
+  const { checkUpdates, skippedVersion } = await readSettings(file);
+  return { checkUpdates, skippedVersion };
 }
 
 export async function readWelcome(file: string): Promise<{ welcomed: boolean; clipsDir: string | null }> {

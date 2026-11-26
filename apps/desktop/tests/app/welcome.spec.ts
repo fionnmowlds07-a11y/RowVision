@@ -195,3 +195,27 @@ test("clips wait for the models, and are measured once they are downloaded", asy
   await page.getByTestId("models-card").getByRole("button", { name: "Download" }).click();
   await expect.poll(() => page.evaluate(async () => (await window.rowvision.listClips())[0].state), { timeout: 20_000 }).toBe("done");
 });
+
+test("a newer version is shown in the side menu until Later, and the check can be turned off", async () => {
+  writeFileSync(path.join(data, "settings.json"), JSON.stringify({ welcomed: true }));
+  const newer = { ROWVISION_LATEST_URL: `data:application/json,${encodeURIComponent(JSON.stringify({ version: "9.9.9" }))}` };
+  await launch(newer);
+
+  const card = page.getByRole("region", { name: "9.9.9 is out" });
+  await expect(card).toContainText("Your clips stay when you install it.");
+  await expect(card.getByRole("link", { name: "Download" })).toHaveAttribute("href", "https://rowvision.app/download");
+  await card.getByRole("button", { name: "Later" }).click();
+  await expect(card).toHaveCount(0);
+  await expect.poll(() => settings().skippedVersion).toBe("9.9.9");
+
+  await close();
+  await launch(newer);
+  await expect(page.getByRole("navigation")).toBeVisible();
+  await expect(page.getByRole("region", { name: /is out/ })).toHaveCount(0);
+
+  await page.getByRole("link", { name: "Settings" }).click();
+  const check = page.getByRole("checkbox", { name: "Check for a new version when RowVision opens" });
+  await expect(check).toBeChecked();
+  await check.uncheck();
+  await expect.poll(() => settings().checkUpdates).toBe(false);
+});

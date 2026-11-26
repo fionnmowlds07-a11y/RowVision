@@ -177,6 +177,12 @@ export type Bridge = {
   /** Asks where to keep clips. Says why in plain words when the folder can't be used. */
   changeClipsFolder(): Promise<{ welcome: Welcome; problem: string | null }>;
   finishWelcome(): Promise<void>;
+  /** A newer version to tell the user about, or null. Checked once each time the app opens. */
+  getUpdate(): Promise<{ version: string; page: string } | null>;
+  /** Stops telling the user about this version. A later one is shown again. */
+  skipUpdate(version: string): Promise<void>;
+  getUpdateCheck(): Promise<boolean>;
+  setUpdateCheck(on: boolean): Promise<void>;
   onSendProgress(listener: (progress: { id: string; sent: number; total: number }) => void): () => void;
 };
 
@@ -215,6 +221,10 @@ export const CHANNELS = {
   getWelcome: "welcome:get",
   changeClipsFolder: "welcome:folder",
   finishWelcome: "welcome:finish",
+  getUpdate: "update:get",
+  skipUpdate: "update:skip",
+  getUpdateCheck: "update:check-get",
+  setUpdateCheck: "update:check-set",
 } as const;
 
 /** Lower-case letters, digits and dashes, so an id can never be a path. */
