@@ -1,0 +1,19 @@
+<!doctype html>
+<!-- The picture shown when a rowvision.app link is shared. Remake public/share.png with:
+     chromium --headless --disable-gpu --hide-scrollbars --window-size=1200,630 --screenshot=public/share.png pipeline/share-image.html
+     It has no footage in it, so it can live in git. -->
+<html><head><meta charset="utf-8"><style>
+@font-face { font-family: Bricolage; src: url('../node_modules/@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-wght-normal.woff2'); font-weight: 200 800; }
+@font-face { font-family: 'DM Sans'; src: url('../node_modules/@fontsource-variable/dm-sans/files/dm-sans-latin-wght-normal.woff2'); font-weight: 100 1000; }
+html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+body { background: radial-gradient(ellipse 70% 90% at 100% 100%, #0d3a22 0%, #020403 65%); color: #fff; font-family: 'DM Sans'; position: relative; }
+.mark { position: absolute; left: 80px; top: 70px; display: flex; align-items: center; gap: 18px; font: 800 40px Bricolage; letter-spacing: -.02em; }
+.mark img { width: 72px; height: 72px; border-radius: 24%; box-shadow: 0 0 0 1px rgba(255,255,255,.12), 0 12px 30px -8px rgba(75,227,138,.5); }
+h1 { position: absolute; left: 80px; top: 210px; margin: 0; font: 800 104px/.98 Bricolage; letter-spacing: -.03em; }
+h1 span { color: #4be38a; }
+p { position: absolute; left: 80px; bottom: 70px; margin: 0; font-size: 30px; color: #a9bdb0; }
+</style></head><body>
+<div class="mark"><img src="../public/logo.png" alt="">RowVision</div>
+<h1>Film your outing.<br><span>See your stroke.</span></h1>
+<p>Free desktop app for Windows and Linux</p>
+</body></html>
