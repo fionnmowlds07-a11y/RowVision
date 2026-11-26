@@ -2,7 +2,7 @@
   "name": "rowvision-desktop",
   "productName": "RowVision",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "RowVision for Windows and Linux.",
   "main": "dist/main/main.js",
   "engines": {

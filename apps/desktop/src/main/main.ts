@@ -13,7 +13,8 @@ import { MOST_BYTES, pdfName, printReport } from "./pdf";
 import { registerSchemes, serve } from "./protocol";
 import { cleanConsent, sendClip } from "./send";
 import { cleanTargets } from "../../../web/lib/targets";
-import { cleanColours, readColours, readEffort, readSetup, readSpeed, readTargets, readWelcome, saveSettings, saveSpeed, writeColours } from "./settings";
+import { cleanColours, readColours, readEffort, readSetup, readSpeed, readTargets, readUpdates, readWelcome, saveSettings, saveSpeed, writeColours } from "./settings";
+import { DOWNLOAD_PAGE, LATEST_URL, findUpdate } from "./updates";
 import { isEffort } from "../shared/effort";
 import { checkFolder, clipsFolderIn, isEmptyLibrary } from "./welcome";
 
@@ -262,6 +263,25 @@ void app.whenReady().then(async () => {
     if (!targets) throw new Error("Not a valid set of targets");
     await saveSettings(settingsFile(), { targets });
     return targets;
+  });
+  // Tests never reach the real server unless they name one.
+  const latestUrl = process.env.ROWVISION_LATEST_URL ?? (process.env.ROWVISION_TEST_NOTICES ? null : LATEST_URL);
+  let newest: Promise<string | null> | null = null;
+  handle(CHANNELS.getUpdate, async () => {
+    const { checkUpdates, skippedVersion } = await readUpdates(settingsFile());
+    if (!checkUpdates || !latestUrl) return null;
+    newest ??= findUpdate(app.getVersion(), latestUrl);
+    const version = await newest;
+    return version && version !== skippedVersion ? { version, page: DOWNLOAD_PAGE } : null;
+  });
+  handle(CHANNELS.skipUpdate, async (version) => {
+    if (typeof version !== "string" || version.length > 20) throw new Error("Not a version");
+    await saveSettings(settingsFile(), { skippedVersion: version });
+  });
+  handle(CHANNELS.getUpdateCheck, async () => (await readUpdates(settingsFile())).checkUpdates);
+  handle(CHANNELS.setUpdateCheck, async (on) => {
+    if (typeof on !== "boolean") throw new Error("Not on or off");
+    await saveSettings(settingsFile(), { checkUpdates: on });
   });
   handle(CHANNELS.getColours, () => readColours(settingsFile()));
   handle(CHANNELS.setColours, async (value) => {

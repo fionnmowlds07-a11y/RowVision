@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ClipItem, Running, Space } from "../shared/bridge";
 import { size } from "./format";
 import type { Route } from "./route";
@@ -45,6 +45,7 @@ export function SideMenu({ route, running, clips, space }: Props) {
         ) : null}
       </nav>
       <div className={styles.fill} />
+      <UpdateCard />
       {space && clips ? <SpaceCard space={space} clips={clips} /> : null}
     </aside>
   );
@@ -87,6 +88,29 @@ function SpaceCard({ space, clips }: { space: Space; clips: ClipItem[] }) {
           <button type="button" className="button quiet" disabled={busy} onClick={() => setConfirming(false)}>Keep them</button>
         </>
       ) : null}
+    </section>
+  );
+}
+
+/** Says a newer version is out. Later hides it until the version after. */
+function UpdateCard() {
+  const [update, setUpdate] = useState<{ version: string; page: string } | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void window.rowvision.getUpdate().then((found) => { if (live) setUpdate(found); }).catch(() => undefined);
+    return () => { live = false; };
+  }, []);
+
+  if (!update) return null;
+  return (
+    <section className={styles.update} aria-labelledby="update-title">
+      <h2 id="update-title">{update.version} is out</h2>
+      <p>Your clips stay when you install it.</p>
+      <div className={styles.updateRow}>
+        <a className="button primary" href={update.page} target="_blank" rel="noreferrer">Download</a>
+        <button type="button" className="button quiet" onClick={() => { void window.rowvision.skipUpdate(update.version); setUpdate(null); }}>Later</button>
+      </div>
     </section>
   );
 }

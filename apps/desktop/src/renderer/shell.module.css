@@ -112,3 +112,31 @@
   flex-direction: column;
   gap: 16px;
 }
+
+.update {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--highlight) 45%, transparent);
+  border-radius: var(--radius-panel);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.update h2 {
+  font-size: 16px;
+}
+
+.update p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.updateRow {
+  display: flex;
+  gap: 8px;
+}
