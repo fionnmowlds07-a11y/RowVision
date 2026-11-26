@@ -223,3 +223,37 @@ html:has(.viewer[open]) { overflow: hidden; }
 #dial .ok { stroke: #4be38a; } #dial .warn { stroke: #e9b949; } #dial .stop { stroke: #ff8f85; }
 #dial text { font: 500 17px 'DM Sans', sans-serif; fill: #a9bdb0; }
 #dial #sight { stroke: rgba(255, 255, 255, .5); stroke-width: 2; stroke-dasharray: 6 8; }
+
+/* Windows install steps: drawn screens, not screenshots, so they stay sharp and light. */
+.win-steps { list-style: none; padding: 0; margin: 32px 0 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; counter-reset: win; }
+.win-steps li { display: grid; gap: 12px; align-content: start; min-width: 0; counter-increment: win; }
+.win-steps h3::before { content: counter(win) ' '; color: var(--hl); }
+.win-steps p { margin: 0; color: var(--soft); }
+.win-shot { display: grid; gap: 8px; align-content: start; min-height: 150px; padding: 12px; border-radius: 8px; background: #f3f3f3; color: #1b1b1b; font: 12px/1.35 'Segoe UI', system-ui, sans-serif; box-shadow: 0 10px 30px rgba(0, 0, 0, .45); overflow: hidden; }
+.win-file { display: flex; gap: 8px; align-items: center; font-weight: 600; overflow-wrap: anywhere; }
+.win-file::before { content: ''; flex: none; width: 14px; height: 17px; border: 1.5px solid #888; border-radius: 2px; }
+.win-warn { color: #8a5a00; }
+.win-btn { display: inline-block; padding: 4px 12px; border: 1px solid #d6d6d6; border-radius: 4px; background: #fff; font-size: 11px; }
+.win-blue { background: #0067c0; border-color: #0067c0; color: #fff; }
+.win-hot { outline: 3px solid var(--hl); outline-offset: 2px; }
+.win-ss { background: #1f5fa8; color: #fff; }
+.win-ss strong { font-size: 15px; font-weight: 600; }
+.win-row { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+.win-sbtn { padding: 4px 10px; border: 1px solid rgba(255, 255, 255, .7); font-size: 11px; }
+.win-ins { padding: 0; gap: 0; }
+.win-t { padding: 10px 12px; background: #fff; border-bottom: 1px solid #d6d6d6; font-weight: 600; }
+.win-b { display: grid; gap: 8px; padding: 10px 12px; }
+.win-f { display: flex; justify-content: flex-end; margin-top: auto; padding: 8px 12px; border-top: 1px solid #d6d6d6; }
+.win-prog { display: block; height: 8px; border-radius: 4px; background: #e2e2e2; overflow: hidden; }
+.win-prog::after { content: ''; display: block; width: 40%; height: 100%; background: var(--hl); }
+.win-app { background: var(--ground); color: var(--text); border: 1px solid var(--line); }
+.win-app strong { font-family: Bricolage, system-ui, sans-serif; font-size: 15px; }
+.win-app small { color: var(--soft); }
+.win-app .win-prog { background: var(--panel); }
+.win-safe { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 32px; }
+.win-safe div { display: grid; gap: 6px; align-content: start; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.win-safe h3 { font-size: 18px; }
+.win-safe p { margin: 0; color: var(--soft); }
+.win-sum { overflow-wrap: anywhere; color: var(--pale); }
+@media (max-width: 900px) { .win-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } .win-safe { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) { .win-steps { grid-template-columns: minmax(0, 1fr); } .win-shot { min-height: 0; } }
