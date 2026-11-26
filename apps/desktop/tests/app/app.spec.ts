@@ -104,7 +104,7 @@ test("the page has no Node access and only the narrow bridge", async () => {
     bridge: Object.keys(window.rowvision).sort(),
     origin: location.origin,
   }));
-  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["addClip", "canSend", "cancelModels", "changeClipsFolder", "deleteClip", "downloadModels", "engineVersion", "exportPdf", "finishWelcome", "getAnalysis", "getClip", "getColours", "getEffort", "getModels", "getSetup", "getSpace", "getTargets", "getWelcome", "listClips", "measureAgain", "measureCrew", "onAnalysis", "onModels", "onSendProgress", "pathForFile", "removeVideo", "sendClip", "setColours", "setEffort", "setTargets", "showReport", "startClip", "stopClip", "tapAgain"], origin: "app://rowvision" });
+  expect(facts).toEqual({ require: "undefined", process: "undefined", bridge: ["addClip", "analyseAccurately", "canSend", "cancelModels", "changeClipsFolder", "deleteClip", "downloadModels", "engineVersion", "exportPdf", "finishWelcome", "getAnalysis", "getClip", "getColours", "getEffort", "getModels", "getSetup", "getSpace", "getTargets", "getWelcome", "listClips", "measureAgain", "measureCrew", "onAnalysis", "onModels", "onSendProgress", "pathForFile", "removeVideo", "sendClip", "setColours", "setEffort", "setTargets", "showReport", "startClip", "stopClip", "tapAgain"], origin: "app://rowvision" });
   const prefs = await app.evaluate(({ BrowserWindow }) => {
     // Not in Electron's types, but it reports the settings the page really runs with.
     const contents = BrowserWindow.getAllWindows()[0].webContents as unknown as { getLastWebPreferences(): Electron.WebPreferences | null };
@@ -796,6 +796,38 @@ test("a clip measured for one rower can then be measured for the whole crew", as
   await expect(page.getByRole("region", { name: "Your crew" }).getByRole("button", { name: /^Seat \d/ })).toHaveCount(2);
   await expect(page.getByRole("button", { name: /^Measure all/ })).toHaveCount(0);
   expect(existsSync(path.join(data, "clips", id, "summary-one-rower.json"))).toBe(false);
+  await page.evaluate(() => { window.location.hash = "#/"; });
+});
+
+test("the model is chosen when adding, remembered, and a clip measured with the faster one can be analysed again", async () => {
+  writeFileSync(control, "done");
+  await openAdd();
+  await page.locator("input[type=file]").setInputFiles(path.join(sources, "row.mp4"));
+  const choice = page.getByRole("region", { name: "Accuracy" });
+  await expect(choice.getByRole("button", { name: "More accurate" })).toHaveAttribute("aria-pressed", "true");
+  await expect(choice).toContainText("takes about two to three times as long");
+  await choice.getByRole("button", { name: "Faster" }).click();
+  await expect(choice).toContainText("knees and legs are rougher");
+  await page.getByRole("region", { name: "Your boat" }).locator("select").first().selectOption("1x");
+  await page.getByRole("button", { name: "Add to your clips" }).click();
+  await expect(page).toHaveURL(/#\/analysis\/[a-z0-9-]+$/);
+  const id = /#\/analysis\/([a-z0-9-]+)$/.exec(page.url())![1];
+  await expect(page.getByRole("heading", { name: "Analysed" })).toBeVisible();
+  expect(readJson(path.join(data, "clips", id, "job.json")).model).toBe("standard");
+  // The last choice is offered next time.
+  await openAdd();
+  await page.locator("input[type=file]").setInputFiles(path.join(sources, "row.mp4"));
+  await expect(page.getByRole("region", { name: "Accuracy" }).getByRole("button", { name: "Faster" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("region", { name: "Accuracy" }).getByRole("button", { name: "More accurate" }).click();
+
+  await page.evaluate((clip) => { window.location.hash = `#/clip/${clip}`; }, id);
+  await page.getByRole("region", { name: "Measure it more accurately" }).getByRole("button", { name: "Analyse again" }).click();
+  await expect(page).toHaveURL(new RegExp(`#/analysis/${id}$`));
+  await expect(page.getByRole("heading", { name: "Analysed" })).toBeVisible();
+  expect(readJson(path.join(data, "clips", id, "job.json")).model).toBe("accurate");
+  await panel().getByRole("link", { name: "See your results" }).click();
+  await expect(page.getByRole("heading", { name: "Export" }).or(page.getByRole("button", { name: "Delete clip" })).first()).toBeVisible();
+  await expect(page.getByRole("region", { name: "Measure it more accurately" })).toHaveCount(0);
   await page.evaluate(() => { window.location.hash = "#/"; });
 });
 

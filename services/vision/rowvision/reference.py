@@ -36,7 +36,7 @@ class Targets:
 
 
 def load_targets(path: Path = GENERAL_TARGETS) -> Targets:
-    data = yaml.safe_load(path.read_text())
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
     entries = data["targets"]
     drive = entries.pop("drive_share")
     ranges = {

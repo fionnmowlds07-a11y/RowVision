@@ -7,6 +7,7 @@ import { SECTION_SECONDS } from "../../../web/lib/clip-checks";
 import { BOAT_SEATS } from "../../../web/lib/setup";
 import type { Analysis, Running } from "../shared/bridge";
 import { DEFAULT_EFFORT, effortPlan, type Effort } from "../shared/effort";
+import { poseModel, type PoseModel } from "../shared/pose-model";
 import { STAGES, canonical } from "../shared/stages";
 import { PAUSE_FILE, STATE_FILE, listClips, markClip, readJson, writeJson } from "./library";
 
@@ -15,10 +16,12 @@ export const FIRST_SPEED = 20;
 const STOP_GRACE_MS = 15_000;
 /** Finding the boats is done once, so each extra seat adds about this share of one rower's time. A first guess. */
 export const CREW_SEAT_SHARE = 0.6;
+/** The more accurate model adds about one rower's whole standard time again for each rower. From one laptop. */
+export const ACCURATE_SEAT_SHARE = 1;
 export const UNEXPECTED = "Analysis stopped unexpectedly. Start again to try once more.";
 export const MOVED = "The video can't be found. Has it been moved or deleted?";
-/** One rower's results, kept while the whole crew is measured, and put back if that does not finish. */
-export const BEFORE_CREW = "summary-one-rower.json";
+/** The results a clip had before it is analysed again, put back if that does not finish. */
+export const BEFORE = "summary-one-rower.json";
 
 /** How far through the whole run the engine is, never going backwards. */
 export function overallProgress(stage: string, progress: number | null, before: number): number {
@@ -28,10 +31,13 @@ export function overallProgress(stage: string, progress: number | null, before: 
   return Math.max(before, known.from + (known.to - known.from) * share);
 }
 
-/** Time left from how fast it has gone so far, once there is enough to go on. */
-export function secondsLeft(progress: number, elapsedSeconds: number): number | null {
-  if (progress < 0.2 || elapsedSeconds < 5) return null;
-  return Math.round((elapsedSeconds * (1 - progress)) / progress);
+/**
+ * Time left in the measuring stage, which is most of the work and steady once under way. How the whole run
+ * is split between the stages depends on the clip, the crew and the model, so it is not used for this.
+ */
+export function measuringLeft(share: number, stageSeconds: number): number | null {
+  if (share < 0.03 || stageSeconds < 5) return null;
+  return Math.round((stageSeconds * (1 - share)) / share);
 }
 
 type Clip = Record<string, unknown>;
@@ -44,7 +50,8 @@ export function clipSeconds(clip: Clip): number {
 /** How much work a clip is, in seconds of video for one rower. A whole crew is most of the work again for each seat. */
 export function clipWork(clip: Clip): number {
   const seats = clip.scope === "crew" && typeof clip.boat_class === "string" ? BOAT_SEATS[clip.boat_class] ?? 1 : 1;
-  return clipSeconds(clip) * (1 + CREW_SEAT_SHARE * (seats - 1));
+  const accurate = poseModel(clip.model) === "accurate" ? ACCURATE_SEAT_SHARE * seats : 0;
+  return clipSeconds(clip) * (1 + CREW_SEAT_SHARE * (seats - 1) + accurate);
 }
 
 /** The engine's own folder goes first on the path, so the ffmpeg and ffprobe packed beside it are the ones it finds. */
@@ -69,6 +76,7 @@ export function jobFor(folder: string, clip: Clip, kind: string): Record<string,
     engine: kind,
     device: "cpu",
     scope: clip.scope === "crew" ? "crew" : "seat",
+    model: poseModel(clip.model),
   };
   // Each seat's side, for a boat not rigged with sides alternating.
   if (Array.isArray(clip.rig)) job.rig = clip.rig;
@@ -95,18 +103,18 @@ type Options = {
   effort?: () => Promise<Effort>;
   /** How many processor cores the computer has. Defaults to what the system says. */
   cores?: () => number;
-  /** Whether the measuring models are on this computer. Clips wait until they are. Defaults to yes. */
-  modelsReady?: () => boolean;
+  /** Whether the models a clip needs are on this computer. Clips wait until they are. Defaults to yes. */
+  modelsReady?: (model: PoseModel) => boolean;
   /** Extra environment for the engine, such as where it keeps its models. */
   env?: () => NodeJS.ProcessEnv;
 };
 
-type Current = Running & { child: ChildProcess; ended: boolean; stopping: boolean; forgotten?: boolean; seconds: number; effort: Effort; timer?: NodeJS.Timeout };
+type Current = Running & { child: ChildProcess; ended: boolean; stopping: boolean; forgotten?: boolean; seconds: number; effort: Effort; stageStartedAt: number; timer?: NodeJS.Timeout };
 
 /** Analyses one clip at a time, oldest first. Everything it knows is also in the clips' folders. */
 export class Analyser {
   private current: Current | null = null;
-  private waiting: { id: string; seconds: number }[] = [];
+  private waiting: { id: string; seconds: number; model: PoseModel }[] = [];
   private speed = FIRST_SPEED;
   private effort: Effort = DEFAULT_EFFORT;
   private quitting = false;
@@ -130,18 +138,24 @@ export class Analyser {
     this.changed();
   }
 
+  private hasModel(model: PoseModel): boolean {
+    return this.options.modelsReady?.(model) ?? true;
+  }
+
   snapshot(): Analysis {
     const running = this.current
       ? { id: this.current.id, stage: this.current.stage, progress: this.current.progress, startedAt: this.current.startedAt, secondsLeft: this.current.secondsLeft }
       : null;
     let ahead = this.current ? (this.current.secondsLeft ?? Math.round(this.current.seconds * this.speed * (1 - this.current.progress))) : 0;
-    const waiting = this.waiting.map(({ id, seconds }) => {
-      const item = { id, secondsUntil: ahead };
+    const waiting = this.waiting.map(({ id, seconds, model }) => {
+      const modelMissing = !this.hasModel(model);
+      const item = { id, secondsUntil: ahead, modelMissing };
+      // A clip with no model yet is passed over, so it keeps nobody waiting.
+      if (modelMissing) return item;
       ahead += Math.round(seconds * this.speed);
       return item;
     });
-    const modelsMissing = !(this.options.modelsReady?.() ?? true);
-    return { running, waiting, onBattery: this.options.onBattery(), engineMissing: this.options.engine() === null, modelsMissing, effort: this.current?.effort ?? this.effort };
+    return { running, waiting, onBattery: this.options.onBattery(), engineMissing: this.options.engine() === null, effort: this.current?.effort ?? this.effort };
   }
 
   changed(): void {
@@ -158,11 +172,16 @@ export class Analyser {
     const library = this.options.library();
     const clips = (await listClips(library)).filter((clip) => clip.state === "waiting" && clip.id !== this.current?.id);
     clips.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-    this.waiting = await Promise.all(clips.map(async (clip) => ({ id: clip.id, seconds: clipWork(((await readJson(path.join(library, clip.id, "clip.json"))) ?? {}) as Clip) })));
+    this.waiting = await Promise.all(clips.map(async ({ id }) => {
+      const clip = ((await readJson(path.join(library, id, "clip.json"))) ?? {}) as Clip;
+      return { id, seconds: clipWork(clip), model: poseModel(clip.model) };
+    }));
     if (this.current || this.quitting || this.waiting.length === 0) return this.changed();
     const command = this.options.engine();
-    if (!command || !(this.options.modelsReady?.() ?? true)) return this.changed();
-    const { id } = this.waiting.shift()!;
+    // The oldest clip whose model is here, so one waiting for a download does not hold up the rest.
+    const next = this.waiting.findIndex(({ model }) => this.hasModel(model));
+    if (!command || next < 0) return this.changed();
+    const [{ id }] = this.waiting.splice(next, 1);
     await this.run(id, command);
     this.changed();
   }
@@ -175,7 +194,7 @@ export class Analyser {
     const source = typeof clip.source === "string" ? clip.source : null;
     if (!hasCopy && (!source || !(await fs.stat(source).then((stat) => stat.isFile(), () => false)))) {
       await markClip(library, id, "failed", MOVED);
-      await this.putBackOneRower(folder);
+      await this.putBack(folder);
       return this.pickNext();
     }
     const jobFile = path.join(folder, "job.json");
@@ -190,7 +209,7 @@ export class Analyser {
     child.stdin?.on("error", () => undefined);
     const current: Current = {
       id, child, stage: "Getting ready", progress: 0, startedAt: new Date().toISOString(), secondsLeft: null,
-      ended: false, stopping: false, seconds: clipWork(clip), effort,
+      ended: false, stopping: false, seconds: clipWork(clip), effort, stageStartedAt: Date.now(),
     };
     this.current = current;
 
@@ -199,7 +218,7 @@ export class Analyser {
       current.ended = true;
       if (current.timer) clearTimeout(current.timer);
       if (mark && !current.forgotten) await markClip(library, id, mark, message);
-      if (mark && !current.forgotten) await this.putBackOneRower(folder);
+      if (mark && !current.forgotten) await this.putBack(folder);
     };
 
     createInterface({ input: child.stdout! }).on("line", (line) => {
@@ -210,13 +229,18 @@ export class Analyser {
         return;
       }
       if (event.event === "stage" && typeof event.stage === "string") {
+        if (event.stage !== current.stage) current.stageStartedAt = Date.now();
         current.stage = event.stage;
+        const share = typeof event.progress === "number" ? event.progress : 0;
         current.progress = overallProgress(event.stage, typeof event.progress === "number" ? event.progress : null, current.progress);
-        current.secondsLeft = secondsLeft(current.progress, (Date.now() - Date.parse(current.startedAt)) / 1000);
+        const measuring = canonical(event.stage) === STAGES[STAGES.length - 1].engine;
+        current.secondsLeft = measuring
+          ? measuringLeft(share, (Date.now() - current.stageStartedAt) / 1000)
+          : null;
         this.changed();
       } else if (event.event === "done") {
         void finish(null).then(async () => {
-          await fs.rm(path.join(folder, BEFORE_CREW), { force: true });
+          await fs.rm(path.join(folder, BEFORE), { force: true });
           const taken = (Date.now() - Date.parse(current.startedAt)) / 1000;
           const speed = taken / Math.max(current.seconds, 1);
           // A change of effort part way through leaves the new effort's speed alone.
@@ -290,22 +314,42 @@ export class Analyser {
     if (seats < 2) return "This boat has one rower, who is already measured.";
     if (clip.scope === "crew") return "The whole crew is already measured.";
     if (this.current?.id === id) return "This clip is being analysed. Try again when it has finished.";
-    const summary = path.join(folder, "summary.json");
-    if (!(await fs.stat(summary).then(() => true, () => false))) return "Measure this clip first.";
-    await fs.rename(summary, path.join(folder, BEFORE_CREW));
-    await writeJson(path.join(folder, "clip.json"), { ...clip, scope: "crew" });
+    if (!(await fs.stat(path.join(folder, "summary.json")).then(() => true, () => false))) return "Measure this clip first.";
+    return this.analyseAgain(id, clip, { scope: "crew" });
+  }
+
+  /** Analyse a clip again with the more accurate model. Its results stay until the new ones arrive. */
+  async analyseAccurately(id: string): Promise<string | null> {
+    const folder = path.join(this.options.library(), id);
+    const clip = ((await readJson(path.join(folder, "clip.json"))) ?? {}) as Clip;
+    if (poseModel(clip.model) === "accurate") return "This clip already used the more accurate model.";
+    if (this.current?.id === id) return "This clip is being analysed. Try again when it has finished.";
+    if (!(await fs.stat(path.join(folder, "summary.json")).then(() => true, () => false))) return "Measure this clip first.";
+    const copy = await fs.stat(path.join(folder, "working.mp4")).then(() => true, () => false);
+    const source = typeof clip.source === "string" && (await fs.stat(clip.source).then((stat) => stat.isFile(), () => false));
+    if (!copy && !source) return "This clip's video was removed, so it can't be analysed again.";
+    return this.analyseAgain(id, clip, { model: "accurate" });
+  }
+
+  private async analyseAgain(id: string, clip: Clip, change: { scope: "crew" } | { model: PoseModel }): Promise<null> {
+    const folder = path.join(this.options.library(), id);
+    await fs.rename(path.join(folder, "summary.json"), path.join(folder, BEFORE));
+    const before = { scope: clip.scope === "crew" ? "crew" : "seat", model: poseModel(clip.model) };
+    await writeJson(path.join(folder, "clip.json"), { ...clip, ...change, before });
     await markClip(this.options.library(), id, null);
     await this.next();
     return null;
   }
 
-  /** A crew run that stopped or failed gives back the one rower's results it started from. */
-  private async putBackOneRower(folder: string): Promise<void> {
-    const kept = path.join(folder, BEFORE_CREW);
+  /** A run that stopped or failed gives back the results it started from. */
+  private async putBack(folder: string): Promise<void> {
+    const kept = path.join(folder, BEFORE);
     if (!(await fs.stat(kept).then(() => true, () => false))) return;
     await fs.rename(kept, path.join(folder, "summary.json"));
     const clip = ((await readJson(path.join(folder, "clip.json"))) ?? {}) as Clip;
-    await writeJson(path.join(folder, "clip.json"), { ...clip, scope: "seat" });
+    const { before, ...rest } = clip;
+    // Only a crew run was possible before this was kept.
+    await writeJson(path.join(folder, "clip.json"), { ...rest, ...((before as Clip | undefined) ?? { scope: "seat" }) });
     await fs.rm(path.join(folder, STATE_FILE), { force: true });
   }
 

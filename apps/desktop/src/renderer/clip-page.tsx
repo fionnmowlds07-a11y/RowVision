@@ -6,6 +6,7 @@ import { useClipStats } from "./use-clip-stats";
 import { ExportPdf } from "./export-dialog";
 import { ExportStats } from "./stats-dialog";
 import { SendClip } from "./send-dialog";
+import { poseModel } from "../shared/pose-model";
 import { libraryChanged } from "./use-library";
 import { Crew } from "@/app/clips/[id]/crew";
 import { Results } from "@/app/clips/[id]/results";
@@ -119,8 +120,40 @@ export function ClipPage({ id }: { id: string }) {
         </>
       )}
       {summary?.rower ? <CompareWith id={clip.id} /> : null}
+      {clip.state === "done" && clip.hasVideo && poseModel(clip.setup.model) === "standard" ? <AnalyseAccurately id={clip.id} /> : null}
       <Manage clip={clip} onChange={() => { setCount((value) => value + 1); libraryChanged(); }} />
     </>
+  );
+}
+
+/** A clip measured with the faster model: one button analyses it again with the more accurate one. */
+function AnalyseAccurately({ id }: { id: string }) {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  async function go() {
+    setBusy(true);
+    setProblem(null);
+    const why = await window.rowvision.analyseAccurately(id);
+    if (why) {
+      setProblem(why);
+      setBusy(false);
+      return;
+    }
+    void window.rowvision.downloadModels();
+    libraryChanged();
+    window.location.hash = `#/analysis/${id}`;
+  }
+
+  return (
+    <section className="card stack" aria-labelledby="accurate-title">
+      <h2 id="accurate-title" style={{ fontSize: 19 }}>Measure it more accurately</h2>
+      <p className="soft">This clip used the faster model. The more accurate one places knees and legs better and takes about two to three times as long. Scores may change. If you stop it, these results come back.</p>
+      {problem ? <p className="error" role="alert">{problem}</p> : null}
+      <div>
+        <button type="button" className="button primary" disabled={busy} onClick={() => void go()}>{busy ? "Starting" : "Analyse again"}</button>
+      </div>
+    </section>
   );
 }
 

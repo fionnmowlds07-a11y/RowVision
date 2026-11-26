@@ -4,9 +4,10 @@ import sys
 import types
 from typing import Any
 
+import numpy as np
 import pytest
 
-from rowvision.pose import RtmBackend
+from rowvision.pose import ACCURATE_INPUT, ACCURATE_POSE, AccurateJoints, RtmBackend
 
 
 class FakeOptions:
@@ -35,6 +36,13 @@ def made(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
             )
 
     rtmlib = types.ModuleType("rtmlib")
+    class RTMPose:
+        def __init__(self, url: str, **settings: Any) -> None:
+            import onnxruntime
+
+            onnxruntime.InferenceSession(path_or_bytes=url, settings=settings)
+
+    rtmlib.RTMPose = RTMPose  # type: ignore[attr-defined]
     rtmlib.Body = Body  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "onnxruntime", ort)
     monkeypatch.setitem(sys.modules, "rtmlib", rtmlib)
@@ -53,3 +61,16 @@ def test_a_cap_reaches_both_models_and_is_undone_after(made: list[dict[str, Any]
     assert all(session["sess_options"].intra_op_num_threads == 2 for session in made)
     assert all(session["sess_options"].inter_op_num_threads == 1 for session in made)
     assert sys.modules["onnxruntime"].InferenceSession is before
+
+
+def test_the_accurate_model_is_capped_like_the_others(made: list[dict[str, Any]]) -> None:
+    AccurateJoints(threads=3)
+    assert made[0]["path_or_bytes"] == ACCURATE_POSE
+    assert made[0]["settings"]["model_input_size"] == ACCURATE_INPUT
+    assert made[0]["sess_options"].intra_op_num_threads == 3
+
+
+def test_the_accurate_model_finds_no_joints_without_boxes(made: list[dict[str, Any]]) -> None:
+    points, scores = AccurateJoints().estimate(None, np.zeros((0, 4)))
+    assert points.shape == (0, 17, 2)
+    assert scores.shape == (0, 17)

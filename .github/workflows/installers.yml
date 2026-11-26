@@ -20,6 +20,7 @@ jobs:
       matrix:
         os: [ubuntu-22.04, windows-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
@@ -79,11 +80,18 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y xvfb
 
-      - name: Start the installed app, let it download the real models, and wait for Ready
+      # The sculler on the public site, saved under a name with accents, as a rower's own video might be.
+      - name: Get a real clip
+        run: |
+          mkdir -p "$RUNNER_TEMP/Seán"
+          curl -fsSL -o "$RUNNER_TEMP/Seán/Vídeo.mp4" https://downloads.rowvision.app/media/single-a.mp4
+
+      - name: Start the app, let it download the real models, and analyse a real clip
         working-directory: apps/desktop
         env:
           CI: "1"
           PACKAGED_DATA_DIR: ${{ runner.temp }}/rowvision-data
+          PACKAGED_CLIP: ${{ runner.temp }}/Seán/Vídeo.mp4
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then
             xvfb-run -a npm run test:packaged
@@ -105,11 +113,51 @@ jobs:
           after=$(find "$models/hub/checkpoints" -type f | wc -l)
           test "$before" = "$after"
 
+      - name: Analyse a real clip with the bundled engine, from a folder with accents in its name
+        run: |
+          unpacked=apps/desktop/release/$([ "$RUNNER_OS" = "Linux" ] && echo linux-unpacked || echo win-unpacked)
+          python apps/desktop/scripts/check-installed.py "$unpacked/resources/engine" "$RUNNER_TEMP/rowvision-data/models/rtmlib"
+
+      - name: Install it into a folder with accents
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem apps/desktop/release/RowVision-Setup-*.exe | Select-Object -First 1
+          $target = Join-Path $env:LOCALAPPDATA "Programs\Seán\RowVision"
+          # NSIS wants /D last, unquoted.
+          Start-Process -Wait $setup.FullName -ArgumentList "/S", "/D=$target"
+          foreach ($file in "RowVision.exe", "resources\app.asar", "resources\engine\rowvision-engine.exe", "resources\engine\ffmpeg.exe") {
+            if (-not (Test-Path (Join-Path $target $file))) { Get-ChildItem -Recurse -Depth 2 (Join-Path $env:LOCALAPPDATA "Programs"); throw "$file was not installed" }
+          }
+          if (-not (Get-ChildItem -Recurse "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" -Filter "RowVision*.lnk")) { throw "no Start menu entry" }
+          "PACKAGED_APP_DIR=$target" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      - name: Analyse a real clip in the app as installed, and look at its results
+        if: runner.os == 'Windows'
+        working-directory: apps/desktop
+        env:
+          CI: "1"
+          PACKAGED_DATA_DIR: ${{ runner.temp }}/Seán/data
+          PACKAGED_CLIP: ${{ runner.temp }}/Seán/Vídeo.mp4
+          PACKAGED_SHOT: ${{ runner.temp }}/windows.png
+        run: npm run test:packaged
+
+      - name: Take it off again, keeping the clips
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $remove = Get-ChildItem $env:PACKAGED_APP_DIR -Filter "Uninstall*.exe" | Select-Object -First 1
+          Start-Process -Wait $remove.FullName -ArgumentList "/S"
+          foreach ($try in 1..30) { if (-not (Test-Path (Join-Path $env:PACKAGED_APP_DIR "RowVision.exe"))) { break }; Start-Sleep 2 }
+          if (Test-Path (Join-Path $env:PACKAGED_APP_DIR "RowVision.exe")) { throw "it was not taken off" }
+          if (-not (Get-ChildItem -Recurse "$env:RUNNER_TEMP\Seán\data\clips" -Filter summary.json)) { throw "the clips went too" }
+
       - uses: actions/upload-artifact@v4
         with:
           name: RowVision-${{ runner.os }}
           path: |
             apps/desktop/release/*.exe
             apps/desktop/release/*.AppImage
+            ${{ runner.temp }}/windows*.png
           retention-days: 7
           if-no-files-found: error

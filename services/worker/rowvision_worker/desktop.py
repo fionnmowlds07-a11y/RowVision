@@ -26,7 +26,9 @@ from rowvision.version import code_version
 
 from rowvision_worker import media, models
 from rowvision_worker.engine import (
+    ACCURATE,
     BOAT_SEATS,
+    STANDARD,
     Cancelled,
     Done,
     Engine,
@@ -69,6 +71,8 @@ class DesktopJob:
     """How many processor cores to use. None uses them all."""
     priority: str = "below"
     """How much the computer favours the analysis over other work: "normal", "below" or "low"."""
+    model: str = STANDARD
+    """Which model finds the joints: "standard", or "accurate", which takes longer."""
 
 
 PRIORITIES = ("normal", "below", "low")
@@ -105,6 +109,7 @@ def parse_job(data: dict[str, Any]) -> DesktopJob:
         device=data.get("device", "cpu"),
         threads=_threads(data.get("threads")),
         priority=data["priority"] if data.get("priority") in PRIORITIES else "below",
+        model=ACCURATE if data.get("model") == ACCURATE else STANDARD,
     )
 
 
@@ -115,7 +120,7 @@ def _threads(value: Any) -> int | None:
 def write_json(path: Path, value: Any) -> None:
     """Write beside the target first, so a crash never leaves half a file."""
     part = path.with_suffix(".part")
-    part.write_text(json.dumps(value, allow_nan=False, separators=(",", ":")))
+    part.write_text(json.dumps(value, allow_nan=False, separators=(",", ":")), encoding="utf-8")
     part.replace(path)
 
 
@@ -124,7 +129,7 @@ def prepare(job: DesktopJob, send: Send) -> Video:
     copy = job.folder / "working.mp4"
     facts = job.folder / "video.json"
     if copy.exists() and facts.exists():
-        saved = json.loads(facts.read_text())
+        saved = json.loads(facts.read_text(encoding="utf-8"))
         return Video(copy, saved["fps"], saved["frames"], saved["width"], saved["height"])
     if job.source is None:
         raise FileNotFoundError("This clip has no video left to analyse")
@@ -165,8 +170,9 @@ def run(job: DesktopJob, engine: Engine, send: Send, stopped: Callable[[], bool]
     (job.folder / "pause.json").unlink(missing_ok=True)
     setup = job.setup
     log.info(
-        "engine %s on %s, threads %s, priority %s: %s, %s %s seat %d, rig %s, tap %s",
-        code_version(), job.device, job.threads or "all", job.priority, setup.boat_class, setup.scope,
+        "engine %s on %s, %s model, threads %s, priority %s: %s, %s %s seat %d, rig %s, tap %s",
+        code_version(), job.device, job.model, job.threads or "all", job.priority, setup.boat_class,
+        setup.scope,
         "coach" if setup.coach else "athlete", setup.seat, ",".join(setup.rig) if setup.rig else "none",
         "yes" if setup.tap else "no",
     )
@@ -213,7 +219,7 @@ def save(folder: Path, done: Done, send: Send) -> None:
 def _with_job_sides(folder: Path, summary: dict[str, Any]) -> dict[str, Any]:
     """Fill in each rower's side from the job, for clips analysed before the side was kept."""
     try:
-        job = json.loads((folder / "job.json").read_text())
+        job = json.loads((folder / "job.json").read_text(encoding="utf-8"))
         rig = parse_rig(job.get("rig"), str(job.get("boat_class")))
         filled: dict[str, Any] = with_sides(summary, int(job["seat"]), str(job["side"]), rig)
         return filled
@@ -224,9 +230,9 @@ def _with_job_sides(folder: Path, summary: dict[str, Any]) -> dict[str, Any]:
 def measure_again(folder: Path, send: Send) -> int:
     """Measure a finished clip again from its saved joints, which takes seconds, not minutes."""
     try:
-        summary = json.loads((folder / "summary.json").read_text())
+        summary = json.loads((folder / "summary.json").read_text(encoding="utf-8"))
         saved = folder / "frames.json"
-        frames = json.loads(saved.read_text()) if saved.exists() else {}
+        frames = json.loads(saved.read_text(encoding="utf-8")) if saved.exists() else {}
         report = remeasure(_with_job_sides(folder, summary), frames)
     except NoSkeleton:
         send({"event": "failed", "message": NO_SKELETON_MESSAGE})
@@ -306,7 +312,7 @@ def main(argv: list[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, stream=sys.stderr)
     try:
-        job = parse_job(json.loads(arguments.job.read_text()))
+        job = parse_job(json.loads(arguments.job.read_text(encoding="utf-8")))
     except (OSError, ValueError, KeyError, TypeError):
         log.exception("could not read the job")
         send_line({"event": "failed", "message": FAILED_MESSAGE})
@@ -314,7 +320,7 @@ def main(argv: list[str] | None = None) -> int:
     lower_priority(job.priority)
     stop = threading.Event()
     threading.Thread(target=watch_input, args=(sys.stdin, stop), daemon=True).start()
-    return run(job, make_engine(job.engine, job.device, job.threads), send_line, stop.is_set)
+    return run(job, make_engine(job.engine, job.device, job.threads, job.model), send_line, stop.is_set)
 
 
 if __name__ == "__main__":

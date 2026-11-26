@@ -460,7 +460,7 @@ export function timingText(gap: number | null | undefined, spread: number | null
 }
 
 export function ratingNote({ calibrated, labelled_frames: frames }: Pick<Rating, "calibrated" | "labelled_frames">) {
-  if (calibrated) return `Estimated accuracy, calibrated on ${frames} hand-labelled frames`;
-  if (frames) return `Estimated accuracy, based on ${frames} hand-labelled frames so far`;
-  return "Estimated accuracy, not yet checked against hand-labelled footage";
+  if (calibrated) return `Estimated accuracy of the body angle, calibrated on ${frames} hand-labelled frames`;
+  if (frames) return `Estimated accuracy of the body angle, based on ${frames} hand-labelled frames so far`;
+  return "Estimated accuracy of the body angle, not yet checked against hand-labelled footage";
 }

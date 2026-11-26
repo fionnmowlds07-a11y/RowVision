@@ -5,7 +5,7 @@ import { copyFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "n
 import path from "node:path";
 
 // `--models status` and `--models fetch`, as the real engine has. What it does comes from the file named by
-// FAKE_MODELS_CONTROL (ready when there is none): "ready", "missing", "offline" (fetching fails) or "slow"
+// FAKE_MODELS_CONTROL (ready when there is none): "ready", "missing", "standard" (all but the more accurate one), "offline" (fetching fails) or "slow"
 // (fetching stops part way until the file changes).
 const TOTAL = 145_022_899;
 if (process.argv[2] === "--models") {
@@ -19,7 +19,7 @@ if (process.argv[2] === "--models") {
   const say = (event) => process.stdout.write(`${JSON.stringify(event)}\n`);
   const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
   if (process.argv[3] === "status") {
-    say({ event: "status", ready: state() === "ready", download_bytes: state() === "ready" ? 0 : TOTAL, total_bytes: TOTAL });
+    say({ event: "status", ready: state() === "ready", standard_ready: state() === "ready" || state() === "standard", download_bytes: state() === "ready" ? 0 : TOTAL, total_bytes: TOTAL });
     process.exit(0);
   }
   let stopped = false;

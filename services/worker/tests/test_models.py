@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from rowvision import pose
 
 from rowvision_worker import desktop, models
 from rowvision_worker.models import Model
@@ -101,7 +102,23 @@ def test_the_real_models_are_listed_with_the_names_rtmlib_gives_them() -> None:
     # The list in use, not the stand-ins. rtmlib names the file after its zip.
     assert [m.zip_name.removesuffix(".zip") for m in REAL] == [m.file.removesuffix(".onnx") for m in REAL]
     assert all(len(m.sha256) == 64 for m in REAL)
-    assert 140e6 < sum(m.zip_bytes for m in REAL) < 150e6
+    assert 140e6 < sum(m.zip_bytes for m in models.STANDARD_MODELS) < 150e6
+    assert (*models.STANDARD_MODELS, models.ACCURATE_MODEL) == REAL
+
+
+def test_the_accurate_model_is_the_one_the_engine_asks_for() -> None:
+    assert models.OPENMMLAB + models.ACCURATE_MODEL.zip_name == pose.ACCURATE_POSE
+
+
+def test_clips_for_the_standard_model_do_not_wait_for_the_accurate_one(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(models, "STANDARD_MODELS", FAKES[:1])
+    assert models.status(tmp_path)["standard_ready"] is False
+    (tmp_path / FAKES[0].file).write_bytes(CONTENT["alpha"])
+    now = models.status(tmp_path)
+    assert now["standard_ready"] is True
+    assert now["ready"] is False
 
 
 def test_status_says_what_is_missing_and_how_much_to_download(tmp_path: Path) -> None:

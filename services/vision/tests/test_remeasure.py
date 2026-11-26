@@ -208,3 +208,17 @@ def test_measuring_again_leaves_out_strokes_from_end_on_shots() -> None:
     early = [stroke for stroke in again["strokes"] if stroke["catch_frame"] < count // 2]
     assert late and all(stroke["catch_lean_deg"] is None for stroke in late)
     assert early and all(stroke["catch_lean_deg"] is not None for stroke in early)
+
+
+def test_a_clip_from_the_larger_model_keeps_its_unsure_legs_hidden_when_measured_again() -> None:
+    summary, frames = saved()
+    # The near ankle (facing right shows the right side) is unsure everywhere.
+    for pose in frames["poses"]:
+        if pose:
+            pose[16] = [*pose[16][:2], 0.2]
+    plain = remeasure(summary, frames)["rower"]
+    larger = remeasure({**summary, "pose_model": "accurate"}, frames)
+    assert larger["pose_model"] == "accurate"
+    knee = {m["name"]: m["value"] for m in larger["rower"]["card"]["metrics"]}.get("catch_knee_deg")
+    assert knee is None
+    assert {m["name"]: m["value"] for m in plain["card"]["metrics"]}["catch_knee_deg"] is not None

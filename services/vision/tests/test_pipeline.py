@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from crew import crew_detections, crossing_sides_detections, distant_people, two_boat_detections
 
+from rowvision import skeleton as sk
 from rowvision.pipeline import (
     COARSE_STEP,
     FILM_CLOSER,
@@ -53,6 +54,25 @@ class FakeBackend:
             int(np.linalg.norm(centres - centre, axis=1).argmin()) for centre in wanted
         ]
         return people[chosen], self.scores[frame][chosen]
+
+
+def test_a_given_joint_finder_measures_the_rowers_and_the_backend_finds_them() -> None:
+    backend = FakeBackend(1)
+    asked: list[int] = []
+
+    class Finder:
+        def estimate(self, frame: int, boxes: FloatArray) -> tuple[FloatArray, FloatArray]:
+            asked.append(frame)
+            points, scores = backend.estimate(frame, boxes)
+            return points + 1.0, scores
+
+    request = Request(boat_seats=1, seat=1)
+    plain = run(backend, request).rowers[0].points
+    found = analyse(
+        lambda index: index, len(backend.points), FPS, request, backend, joint_finder=Finder()
+    )
+    assert len(asked) > 200
+    assert np.allclose(found.rowers[0].points, plain + 1.0, equal_nan=True)
 
 
 def run(backend: FakeBackend, request: Request) -> Analysis:
@@ -634,3 +654,35 @@ def test_without_scores_keeps_timing_and_drops_the_overall() -> None:
     assert off.overall is None
     assert {m.name: m.score for m in off.metrics}["drive_share"] is not None
     assert {m.name: m.reason for m in off.metrics}["catch_lean_deg"] == "why"
+
+
+def test_legs_the_model_was_unsure_of_are_not_shown_but_still_time_legs_before_body() -> None:
+    clip = generate(strokes=8, facing=1, pixel_noise=0.5, seed=5)
+    frames = len(clip.points)
+    timeline = detect_strokes(reach_signal(clip.points, 1), FPS)
+    scores = np.full((frames, 17), 0.9)
+    # Unsure of the near ankle (facing right shows the right side) on every other stroke's catch.
+    unsure = np.zeros(frames, dtype=bool)
+    for catch in timeline.catches[::2]:
+        unsure[max(catch - 3, 0) : catch + 4] = True
+    scores[unsure, sk.RIGHT_ANKLE] = 0.3
+    # The far ankle is not read, so being unsure of it changes nothing.
+    scores[:, sk.LEFT_ANKLE] = 0.1
+
+    def run(floor: float | None) -> RowerResult:
+        return measure_rower(
+            1, clip.points, scores, 1, 0.0, np.zeros(frames), FPS, timeline,
+            trunk_px=60.0, coverage=1.0, leg_floor=floor,
+        )  # fmt: skip
+
+    shown, plain = run(0.5), run(None)
+    assert shown.angles is not None and plain.angles is not None
+    assert np.isnan(shown.angles.knee[unsure]).all()
+    assert np.allclose(shown.angles.knee[~unsure], plain.angles.knee[~unsure], equal_nan=True)
+    hidden = [s for s in shown.strokes if unsure[s.catch_frame]]
+    assert hidden and all(np.isnan(s.catch_knee_deg) and np.isnan(s.catch_shin_deg) for s in hidden)
+    assert shown.summary["legs_lead"] == plain.summary["legs_lead"]
+    assert shown.summary["catch_lean_deg"] == plain.summary["catch_lean_deg"]
+    # Over the whole frame, below the floor everywhere: no leg is shown at all.
+    scores[:, sk.RIGHT_ANKLE] = 0.3
+    assert "catch_knee_deg" not in run(0.5).summary

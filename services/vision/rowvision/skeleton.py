@@ -44,6 +44,11 @@ def ankles(points: FloatArray) -> FloatArray:
     return midpoint(points, LEFT_ANKLE, RIGHT_ANKLE)
 
 
+def near_leg_joints(facing: int) -> tuple[int, int, int]:
+    """Return the hip, knee and ankle of the leg nearest the camera, as `near_leg` chooses it."""
+    return (LEFT_HIP, LEFT_KNEE, LEFT_ANKLE) if facing < 0 else (RIGHT_HIP, RIGHT_KNEE, RIGHT_ANKLE)
+
+
 def near_leg(points: FloatArray, facing: int) -> tuple[FloatArray, FloatArray, FloatArray]:
     """Return the hip, knee and ankle of the leg nearest the camera.
 

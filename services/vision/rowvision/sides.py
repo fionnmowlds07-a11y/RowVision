@@ -88,6 +88,16 @@ LEFT_RIGHT = [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15]
 """Each joint's partner on the other side of the body."""
 
 
+def scores_one_side(scores: FloatArray, flipped: npt.NDArray[np.bool_] | None) -> FloatArray:
+    """Return each joint's confidence named as `as_one_side` names the joint."""
+    if flipped is None or not flipped.any():
+        return scores
+    turned = flipped[: len(scores)]
+    out = scores.copy()
+    out[turned] = scores[turned][:, LEFT_RIGHT]
+    return out
+
+
 def as_one_side(points: FloatArray, flipped: npt.NDArray[np.bool_] | None) -> FloatArray:
     """Return the joints as they would look if the whole clip had been filmed from one side.
 

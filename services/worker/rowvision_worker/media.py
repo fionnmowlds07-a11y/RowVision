@@ -61,10 +61,16 @@ def parse_probe(report: dict[str, object]) -> Facts:
     )
 
 
+# Both programs get an empty input. The engine is always waiting on its own for "cancel", and on
+# Windows a program that shares that input can't start until the wait ends, so no clip would finish.
+
+
 def probe(path: Path) -> Facts:
     output = subprocess.check_output(
         ["ffprobe", "-v", "error", "-print_format", "json", "-show_streams", "-show_format", str(path)],
-        text=True,
+        stdin=subprocess.DEVNULL,
+        # Windows would otherwise read it in its own code page, and a tag with an accent could stop the clip.
+        encoding="utf-8", errors="replace",
     )
     return parse_probe(json.loads(output))
 
@@ -90,7 +96,9 @@ def make_working_copy(
 ) -> Facts:
     """Cut the section and normalise it. Returns the facts of the copy, with the source's date."""
     original = probe(source)
-    subprocess.check_call(copy_command(source, target, start, length, original.fps))
+    subprocess.check_call(
+        copy_command(source, target, start, length, original.fps), stdin=subprocess.DEVNULL
+    )
     copy = probe(target)
     return Facts(
         width=copy.width,

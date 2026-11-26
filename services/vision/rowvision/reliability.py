@@ -41,7 +41,7 @@ class Calibration:
 
 def load_calibration(path: Path = CALIBRATION_FILE) -> Calibration:
     """Return the measured keypoint error, or the assumption if too few frames are labelled."""
-    data = yaml.safe_load(path.read_text())
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
     measured = data.get("keypoint_error_px")
     frames = data.get("labelled_frames", 0)
     if measured is None or frames < MIN_MEASURED_FRAMES:

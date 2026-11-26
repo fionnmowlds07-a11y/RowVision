@@ -38,7 +38,7 @@ test("models that are there are reported ready, with their size", async () => {
   const m = make();
   expect(m.snapshot().state).toBe("checking");
   await m.check();
-  expect(m.ready()).toBe(true);
+  expect(m.ready("accurate")).toBe(true);
   expect(m.snapshot()).toMatchObject({ state: "ready", totalBytes: TOTAL, downloadedBytes: TOTAL, message: null });
 });
 
@@ -46,8 +46,17 @@ test("models that are not there say how much there is to download", async () => 
   set("missing");
   const m = make();
   await m.check();
-  expect(m.ready()).toBe(false);
+  expect(m.ready("accurate")).toBe(false);
   expect(m.snapshot()).toMatchObject({ state: "missing", totalBytes: TOTAL, downloadedBytes: 0 });
+});
+
+test("with all but the more accurate model, only clips for the standard one can start", async () => {
+  set("standard");
+  const m = make();
+  await m.check();
+  expect(m.ready("standard")).toBe(true);
+  expect(m.ready("accurate")).toBe(false);
+  expect(m.snapshot()).toMatchObject({ state: "missing", standardReady: true });
 });
 
 test("without the engine there is nothing to download", async () => {
@@ -75,7 +84,7 @@ test("downloading shows progress that only goes forward, then is ready", async (
   expect(downloading.length).toBeGreaterThan(2);
   expect(downloading).toEqual([...downloading].sort((a, b) => a - b));
   expect(seen.at(-1)?.state).toBe("ready");
-  expect(m.ready()).toBe(true);
+  expect(m.ready("accurate")).toBe(true);
   expect(readFileSync(control, "utf8")).toBe("ready");
 });
 
@@ -127,5 +136,5 @@ test("a second download while one is running does nothing extra", async () => {
   await m.download();
   set("missing");
   await first;
-  expect(m.ready()).toBe(true);
+  expect(m.ready("accurate")).toBe(true);
 });

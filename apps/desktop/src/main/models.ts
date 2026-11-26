@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 import type { ModelsState } from "../shared/bridge";
+import type { PoseModel } from "../shared/pose-model";
 import { engineEnv } from "./analysis";
 
 export const COULDNT_GET = "We couldn't get the measuring models. Check your internet connection and try again.";
@@ -13,7 +14,7 @@ type Options = {
   onChange: (state: ModelsState) => void;
 };
 
-const START: ModelsState = { state: "checking", downloadedBytes: 0, totalBytes: 0, message: null };
+const START: ModelsState = { state: "checking", standardReady: false, downloadedBytes: 0, totalBytes: 0, message: null };
 
 /**
  * Knows whether the measuring models are on this computer, and fetches them. All of it goes through
@@ -30,8 +31,9 @@ export class Models {
     return this.current;
   }
 
-  ready(): boolean {
-    return this.current.state === "ready";
+  /** Whether the models a clip needs are here. Both need the standard ones. */
+  ready(model: PoseModel): boolean {
+    return this.current.state === "ready" || (model === "standard" && this.current.standardReady);
   }
 
   private set(next: Partial<ModelsState> & { state: ModelsState["state"] }): void {
@@ -53,7 +55,7 @@ export class Models {
   }
 
   /** Asks the engine what is on this computer, without changing what the app says. Null when it gave no answer. */
-  private async probe(): Promise<Pick<ModelsState, "state" | "downloadedBytes" | "totalBytes"> | "no_engine" | null> {
+  private async probe(): Promise<Pick<ModelsState, "state" | "standardReady" | "downloadedBytes" | "totalBytes"> | "no_engine" | null> {
     const started = this.run("status");
     if (!started) return "no_engine";
     const { child, lines } = started;
@@ -74,7 +76,8 @@ export class Models {
     if (!reply) return null;
     const total = typeof reply.total_bytes === "number" ? reply.total_bytes : 0;
     const needed = typeof reply.download_bytes === "number" ? reply.download_bytes : total;
-    return reply.ready === true ? { state: "ready", downloadedBytes: total, totalBytes: total } : { state: "missing", downloadedBytes: 0, totalBytes: needed };
+    if (reply.ready === true) return { state: "ready", standardReady: true, downloadedBytes: total, totalBytes: total };
+    return { state: "missing", standardReady: reply.standard_ready === true, downloadedBytes: 0, totalBytes: needed };
   }
 
   /** Asks the engine what is on this computer. */
@@ -123,7 +126,7 @@ export class Models {
     const found = await this.probe();
     if (this.quitting) return;
     if (found !== "no_engine" && found?.state === "ready") this.set(found);
-    else this.set({ state: "failed", message: failure ?? COULDNT_GET });
+    else this.set({ state: "failed", message: failure ?? COULDNT_GET, ...(found && found !== "no_engine" ? { standardReady: found.standardReady } : {}) });
   }
 
   /** Stops a download part way. What was fetched so far is thrown away by the engine. */

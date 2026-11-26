@@ -88,6 +88,7 @@ function asSetup(value: unknown): ClipSetup {
   if (typeof raw.seat === "number") setup.seat = raw.seat;
   if (raw.scope === "crew") setup.scope = "crew";
   if (raw.coach === true) setup.coach = true;
+  if (raw.model === "accurate" || raw.model === "standard") setup.model = raw.model;
   if (typeof raw.note === "string") setup.note = raw.note;
   if (typeof raw.filmed_at === "string") setup.filmed_at = raw.filmed_at;
   return setup;

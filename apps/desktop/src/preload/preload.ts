@@ -21,6 +21,7 @@ const bridge: Bridge = {
   },
   stopClip: (id: string) => ipcRenderer.invoke(CHANNELS.stopClip, id),
   startClip: (id: string) => ipcRenderer.invoke(CHANNELS.startClip, id),
+  analyseAccurately: (id: string) => ipcRenderer.invoke(CHANNELS.analyseAccurately, id),
   measureCrew: (id: string) => ipcRenderer.invoke(CHANNELS.measureCrew, id),
   exportPdf: (html: string, name: string) => ipcRenderer.invoke(CHANNELS.exportPdf, html, name),
   showReport: () => ipcRenderer.invoke(CHANNELS.showReport),
