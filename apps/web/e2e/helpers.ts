@@ -15,8 +15,14 @@ export function makeClip(name: string, seconds: number, size = "1920x1080"): str
   return path;
 }
 
-async function code(email: string): Promise<string> {
+async function code(page: Page, email: string): Promise<string> {
   for (let attempt = 0; attempt < 30; attempt += 1) {
+    // The same email can't be sent another code within a second, so a test that
+    // signs in straight after another with that email may have to ask again.
+    if (await page.getByText("Too many codes have been sent").isVisible()) {
+      await page.waitForTimeout(1000);
+      await page.getByRole("button", { name: "Send my code" }).click();
+    }
     const search = await (await fetch(`${MAIL}/api/v1/search?query=${encodeURIComponent(`to:${email} subject:"Your RowVision code"`)}`)).json();
     if (search.messages?.[0]) {
       const message = await (await fetch(`${MAIL}/api/v1/message/${search.messages[0].ID}`)).json();
@@ -32,7 +38,7 @@ export async function signIn(page: Page, email: string) {
   await page.goto("/sign-in");
   await page.getByLabel("Email").fill(email);
   await page.getByRole("button", { name: "Send my code" }).click();
-  await page.getByLabel("Code").fill(await code(email));
+  await page.getByLabel("Code").fill(await code(page, email));
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("heading", { name: "Your clips" })).toBeVisible();
 }
