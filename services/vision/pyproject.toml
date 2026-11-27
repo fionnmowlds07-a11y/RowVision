@@ -3,6 +3,7 @@ name = "rowvision"
 version = "0.1.0"
 description = "Rowing biomechanics analysis pipeline"
 requires-python = ">=3.12,<3.13"
+license = "GPL-3.0-or-later"
 dependencies = [
     "numpy>=2.0,<3",
     "opencv-python-headless>=4.10,<5",
@@ -15,7 +16,7 @@ dependencies = [
 dev = ["pytest>=8", "pytest-cov>=5", "hypothesis>=6", "ruff>=0.6", "mypy>=1.11", "types-PyYAML"]
 
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]

@@ -1,6 +1,6 @@
 # RowVision marketing site
 
-Static Vite site with eleven pages: the home page film (`index.html`), How it works, What it measures, Accuracy, Filming, Boats and crews, Reports, Privacy, Terms, Licences and Download.
+Static Vite site with twelve pages: the home page film (`index.html`), How it works, What it measures, Accuracy, Filming, Boats and crews, Reports, Privacy, Terms, Licences, Code signing policy and Download.
 
 Every page shares one header and footer, kept in `partials/` and written into the HTML by a small plugin in `vite.config.js`, so each page is whole without script. Home, How it works, Reports and Download sit in the header, and every other page is under More. To add a page, add its name to `PAGES` there and link it from `partials/nav.html` and `partials/foot.html`.
 

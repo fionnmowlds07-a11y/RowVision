@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig, loadEnv } from 'vite';
 
-const PAGES = ['index', 'how', 'measures', 'accuracy', 'filming', 'boats', 'reports', 'privacy', 'terms', 'licences', 'download'];
+const PAGES = ['index', 'how', 'measures', 'accuracy', 'filming', 'boats', 'reports', 'privacy', 'terms', 'licences', 'code-signing', 'download'];
 const SITE = 'https://rowvision.app';
 // The address Google should keep for each page: the bare domain, with no .html, as Cloudflare serves it.
 const address = page => `${SITE}/${page === 'index' ? '' : page}`;
