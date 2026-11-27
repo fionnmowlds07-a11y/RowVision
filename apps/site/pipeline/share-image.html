@@ -1,7 +1,8 @@
 <!doctype html>
-<!-- The picture shown when a rowvision.app link is shared. Remake public/share.png with:
-     chromium --headless --disable-gpu --hide-scrollbars --window-size=1200,630 --screenshot=public/share.png pipeline/share-image.html
-     It has no footage in it, so it can live in git. -->
+<!-- The picture shown when a rowvision.app link is shared. Remake it with:
+     chromium --headless --disable-gpu --hide-scrollbars --window-size=1200,630 --screenshot=/tmp/share.png pipeline/share-image.html
+     then upload it to the R2 bucket as media/share.png (served at downloads.rowvision.app/media/share.png).
+     Pictures stay out of git, which the footage check enforces. -->
 <html><head><meta charset="utf-8"><style>
 @font-face { font-family: Bricolage; src: url('../node_modules/@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-wght-normal.woff2'); font-weight: 200 800; }
 @font-face { font-family: 'DM Sans'; src: url('../node_modules/@fontsource-variable/dm-sans/files/dm-sans-latin-wght-normal.woff2'); font-weight: 100 1000; }
