@@ -14,6 +14,13 @@ export type TargetChoices = Record<TargetName, TargetChoice>;
 
 /** A range can be this wide at most, so a score still tells good from very good. */
 export const MAX_WIDTH = 5;
+/** Finish layback varies more between good rowers: Olympic champions sit well past -25 (issue 269). */
+const WIDER: Partial<Record<TargetName, number>> = { finish_lean_deg: 10 };
+
+/** How wide this measure's range may be. */
+export function maxWidth(name: TargetName): number {
+  return WIDER[name] ?? MAX_WIDTH;
+}
 /** A body angle loses all its points this far outside the range, as in the engine. */
 const FALLOFF_DEG = 10;
 /** The engine does not score a measure that varies more than this from stroke to stroke. */
@@ -31,7 +38,7 @@ export const TARGET_METRICS: { name: TargetName; label: string; help: string; ph
 /** Knees and shins are shown as a rough guide until the athlete chooses to count them. */
 export const GENERAL_TARGETS: TargetChoices = {
   catch_lean_deg: { low: 26, high: 31, counts: true },
-  finish_lean_deg: { low: -25, high: -20, counts: true },
+  finish_lean_deg: { low: -30, high: -20, counts: true },
   catch_knee_deg: { low: 50, high: 55, counts: false },
   catch_shin_deg: { low: -2, high: 2, counts: false },
   finish_knee_deg: { low: 167, high: 172, counts: false },
@@ -47,7 +54,8 @@ export function rangeProblem(name: TargetName, low: number, high: number): strin
   if (!metric || !Number.isFinite(low) || !Number.isFinite(high)) return "Type a number.";
   if (low < metric.min || high > metric.max) return `Keep it between ${metric.min}° and ${metric.max}°.`;
   if (high <= low) return "The top must be above the bottom.";
-  if (high - low > MAX_WIDTH) return `Wider than ${MAX_WIDTH}° makes scores too easy. Narrow it to ${MAX_WIDTH}° or less.`;
+  const widest = maxWidth(name);
+  if (high - low > widest) return `Wider than ${widest}° makes scores too easy. Narrow it to ${widest}° or less.`;
   return null;
 }
 

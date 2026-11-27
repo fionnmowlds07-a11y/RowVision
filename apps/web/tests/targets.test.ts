@@ -100,6 +100,8 @@ describe("checks on a range", () => {
     expect(rangeProblem("catch_lean_deg", 31, 26)).toMatch(/above/);
     expect(rangeProblem("catch_lean_deg", -3, 2)).toMatch(/between/);
     expect(rangeProblem("catch_lean_deg", Number.NaN, 2)).toMatch(/number/);
+    expect(rangeProblem("finish_lean_deg", -30, -20)).toBeNull();
+    expect(rangeProblem("finish_lean_deg", -31, -20)).toMatch(/10°/);
   });
 
   it("cleans saved choices, and drops them if any is wrong", () => {

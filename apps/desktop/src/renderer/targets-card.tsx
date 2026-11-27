@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 import {
-  GENERAL_TARGETS, MAX_WIDTH, TARGET_METRICS, overallProblem, rangeProblem, sameChoices,
+  GENERAL_TARGETS, MAX_WIDTH, TARGET_METRICS, maxWidth, overallProblem, rangeProblem, sameChoices,
   type TargetChoices, type TargetName,
 } from "@/lib/targets";
 import type { ClipItem } from "../shared/bridge";
@@ -81,9 +81,9 @@ export function TargetsCard() {
       low = Math.min(Math.max(now.low + by, min), max - (now.high - now.low));
       high = low + (now.high - now.low);
     } else if (now.mode === "low") {
-      low = Math.min(Math.max(Math.round(at), min, high - MAX_WIDTH), high - 1);
+      low = Math.min(Math.max(Math.round(at), min, high - maxWidth(name)), high - 1);
     } else {
-      high = Math.max(Math.min(Math.round(at), max, low + MAX_WIDTH), low + 1);
+      high = Math.max(Math.min(Math.round(at), max, low + maxWidth(name)), low + 1);
     }
     setChoices({ ...choices, [name]: { ...choices[name], low, high } });
     setTyped((all) => ({ ...all, [`${name}-low`]: String(low), [`${name}-high`]: String(high) }));
@@ -153,7 +153,7 @@ export function TargetsCard() {
         <h2 id="targets-title" style={{ fontSize: 19 }}>Technique targets</h2>
         <span className={`${styles.pill} ${changed ? styles.mine : ""}`}>{changed ? "Your own setup" : "General standard"}</span>
       </div>
-      <p className="soft">Choose which measures count towards the score, and the range for each. Drag a bar or type the numbers. A range can be {MAX_WIDTH}° wide at most. These ranges are provisional: a coach has not reviewed them.</p>
+      <p className="soft">Choose which measures count towards the score, and the range for each. Drag a bar or type the numbers. A range can be {MAX_WIDTH}° wide at most, or {maxWidth("finish_lean_deg")}° for the finish body angle. These ranges are provisional: a coach has not reviewed them.</p>
       <div className={styles.legend}>
         <span><i style={{ background: "var(--link)" }} />Your range</span>
         <span><i style={{ border: "2px dashed var(--ink)", opacity: 0.6 }} />General standard</span>
