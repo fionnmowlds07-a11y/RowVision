@@ -48,5 +48,6 @@
     "esbuild@0.28.2": true
   },
   "author": "RowVision",
+  "license": "GPL-3.0-or-later",
   "homepage": "https://github.com/fionnmowlds07-a11y/RowVision"
 }

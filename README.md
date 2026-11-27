@@ -273,4 +273,4 @@ The web app, database and worker are covered in the [runbook](docs/runbook.md), 
 
 ## Licence
 
-Copyright © 2026 Fionn Mowlds. All rights reserved. The source is public so that it can be read and reviewed. It is not licensed for reuse, copying or redistribution.
+Copyright © 2026 Fionn Mowlds. RowVision is free software under the [GNU General Public License, version 3 or later](LICENSE). You may copy, change and share it under that licence; any copy you hand out must come with its source under the same licence. The measuring models are downloaded separately and keep their own licences (see the site's [licences page](https://rowvision.app/licences.html)).
